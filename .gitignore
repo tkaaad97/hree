@@ -1,0 +1,10 @@
+.stack/
+.stack-work/
+*.cabal
+*~
+*.swp
+docker-compose.override.yml
+.nvimrc
+.vimrc
+.stylish-haskell.yaml
+.vscode
