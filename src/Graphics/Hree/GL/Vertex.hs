@@ -1,10 +1,31 @@
-module Vertex
+{-# LANGUAGE OverloadedStrings #-}
+module Graphics.Hree.GL.Vertex
     ( BasicVertex(..)
+    , Vertex(..)
+    , VertexField(..)
+    , VertexSpec(..)
     ) where
 
+import Data.ByteString (ByteString)
+import Data.Proxy (Proxy)
 import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
+import Graphics.Hree.GL.Types
 import Graphics.Hree.Math
+import qualified Graphics.Rendering.OpenGL as GL
+
+data VertexField = VertexField
+    { vertexFieldAttribName        :: !ByteString
+    , vertexFieldAttribFormat      :: !AttribFormat
+    , vertexFieldBindBufferSetting :: !BindBufferSetting
+    } deriving (Show, Eq)
+
+newtype VertexSpec = VertexSpec
+    { unVertexSpec :: [VertexField]
+    } deriving (Show, Eq)
+
+class Storable a => Vertex a where
+    vertexSpec :: Proxy a -> VertexSpec
 
 data BasicVertex = BasicVertex
     { bvPosition :: !Vec3
@@ -45,3 +66,18 @@ uvOffset = alignOffset (undefined :: Vec2) normalOffset
 
 colorOffset :: Int
 colorOffset = alignOffset (undefined :: ColorW8) uvOffset
+
+instance Vertex BasicVertex where
+    vertexSpec _ = VertexSpec
+        [ positionField
+        , normalField
+        , uvField
+        , colorField
+        ]
+
+        where
+        bbs = BindBufferSetting 0 (sizeOf (undefined :: BasicVertex))
+        positionField = VertexField "position" (AttribFormat 3 GL.Float positionOffset) bbs
+        normalField = VertexField "position" (AttribFormat 3 GL.Float normalOffset) bbs
+        uvField = VertexField "uv" (AttribFormat 2 GL.Float uvOffset) bbs
+        colorField = VertexField "color" (AttribFormat 3 GL.UnsignedByte colorOffset) bbs

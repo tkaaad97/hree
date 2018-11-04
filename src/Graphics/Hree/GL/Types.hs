@@ -3,52 +3,72 @@
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeOperators             #-}
 module Graphics.Hree.GL.Types
-    (
+    ( AttribBinding(..)
+    , AttribFormat(..)
+    , AttribInfo(..)
+    , BindingIndex
+    , BufferSource(..)
+    , BindBufferSetting(..)
     ) where
 
+import Data.ByteString (ByteString)
 import Data.Map.Strict (Map)
 import Data.Proxy (Proxy(..))
-import Data.Text (Text)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import Data.Word (Word8)
+import Foreign.Ptr (Ptr)
+import Foreign.Storable (Storable)
 import qualified Graphics.Rendering.OpenGL as GL
 
 data Uniform = forall a. (GL.Uniform a, Show a) => Uniform !a
 deriving instance Show Uniform
 
-data UniformInfo = UniformInfo !GL.UniformLocation !Uniform
+data UniformInfo = UniformInfo
+    { uiUniformName     :: !ByteString
+    , uiUniformLocation :: !GL.UniformLocation
+    }
     deriving (Show)
 
-data AttribInfo = AttribInfo
-    { aiAttribLocation  :: !GL.AttribLocation
-    , aiDataType        :: !GL.DataType
-    , aiNumArrayIndices :: !Int
-    , aiIntegerHandling :: !GL.IntegerHandling
-    , aiStride          :: !Int
-    , aiOffset          :: !Int
+data AttribFormat = AttribFormat
+    { attribFormatSize           :: !Int
+    , attribFormatDataType       :: !GL.DataType
+    , attribFormatRelativeOffset :: !Int
     } deriving (Show, Eq)
 
-data ProgramInfo = ProgramInfo !GL.Program ![AttribInfo] ![GL.UniformLocation]
+data AttribInfo = AttribInfo
+    { aiAttribName     :: !ByteString
+    , aiAttribLocation :: !GL.AttribLocation
+    , aiAttribFormat   :: !AttribFormat
+    } deriving (Show, Eq)
+
+data ProgramInfo = ProgramInfo !GL.Program !(Map ByteString AttribInfo) !(Map ByteString UniformInfo)
     deriving (Show)
 
 data RenderInfo = RenderInfo
-    { riProgram      :: !ProgramInfo
-    , riMode         :: !GL.PrimitiveMode
-    , riVertexBuffer :: !GL.BufferObject
-    , riIndex        :: !GL.ArrayIndex
-    , riNum          :: !GL.NumArrayIndices
-    , riUniformInfos :: ![UniformInfo]
-    , riTexture      :: !GL.TextureObject
+    { riProgram     :: !ProgramInfo
+    , riDrawMethod  :: !DrawMethod
+    , riVertexArray :: !GL.VertexArrayObject
+    , riUniforms    :: ![(UniformInfo, Uniform)]
+    , riTexture     :: !GL.TextureObject
     }
 
-data RenderProgramInfos = RenderProgramInfos
-    { rpiTriangleProgramInfo :: !ProgramInfo
-    , rpiArcProgramInfo      :: !ProgramInfo
-    , rpiLineProgramInfo     :: !ProgramInfo
-    } deriving (Show)
+data DrawMethod =
+    DrawArrays !GL.PrimitiveMode !GL.ArrayIndex !GL.NumArrayIndices |
+    DrawElements !GL.PrimitiveMode !GL.NumArrayIndices !GL.DataType !(Ptr GL.NumArrayIndices)
+    deriving (Show, Eq)
 
-data RenderResource = RenderResource
-    { rrRenderProgramInfos :: !RenderProgramInfos
-    , rrTextures           :: !(Map Text GL.TextureObject)
-    } deriving (Show)
+data BufferSource = forall a. Storable a => BufferSource !(Vector a) !GL.BufferUsage
+
+type BindingIndex = Int
+
+data BindBufferSetting = BindBufferSetting
+    { bindBufferSettingOffset :: !Int
+    , bindBufferSettingStride :: !Int
+    } deriving (Show, Eq)
+
+data AttribBinding = AttribBinding
+    { attribBindingIndex         :: !Int
+    , attribBindingAttribName    :: !ByteString
+    , attribBindingBufferSetting :: !BindBufferSetting
+    } deriving (Show, Eq)
