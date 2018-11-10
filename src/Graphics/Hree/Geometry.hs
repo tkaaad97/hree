@@ -24,10 +24,10 @@ data Geometry = Geometry
     , geometryCount          :: !Int
     }
 
-addAttribBindings :: Geometry -> Int -> Map ByteString BindBufferSetting -> BufferSource -> Geometry
+addAttribBindings :: Geometry -> Int -> Map ByteString (AttribInfo, BindBufferSetting) -> BufferSource -> Geometry
 addAttribBindings geo bindingIndex settings bufferSource = geo'
     where
-    xs = Map.mapWithKey (AttribBinding bindingIndex) settings
+    xs = Map.map (uncurry $ AttribBinding bindingIndex) settings
     attribBindings = Map.union (geometryAttribBindings geo) xs
     sources = IntMap.insert bindingIndex bufferSource (geometryBufferSources geo)
     geo' = geo { geometryAttribBindings = attribBindings, geometryBufferSources = sources }
@@ -39,5 +39,5 @@ fromVertexVector index bindingIndex storage usage = Geometry index attribBinding
     VertexSpec fields = vertexSpec (Proxy :: Proxy a)
     keys = map vertexFieldAttribName fields
     bindings = map toAttribBinding fields
-    toAttribBinding (VertexField name _ setting) = AttribBinding bindingIndex name setting
+    toAttribBinding (VertexField name format setting) = AttribBinding bindingIndex (AttribInfo name format) setting
     attribBindings = Map.fromList $ zip keys bindings

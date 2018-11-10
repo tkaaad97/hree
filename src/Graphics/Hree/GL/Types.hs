@@ -33,13 +33,13 @@ data UniformInfo = UniformInfo
 data AttribFormat = AttribFormat
     { attribFormatSize           :: !Int
     , attribFormatDataType       :: !GL.DataType
+    , attribFormatNormalized     :: !Bool
     , attribFormatRelativeOffset :: !Int
     } deriving (Show, Eq)
 
 data AttribInfo = AttribInfo
-    { aiAttribName     :: !ByteString
-    , aiAttribLocation :: !GL.AttribLocation
-    , aiAttribFormat   :: !AttribFormat
+    { aiAttribName   :: !ByteString
+    , aiAttribFormat :: !AttribFormat
     } deriving (Show, Eq)
 
 data ProgramInfo = ProgramInfo !GL.Program !(Map ByteString AttribInfo) !(Map ByteString UniformInfo)
@@ -69,6 +69,6 @@ data BindBufferSetting = BindBufferSetting
 
 data AttribBinding = AttribBinding
     { attribBindingIndex         :: !Int
-    , attribBindingAttribName    :: !ByteString
+    , attribBindingAttribInfo    :: !AttribInfo
     , attribBindingBufferSetting :: !BindBufferSetting
     } deriving (Show, Eq)

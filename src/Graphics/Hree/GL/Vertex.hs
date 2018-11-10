@@ -77,7 +77,7 @@ instance Vertex BasicVertex where
 
         where
         bbs = BindBufferSetting 0 (sizeOf (undefined :: BasicVertex))
-        positionField = VertexField "position" (AttribFormat 3 GL.Float positionOffset) bbs
-        normalField = VertexField "position" (AttribFormat 3 GL.Float normalOffset) bbs
-        uvField = VertexField "uv" (AttribFormat 2 GL.Float uvOffset) bbs
-        colorField = VertexField "color" (AttribFormat 3 GL.UnsignedByte colorOffset) bbs
+        positionField = VertexField "position" (AttribFormat 3 GL.Float False positionOffset) bbs
+        normalField = VertexField "position" (AttribFormat 3 GL.Float False normalOffset) bbs
+        uvField = VertexField "uv" (AttribFormat 2 GL.Float False uvOffset) bbs
+        colorField = VertexField "color" (AttribFormat 3 GL.UnsignedByte False colorOffset) bbs
