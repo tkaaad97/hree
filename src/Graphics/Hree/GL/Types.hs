@@ -9,6 +9,7 @@ module Graphics.Hree.GL.Types
     , BindingIndex
     , BufferSource(..)
     , BindBufferSetting(..)
+    , Uniform(..)
     ) where
 
 import Data.ByteString (ByteString)
