@@ -47,6 +47,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - hree
+    - GLFW-b
 
 tests:
   hree-test:

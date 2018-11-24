@@ -4,6 +4,8 @@ module Graphics.Hree.Program
     ( VertexShaderSpec(..)
     , FragmentShaderSpec(..)
     , ProgramSpec(..)
+    , mkProgram
+    , resolveProgramSpec
     ) where
 
 import Control.Exception (throwIO)
@@ -11,6 +13,7 @@ import Control.Monad (unless)
 import Data.ByteString (ByteString)
 import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
+import Graphics.Hree.Mesh
 import qualified Graphics.Rendering.OpenGL as GL
 import System.IO.Error (userError)
 
@@ -75,3 +78,6 @@ checkStatus getStatus getInfoLog message object = do
     unless ok $ do
         log' <- GL.get . getInfoLog $ object
         throwIO . userError $ message ++ ": " ++ log'
+
+resolveProgramSpec :: Mesh -> ProgramSpec
+resolveProgramSpec _ = ProgramSpec VertexShaderSpec FragmentShaderSpec
