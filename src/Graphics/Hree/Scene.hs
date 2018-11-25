@@ -12,6 +12,7 @@ import Data.IORef (IORef, atomicModifyIORef', readIORef)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Traversable as Traversable (mapM)
+import qualified Foreign (with)
 import Graphics.Hree.Geometry
 import Graphics.Hree.GL
 import Graphics.Hree.GL.Types
@@ -24,6 +25,7 @@ data MeshInfo = MeshInfo
     , meshInfoMesh        :: !Mesh
     , meshInfoBuffers     :: ![GL.BufferObject]
     , meshInfoVertexArray :: !GL.VertexArrayObject
+    , meshInfoProgram     :: !GL.Program
     }
 
 data Scene = Scene
@@ -40,7 +42,7 @@ addMesh scene mesh = do
     let bs' = maybe (IntMap.elems bs) (: IntMap.elems bs) maybeIndexBuffer
     program <- mkProgramIfNotExists scene pspec
     vao <- mkVertexArray (geometryAttribBindings geo) bs maybeIndexBuffer program
-    let minfo = MeshInfo i mesh bs' vao
+    let minfo = MeshInfo i mesh bs' vao program
     insertMeshInfo i minfo
     return i
     where
@@ -57,7 +59,9 @@ removeMesh :: Scene -> Int -> IO ()
 removeMesh scene i = do
     minfo <- atomicModifyIORef' meshesRef del
     case minfo of
-        Just (MeshInfo _ _ bs) -> GL.deleteObjectNames bs
+        Just (MeshInfo _ _ bs vao _) -> do
+            GL.deleteObjectNames bs
+            Foreign.with (unsafeCoerce vao) (GLRaw.glDeleteVertexArrays 1)
         Nothing                -> return ()
     where
     meshesRef = sceneMeshs scene
