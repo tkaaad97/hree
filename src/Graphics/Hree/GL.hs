@@ -18,6 +18,24 @@ import qualified Graphics.Rendering.OpenGL as GL
 import System.IO.Error (userError)
 import Unsafe.Coerce (unsafeCoerce)
 
+render :: Maybe GL.Program -> RenderInfo -> IO (Maybe GL.Program)
+render cur a = do
+    setCurrentProgram cur program
+    GL.bindVertexArrayObject GL.$= Just (riVertexArray a)
+    bindUniforms uniforms
+    drawWith method
+    return . Just $ program
+    where
+    program = programInfoProgram . riProgram $ a
+    method = riDrawMethod a
+    uniforms = riUniforms a
+    setCurrentProgram (Just p0) p1 | p0 == p1 = return ()
+    setCurrentProgram _ p          = GL.currentProgram GL.$= Just p
+
+drawWith :: DrawMethod -> IO ()
+drawWith (DrawArrays mode index num) = GL.drawArrays mode index num
+drawWith (DrawElements mode num dataType indicesOffset) = GL.drawElements mode num dataType indicesOffset
+
 mkBuffer :: GL.BufferTarget -> BufferSource -> IO GL.BufferObject
 mkBuffer target (BufferSource vec usage) = do
     let n = V.length vec

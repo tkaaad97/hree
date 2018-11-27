@@ -13,6 +13,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Traversable as Traversable (mapM)
 import qualified Foreign (with)
+import Graphics.Hree.Camera
 import Graphics.Hree.Geometry
 import Graphics.Hree.GL
 import Graphics.Hree.GL.Types
@@ -25,14 +26,22 @@ data MeshInfo = MeshInfo
     , meshInfoMesh        :: !Mesh
     , meshInfoBuffers     :: ![GL.BufferObject]
     , meshInfoVertexArray :: !GL.VertexArrayObject
-    , meshInfoProgram     :: !GL.Program
+    , meshInfoProgram     :: !ProgramInfo
     }
 
 data Scene = Scene
     { sceneMeshCounter :: !(IORef Int)
     , sceneMeshs       :: !(IORef (IntMap MeshInfo))
-    , scenePrograms    :: !(IORef (Map ProgramSpec GL.Program))
+    , scenePrograms    :: !(IORef (Map ProgramSpec ProgramInfo))
     }
+
+renderScene :: Scene -> Camera -> IO ()
+renderScene scene camera = do
+    projectionViewMatrix <- getCameraMatrix camera
+    GL.clearColor GL.$= GL.Color4 1 1 1 1
+    GL.clear [GL.ColorBuffer]
+    meshs <- readIORef (sceneMeshs scene)
+    mapM_ renderMesh meshs
 
 addMesh :: Scene -> Mesh -> IO Int
 addMesh scene mesh = do
@@ -62,7 +71,7 @@ removeMesh scene i = do
         Just (MeshInfo _ _ bs vao _) -> do
             GL.deleteObjectNames bs
             Foreign.with (unsafeCoerce vao) (GLRaw.glDeleteVertexArrays 1)
-        Nothing                -> return ()
+        Nothing -> return ()
     where
     meshesRef = sceneMeshs scene
     del a =

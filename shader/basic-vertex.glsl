@@ -10,12 +10,12 @@ out vec3 fragmentNormal;
 out vec2 fragmentUv;
 out vec4 fragmentColor;
 
-uniform mat4 projectionMatrix;
-uniform mat4 modelViewMatrix;
+uniform mat4 projectionViewMatrix;
+uniform mat4 modelMatrix;
 
 void main()
 {
-    fragmentPosition = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    fragmentPosition = projectionViewMatrix * modelMatrix * vec4(position, 1.0);
     fragmentNormal = normal;
     fragmentUv = uv;
     fragmentColor = color;

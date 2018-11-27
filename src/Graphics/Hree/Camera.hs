@@ -51,6 +51,9 @@ perspective = Perspective
 orthographic :: Float -> Float -> Float -> Float -> Float -> Float -> Projection
 orthographic = Orthographic
 
+lookAt :: V3 Float -> V3 Float -> V3 Float -> LookAt
+lookAt = LookAt
+
 newCamera :: Projection -> LookAt -> IO Camera
 newCamera p l = Camera <$> newIORef (CameraState p l Linear.identity True)
 

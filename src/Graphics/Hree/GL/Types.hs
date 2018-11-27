@@ -9,6 +9,9 @@ module Graphics.Hree.GL.Types
     , BindingIndex
     , BufferSource(..)
     , BindBufferSetting(..)
+    , DrawMethod(..)
+    , ProgramInfo(..)
+    , RenderInfo(..)
     , Uniform(..)
     ) where
 
@@ -43,8 +46,11 @@ data AttribInfo = AttribInfo
     , aiAttribFormat :: !AttribFormat
     } deriving (Show, Eq)
 
-data ProgramInfo = ProgramInfo !GL.Program !(Map ByteString AttribInfo) !(Map ByteString UniformInfo)
-    deriving (Show)
+data ProgramInfo = ProgramInfo
+    { programInfoProgram  :: !GL.Program
+    , programInfoAttribs  :: !(Map ByteString AttribInfo)
+    , programInfoUniforms :: !(Map ByteString UniformInfo)
+    } deriving (Show)
 
 data RenderInfo = RenderInfo
     { riProgram     :: !ProgramInfo
