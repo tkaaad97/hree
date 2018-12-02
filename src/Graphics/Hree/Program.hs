@@ -5,28 +5,35 @@ module Graphics.Hree.Program
     , FragmentShaderSpec(..)
     , ProgramSpec(..)
     , mkProgram
-    , resolveProgramSpec
     ) where
 
 import Control.Exception (throwIO)
 import Control.Monad (unless)
+import Control.Monad.IO.Class (MonadIO)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as ByteString (pack)
 import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
-import Graphics.Hree.Mesh
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Foreign (Ptr, alloca, allocaArray, peek)
+import Foreign.C.String (peekCStringLen)
+import qualified Graphics.GL as GLRaw
+import Graphics.Hree.GL.Types
 import qualified Graphics.Rendering.OpenGL as GL
 import System.IO.Error (userError)
+import Unsafe.Coerce (unsafeCoerce)
 
 data VertexShaderSpec = VertexShaderSpec
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 data FragmentShaderSpec = FragmentShaderSpec
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 data ProgramSpec = ProgramSpec
     { vertexShaderSpec   :: !VertexShaderSpec
     , fragmentShaderSpec :: !FragmentShaderSpec
-    } deriving (Show, Eq)
+    } deriving (Show, Eq, Ord)
 
 instance Hashable VertexShaderSpec where
     hash _ = 0
@@ -39,7 +46,7 @@ instance Hashable FragmentShaderSpec where
 instance Hashable ProgramSpec where
     hashWithSalt s (ProgramSpec a b) = s `hashWithSalt` a `hashWithSalt` b
 
-mkProgram :: ProgramSpec -> IO GL.Program
+mkProgram :: ProgramSpec -> IO ProgramInfo
 mkProgram (ProgramSpec vspec fspec) = do
     vshader <- mkVertexShader vspec
     fshader <- mkFragmentShader fspec
@@ -47,7 +54,14 @@ mkProgram (ProgramSpec vspec fspec) = do
     mapM_ (GL.attachShader program) [vshader, fshader]
     GL.linkProgram program
     checkStatus GL.linkStatus GL.programInfoLog "program link error" program
-    return program
+
+    attribs <- getActiveAttribs (unsafeCoerce program)
+    uniforms <- getActiveUniforms (unsafeCoerce program)
+
+    let attribMap = Map.fromList $ zip (map aiAttribName attribs) attribs
+        uniformMap = Map.fromList $ zip (map uiUniformName uniforms) uniforms
+
+    return $ ProgramInfo program attribMap uniformMap
 
 mkVertexShader :: VertexShaderSpec -> IO GL.Shader
 mkVertexShader _ = mkShader "vertexShader" GL.VertexShader shaderSource
@@ -79,5 +93,32 @@ checkStatus getStatus getInfoLog message object = do
         log' <- GL.get . getInfoLog $ object
         throwIO . userError $ message ++ ": " ++ log'
 
-resolveProgramSpec :: Mesh -> ProgramSpec
-resolveProgramSpec _ = ProgramSpec VertexShaderSpec FragmentShaderSpec
+getActiveAttribs :: GL.GLuint -> IO [AttribInfo]
+getActiveAttribs = getActivePorts AttribInfo GLRaw.GL_ACTIVE_ATTRIBUTES GLRaw.glGetActiveAttrib
+
+getActiveUniforms :: GL.GLuint -> IO [UniformInfo]
+getActiveUniforms = getActivePorts UniformInfo GLRaw.GL_ACTIVE_UNIFORMS GLRaw.glGetActiveUniform
+
+getActivePorts ::
+    (ByteString -> GLRaw.GLuint -> GLRaw.GLuint -> GL.GLuint -> a)
+    -> GLRaw.GLenum
+    -> (GLRaw.GLuint -> GLRaw.GLuint -> GLRaw.GLsizei -> Ptr GLRaw.GLsizei -> Ptr GLRaw.GLint -> Ptr GLRaw.GLenum -> Ptr GLRaw.GLchar -> IO ())
+    -> GL.GLuint
+    -> IO [a]
+getActivePorts construct pname f program = do
+    num  <- alloca $ \p -> GLRaw.glGetProgramiv program pname p >> peek p
+    mapM g [0..(fromIntegral num - 1)]
+
+    where
+    maxNameBytes = 64
+    g i =
+        alloca $ \lp ->
+            alloca $ \sp ->
+                alloca $ \tp ->
+                    allocaArray maxNameBytes $ \np -> do
+                        f program i (fromIntegral maxNameBytes) lp sp tp np
+                        length <- peek lp
+                        size <- peek sp
+                        dataType <- peek tp
+                        name <- ByteString.pack <$> peekCStringLen (np, fromIntegral length)
+                        return $ construct name i (fromIntegral size) dataType

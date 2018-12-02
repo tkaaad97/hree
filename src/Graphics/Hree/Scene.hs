@@ -13,6 +13,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Traversable as Traversable (mapM)
 import qualified Foreign (with)
+import qualified Graphics.GL as GLRaw
 import Graphics.Hree.Camera
 import Graphics.Hree.Geometry
 import Graphics.Hree.GL
@@ -20,6 +21,7 @@ import Graphics.Hree.GL.Types
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
 import qualified Graphics.Rendering.OpenGL as GL
+import Unsafe.Coerce (unsafeCoerce)
 
 data MeshInfo = MeshInfo
     { mishInfoId          :: !Int
@@ -43,11 +45,13 @@ renderScene scene camera = do
     meshs <- readIORef (sceneMeshs scene)
     mapM_ renderMesh meshs
 
+renderMesh = undefined
+
 addMesh :: Scene -> Mesh -> IO Int
 addMesh scene mesh = do
     i <- genMeshId
     bs <- Traversable.mapM (mkBuffer GL.ArrayBuffer) bufferSources
-    maybIndexBuffer <- mkBuffer GL.ElementArrayBuffer . uncurry BufferSource <$> indexBufferSource
+    maybeIndexBuffer <- maybe (return Nothing) (fmap Just . mkBuffer GL.ElementArrayBuffer . uncurry BufferSource) indexBufferSource
     let bs' = maybe (IntMap.elems bs) (: IntMap.elems bs) maybeIndexBuffer
     program <- mkProgramIfNotExists scene pspec
     vao <- mkVertexArray (geometryAttribBindings geo) bs maybeIndexBuffer program
@@ -80,7 +84,7 @@ removeMesh scene i = do
 
 --setBackground
 
-mkProgramIfNotExists :: Scene -> ProgramSpec -> IO GL.Program
+mkProgramIfNotExists :: Scene -> ProgramSpec -> IO ProgramInfo
 mkProgramIfNotExists scene pspec = do
     programs <- readIORef programsRef
     let maybeProgram = Map.lookup pspec programs
@@ -88,10 +92,10 @@ mkProgramIfNotExists scene pspec = do
     where
     programsRef = scenePrograms scene
 
-mkProgramAndInsert :: IORef (Map ProgramSpec GL.Program) -> ProgramSpec -> IO GL.Program
+mkProgramAndInsert :: IORef (Map ProgramSpec ProgramInfo) -> ProgramSpec -> IO ProgramInfo
 mkProgramAndInsert programsRef pspec = do
     program <- mkProgram pspec
-    atomicModifyIORef' programsRef (Map.insert pspec program)
+    atomicModifyIORef' programsRef (\a -> (Map.insert pspec program a, ()))
     return program
 
 deleteScene :: Scene -> IO ()

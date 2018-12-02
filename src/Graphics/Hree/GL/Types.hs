@@ -13,6 +13,7 @@ module Graphics.Hree.GL.Types
     , ProgramInfo(..)
     , RenderInfo(..)
     , Uniform(..)
+    , UniformInfo(..)
     ) where
 
 import Data.ByteString (ByteString)
@@ -23,6 +24,7 @@ import qualified Data.Vector.Storable as Vector
 import Data.Word (Word8)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable)
+import qualified Graphics.GL as GLRaw
 import qualified Graphics.Rendering.OpenGL as GL
 
 data Uniform = forall a. (GL.Uniform a, Show a) => Uniform !a
@@ -30,20 +32,24 @@ deriving instance Show Uniform
 
 data UniformInfo = UniformInfo
     { uiUniformName     :: !ByteString
-    , uiUniformLocation :: !GL.UniformLocation
+    , uiUniformLocation :: !GLRaw.GLuint
+    , uiUniformSize     :: !GLRaw.GLuint
+    , uiUniformDataType :: !GLRaw.GLuint
     }
     deriving (Show)
 
 data AttribFormat = AttribFormat
     { attribFormatSize           :: !Int
-    , attribFormatDataType       :: !GL.DataType
+    , attribFormatDataType       :: !GLRaw.GLuint
     , attribFormatNormalized     :: !Bool
     , attribFormatRelativeOffset :: !Int
     } deriving (Show, Eq)
 
 data AttribInfo = AttribInfo
-    { aiAttribName   :: !ByteString
-    , aiAttribFormat :: !AttribFormat
+    { aiAttribName     :: !ByteString
+    , aiAttribLocation :: !GLRaw.GLuint
+    , aiAttribSize     :: !GLRaw.GLuint
+    , aiAttribDataType :: !GLRaw.GLuint
     } deriving (Show, Eq)
 
 data ProgramInfo = ProgramInfo
@@ -76,6 +82,6 @@ data BindBufferSetting = BindBufferSetting
 
 data AttribBinding = AttribBinding
     { attribBindingIndex         :: !Int
-    , attribBindingAttribInfo    :: !AttribInfo
+    , attribBindingAttribFormat  :: !AttribFormat
     , attribBindingBufferSetting :: !BindBufferSetting
     } deriving (Show, Eq)

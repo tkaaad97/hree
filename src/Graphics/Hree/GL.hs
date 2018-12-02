@@ -46,23 +46,26 @@ mkBuffer target (BufferSource vec usage) = do
     GL.bindBuffer target GL.$= Nothing
     return buffer
 
-mkVertexArray :: Map ByteString AttribBinding -> IntMap GL.BufferObject -> Maybe GL.BufferObject -> GL.Program -> IO GL.VertexArrayObject
-mkVertexArray attribBindings buffers indexBuffer program =
+mkVertexArray :: Map ByteString AttribBinding -> IntMap GL.BufferObject -> Maybe GL.BufferObject -> ProgramInfo -> IO GL.VertexArrayObject
+mkVertexArray attribBindings buffers indexBuffer programInfo =
     Foreign.alloca $ \p -> do
         GLRaw.glCreateVertexArrays 1 p
         vaoRaw <- Foreign.peek p
         let vao = unsafeCoerce vaoRaw
         setIndexBuffer vaoRaw (unsafeCoerce indexBuffer)
-        mapM_ (setAttrib vao) attribBindings
+        mapM_ (setAttrib vao) (Map.toList attribBindings)
         return vao
 
     where
-    setAttrib vao a = do
+    program = programInfoProgram programInfo
+
+    attribInfos = programInfoAttribs programInfo
+
+    setAttrib vao (k, a) = do
         let binding = attribBindingIndex a
-            attribName = aiAttribName . attribBindingAttribInfo $ a
         buffer <- maybe (throwIO . userError $ "binding buffer not found") return (IntMap.lookup binding buffers)
-        attribLocation <- GL.get $ GL.attribLocation program (ByteString.unpack attribName)
-        setVertexArrayAttribFormatAndBinding vao attribLocation a buffer
+        location <- maybe (throwIO . userError $ "attrib not found") (return . aiAttribLocation) (Map.lookup k attribInfos)
+        setVertexArrayAttribFormatAndBinding vao location a buffer
 
     setIndexBuffer vao (Just b) =
         GLRaw.glVertexArrayElementBuffer vao b
@@ -70,8 +73,8 @@ mkVertexArray attribBindings buffers indexBuffer program =
     setIndexBuffer _ Nothing = return ()
 
 
-setVertexArrayAttribFormatAndBinding :: GL.VertexArrayObject -> GL.AttribLocation -> AttribBinding -> GL.BufferObject -> IO ()
-setVertexArrayAttribFormatAndBinding vao attribLocation' (AttribBinding binding' info (BindBufferSetting offset' stride')) buffer = do
+setVertexArrayAttribFormatAndBinding :: GL.VertexArrayObject -> GLRaw.GLuint -> AttribBinding -> GL.BufferObject -> IO ()
+setVertexArrayAttribFormatAndBinding vao attribLocation (AttribBinding binding' format (BindBufferSetting offset' stride')) buffer = do
     GLRaw.glEnableVertexArrayAttrib vaoId attribLocation
     GLRaw.glVertexArrayAttribFormat vaoId attribLocation formatSize formatDataType formatNormalized formatRelativeOffset
 
@@ -80,17 +83,20 @@ setVertexArrayAttribFormatAndBinding vao attribLocation' (AttribBinding binding'
 
     where
     vaoId = unsafeCoerce vao
-    attribLocation = unsafeCoerce attribLocation'
     bufferId = unsafeCoerce buffer
     binding = fromIntegral binding'
-    AttribInfo _ format = info
-    AttribFormat fsize ftype fnormalized foffset = format
+    AttribFormat fsize formatDataType fnormalized foffset = format
     formatSize = fromIntegral fsize
-    formatDataType = marshalDataType ftype
     formatNormalized = fromIntegral . fromEnum $ fnormalized
     formatRelativeOffset = fromIntegral foffset
     offset = fromIntegral offset'
     stride = fromIntegral stride'
+
+bindUniforms :: [(UniformInfo, Uniform)] -> IO ()
+bindUniforms = mapM_ bindUniform
+    where
+    bindUniform (ui, Uniform a) =
+        GL.uniform (unsafeCoerce $ uiUniformLocation ui) GL.$= a
 
 -- from Graphics.Rendering.OpenGL.GL.DataType
 marshalDataType :: GL.DataType -> GLRaw.GLenum

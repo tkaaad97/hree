@@ -10,6 +10,7 @@ import Data.ByteString (ByteString)
 import Data.Proxy (Proxy)
 import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
+import qualified Graphics.GL as GLRaw
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Math
 import qualified Graphics.Rendering.OpenGL as GL
@@ -77,7 +78,7 @@ instance Vertex BasicVertex where
 
         where
         bbs = BindBufferSetting 0 (sizeOf (undefined :: BasicVertex))
-        positionField = VertexField "position" (AttribFormat 3 GL.Float False positionOffset) bbs
-        normalField = VertexField "position" (AttribFormat 3 GL.Float False normalOffset) bbs
-        uvField = VertexField "uv" (AttribFormat 2 GL.Float False uvOffset) bbs
-        colorField = VertexField "color" (AttribFormat 3 GL.UnsignedByte False colorOffset) bbs
+        positionField = VertexField "position" (AttribFormat 3 GLRaw.GL_FLOAT False positionOffset) bbs
+        normalField = VertexField "position" (AttribFormat 3 GLRaw.GL_FLOAT False normalOffset) bbs
+        uvField = VertexField "uv" (AttribFormat 2 GLRaw.GL_FLOAT False uvOffset) bbs
+        colorField = VertexField "color" (AttribFormat 3 GLRaw.GL_UNSIGNED_BYTE False colorOffset) bbs
