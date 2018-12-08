@@ -1,11 +1,15 @@
 module Graphics.Hree.GL
     ( mkBuffer
     , mkVertexArray
+    , render
+    , renderMany
     ) where
 
 import Control.Exception (throwIO)
+import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString
+import Data.Foldable (foldrM)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
@@ -18,8 +22,8 @@ import qualified Graphics.Rendering.OpenGL as GL
 import System.IO.Error (userError)
 import Unsafe.Coerce (unsafeCoerce)
 
-render :: Maybe GL.Program -> RenderInfo -> IO (Maybe GL.Program)
-render cur a = do
+render :: RenderInfo -> Maybe GL.Program -> IO (Maybe GL.Program)
+render a cur = do
     setCurrentProgram cur program
     GL.bindVertexArrayObject GL.$= Just (riVertexArray a)
     bindUniforms uniforms
@@ -31,6 +35,9 @@ render cur a = do
     uniforms = riUniforms a
     setCurrentProgram (Just p0) p1 | p0 == p1 = return ()
     setCurrentProgram _ p          = GL.currentProgram GL.$= Just p
+
+renderMany :: Foldable t => t RenderInfo -> IO ()
+renderMany = void . foldrM render Nothing
 
 drawWith :: DrawMethod -> IO ()
 drawWith (DrawArrays mode index num) = GL.drawArrays mode index num

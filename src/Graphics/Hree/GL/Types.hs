@@ -63,7 +63,7 @@ data RenderInfo = RenderInfo
     , riDrawMethod  :: !DrawMethod
     , riVertexArray :: !GL.VertexArrayObject
     , riUniforms    :: ![(UniformInfo, Uniform)]
-    , riTexture     :: !GL.TextureObject
+    , riTexture     :: !(Maybe GL.TextureObject)
     }
 
 data DrawMethod =

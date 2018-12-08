@@ -20,7 +20,7 @@ data Geometry = Geometry
     { geometryId             :: !Int
     , geometryAttribBindings :: !(Map ByteString AttribBinding)
     , geometryBufferSources  :: !(IntMap BufferSource)
-    , geometryIndexBuffer    :: !(Maybe (Vector GL.GLushort, GL.BufferUsage))
+    , geometryIndexBuffer    :: !(Maybe (Vector GL.GLuint, GL.BufferUsage))
     , geometryCount          :: !Int
     }
 

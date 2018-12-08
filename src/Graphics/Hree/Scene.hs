@@ -11,8 +11,9 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (IORef, atomicModifyIORef', readIORef)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (isNothing)
 import qualified Data.Traversable as Traversable (mapM)
-import qualified Foreign (with)
+import qualified Foreign (nullPtr, with)
 import qualified Graphics.GL as GLRaw
 import Graphics.Hree.Camera
 import Graphics.Hree.Geometry
@@ -27,8 +28,8 @@ data MeshInfo = MeshInfo
     { mishInfoId          :: !Int
     , meshInfoMesh        :: !Mesh
     , meshInfoBuffers     :: ![GL.BufferObject]
-    , meshInfoVertexArray :: !GL.VertexArrayObject
     , meshInfoProgram     :: !ProgramInfo
+    , meshInfoVertexArray :: !GL.VertexArrayObject
     }
 
 data Scene = Scene
@@ -43,9 +44,28 @@ renderScene scene camera = do
     GL.clearColor GL.$= GL.Color4 1 1 1 1
     GL.clear [GL.ColorBuffer]
     meshs <- readIORef (sceneMeshs scene)
-    mapM_ renderMesh meshs
+    renderMeshs meshs
 
-renderMesh = undefined
+renderMeshs :: IntMap MeshInfo -> IO ()
+renderMeshs = renderMany . fmap toRenderInfo
+
+toRenderInfo :: MeshInfo -> RenderInfo
+toRenderInfo m = renderInfo
+    where
+    program = meshInfoProgram m
+    vao = meshInfoVertexArray m
+    dm = resolveDrawMethod . meshGeometry . meshInfoMesh $ m
+    uniforms = [] -- TODO
+    texture = Nothing -- TODO
+    renderInfo = RenderInfo program dm vao uniforms texture
+
+resolveDrawMethod :: Geometry -> DrawMethod
+resolveDrawMethod geo | isNothing (geometryIndexBuffer geo) =
+    let count = fromIntegral . geometryCount $ geo
+    in DrawArrays GL.Triangles 0 count
+resolveDrawMethod geo =
+    let count = fromIntegral . geometryCount $ geo
+    in DrawElements GL.Triangles count GL.UnsignedInt Foreign.nullPtr
 
 addMesh :: Scene -> Mesh -> IO Int
 addMesh scene mesh = do
@@ -55,7 +75,7 @@ addMesh scene mesh = do
     let bs' = maybe (IntMap.elems bs) (: IntMap.elems bs) maybeIndexBuffer
     program <- mkProgramIfNotExists scene pspec
     vao <- mkVertexArray (geometryAttribBindings geo) bs maybeIndexBuffer program
-    let minfo = MeshInfo i mesh bs' vao program
+    let minfo = MeshInfo i mesh bs' program vao
     insertMeshInfo i minfo
     return i
     where
