@@ -81,7 +81,6 @@ data BindBufferSetting = BindBufferSetting
     } deriving (Show, Eq)
 
 data AttribBinding = AttribBinding
-    { attribBindingIndex         :: !Int
-    , attribBindingAttribFormat  :: !AttribFormat
-    , attribBindingBufferSetting :: !BindBufferSetting
+    { attribBindingIndex        :: !Int
+    , attribBindingAttribFormat :: !AttribFormat
     } deriving (Show, Eq)

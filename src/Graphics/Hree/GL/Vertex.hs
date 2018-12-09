@@ -4,6 +4,10 @@ module Graphics.Hree.GL.Vertex
     , Vertex(..)
     , VertexField(..)
     , VertexSpec(..)
+    , positionOffset
+    , normalOffset
+    , uvOffset
+    , colorOffset
     ) where
 
 import Data.ByteString (ByteString)
@@ -16,14 +20,14 @@ import Graphics.Hree.Math
 import qualified Graphics.Rendering.OpenGL as GL
 
 data VertexField = VertexField
-    { vertexFieldAttribName        :: !ByteString
-    , vertexFieldAttribFormat      :: !AttribFormat
-    , vertexFieldBindBufferSetting :: !BindBufferSetting
+    { vertexFieldAttribName   :: !ByteString
+    , vertexFieldAttribFormat :: !AttribFormat
     } deriving (Show, Eq)
 
-newtype VertexSpec = VertexSpec
-    { unVertexSpec :: [VertexField]
-    } deriving (Show, Eq)
+data VertexSpec = VertexSpec
+    { vertexSpecBindBufferSetting :: !BindBufferSetting
+    , vertexSpecFields            :: ![VertexField]
+    }
 
 class Storable a => Vertex a where
     vertexSpec :: Proxy a -> VertexSpec
@@ -60,25 +64,25 @@ positionOffset :: Int
 positionOffset = alignOffset (undefined :: Vec3) 0
 
 normalOffset :: Int
-normalOffset = alignOffset (undefined :: Vec3) positionOffset
+normalOffset = alignOffset (undefined :: Vec3) (positionOffset + sizeOf (undefined :: Vec3))
 
 uvOffset :: Int
-uvOffset = alignOffset (undefined :: Vec2) normalOffset
+uvOffset = alignOffset (undefined :: Vec2) (normalOffset + sizeOf (undefined :: Vec3))
 
 colorOffset :: Int
-colorOffset = alignOffset (undefined :: ColorW8) uvOffset
+colorOffset = alignOffset (undefined :: ColorW8) (uvOffset + sizeOf (undefined :: Vec2))
 
 instance Vertex BasicVertex where
-    vertexSpec _ = VertexSpec
-        [ positionField
-        , normalField
-        , uvField
-        , colorField
-        ]
+    vertexSpec _ = VertexSpec bbs fields
 
         where
+        positionField = VertexField "position" (AttribFormat 3 GLRaw.GL_FLOAT False positionOffset)
+        normalField = VertexField "normal" (AttribFormat 3 GLRaw.GL_FLOAT False normalOffset)
+        uvField = VertexField "uv" (AttribFormat 2 GLRaw.GL_FLOAT False uvOffset)
+        colorField = VertexField "color" (AttribFormat 4 GLRaw.GL_UNSIGNED_BYTE False colorOffset)
+        fields = [ positionField
+            , normalField
+            , uvField
+            , colorField
+            ]
         bbs = BindBufferSetting 0 (sizeOf (undefined :: BasicVertex))
-        positionField = VertexField "position" (AttribFormat 3 GLRaw.GL_FLOAT False positionOffset) bbs
-        normalField = VertexField "position" (AttribFormat 3 GLRaw.GL_FLOAT False normalOffset) bbs
-        uvField = VertexField "uv" (AttribFormat 2 GLRaw.GL_FLOAT False uvOffset) bbs
-        colorField = VertexField "color" (AttribFormat 4 GLRaw.GL_UNSIGNED_BYTE False colorOffset) bbs

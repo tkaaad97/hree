@@ -21,7 +21,7 @@ import qualified Graphics.Rendering.OpenGL as GL
 
 data Geometry = Geometry
     { geometryAttribBindings :: !(Map ByteString AttribBinding)
-    , geometryBufferSources  :: !(IntMap BufferSource)
+    , geometryBuffers        :: !(IntMap (BufferSource, BindBufferSetting))
     , geometryIndexBuffer    :: !(Maybe (Vector GL.GLuint, GL.BufferUsage))
     , geometryCount          :: !Int
     }
@@ -29,20 +29,20 @@ data Geometry = Geometry
 empty :: Geometry
 empty = Geometry Map.empty IntMap.empty Nothing 0
 
-addAttribBindings :: Geometry -> Int -> Map ByteString AttribBinding -> BufferSource -> Geometry
-addAttribBindings geo bindingIndex xs bufferSource = geo'
+addAttribBindings :: Geometry -> Int -> Map ByteString AttribBinding -> (BufferSource, BindBufferSetting) -> Geometry
+addAttribBindings geo bindingIndex xs b = geo'
     where
     attribBindings = Map.union (geometryAttribBindings geo) xs
-    sources = IntMap.insert bindingIndex bufferSource (geometryBufferSources geo)
-    geo' = geo { geometryAttribBindings = attribBindings, geometryBufferSources = sources }
+    buffers = IntMap.insert bindingIndex b (geometryBuffers geo)
+    geo' = geo { geometryAttribBindings = attribBindings, geometryBuffers = buffers }
 
 fromVertexVector :: forall a. (Storable a, Vertex a) => Int -> Vector a -> GL.BufferUsage -> Geometry
-fromVertexVector bindingIndex storage usage = Geometry attribBindings sources Nothing num
+fromVertexVector bindingIndex storage usage = Geometry attribBindings buffers Nothing num
     where
-    sources = IntMap.singleton bindingIndex $ BufferSource storage usage
-    VertexSpec fields = vertexSpec (Proxy :: Proxy a)
+    VertexSpec bbs fields = vertexSpec (Proxy :: Proxy a)
+    buffers = IntMap.singleton bindingIndex (BufferSource storage usage, bbs)
     keys = map vertexFieldAttribName fields
     bindings = map toAttribBinding fields
-    toAttribBinding (VertexField name format setting) = AttribBinding bindingIndex format setting
+    toAttribBinding (VertexField name format) = AttribBinding bindingIndex format
     attribBindings = Map.fromList $ zip keys bindings
     num = Vector.length storage `div` 3

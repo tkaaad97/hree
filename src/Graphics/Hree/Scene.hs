@@ -75,10 +75,11 @@ addMesh :: Scene -> Mesh -> IO Int
 addMesh scene mesh = do
     i <- genMeshId
     putStrLn "genMeshId"
-    bs <- Traversable.mapM (mkBuffer GL.ArrayBuffer) bufferSources
+    bs <- Traversable.mapM mkBuffer' buffers
+    let bos = map fst . IntMap.elems $ bs
     putStrLn "mkBuffers"
     maybeIndexBuffer <- maybe (return Nothing) (fmap Just . mkBuffer GL.ElementArrayBuffer . uncurry BufferSource) indexBufferSource
-    let bs' = maybe (IntMap.elems bs) (: IntMap.elems bs) maybeIndexBuffer
+    let bs' = maybe bos (: bos) maybeIndexBuffer
     program <- mkProgramIfNotExists scene pspec
     putStrLn "mkProgramInNotExists"
     vao <- mkVertexArray (geometryAttribBindings geo) bs maybeIndexBuffer program
@@ -93,9 +94,12 @@ addMesh scene mesh = do
     genMeshId = atomicModifyIORef' mcRef (\a -> (a + 1, a))
     insertMeshInfo i minfo = atomicModifyIORef' meshesRef $ \a -> (IntMap.insert i minfo a, ())
     geo = meshGeometry mesh
-    bufferSources = geometryBufferSources geo
+    buffers = geometryBuffers geo
     indexBufferSource = geometryIndexBuffer geo
     pspec = resolveProgramSpec mesh
+    mkBuffer' (source, setting) = do
+        b <- mkBuffer GL.ArrayBuffer source
+        return (b, setting)
 
 removeMesh :: Scene -> Int -> IO ()
 removeMesh scene i = do
