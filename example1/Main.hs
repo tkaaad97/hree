@@ -22,29 +22,33 @@ main = do
     width  = 640
     height = 480
 
+    x = 1000.0
     vs = Vector.fromList
         [ BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
-        , BasicVertex (V3 1 1 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
-        , BasicVertex (V3 0 1 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
-        , BasicVertex (V3 1 1 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
+        , BasicVertex (V3 x x 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
+        , BasicVertex (V3 0 x 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
+        , BasicVertex (V3 x x 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
         , BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
-        , BasicVertex (V3 1 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
+        , BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
         ]
 
-    geometry = Geometry.fromVertexVector 0 vs GL.StaticRead
+    geometry = Geometry.fromVertexVector 0 vs GL.StreamDraw
 
     material = Material.basicMaterial
 
     mesh = Mesh geometry material
 
-    proj = orthographic 0 1 1 0 0 1
+    proj = orthographic 0 1 0 1 (-10) 10
 
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     init = do
         scene <- newScene
+        putStrLn "newScene"
         addMesh scene mesh
+        putStrLn "addMesh"
         camera <- newCamera proj la
+        putStrLn "newCamera"
         return (scene, camera)
 
     onDisplay (s, c) w = do

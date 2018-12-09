@@ -1,6 +1,5 @@
 #version 450
 
-in vec3 fragmentPosition;
 in vec3 fragmentNormal;
 in vec2 fragmentUv;
 in vec4 fragmentColor;
@@ -9,5 +8,6 @@ uniform sampler2D texture;
 
 void main()
 {
-    outColor = vec4(1.0, 0.0, 0.0, 1.0);
+    float f = dot(fragmentNormal, vec3(0.00001)) + dot(fragmentUv, vec2(0.00001)) + dot(fragmentColor, vec4(0.00001));
+    outColor = vec4(1.0, 0.0, 0.0, 1.0 + f);
 }

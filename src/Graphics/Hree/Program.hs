@@ -17,7 +17,7 @@ import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Foreign (Ptr, alloca, allocaArray, peek)
+import Foreign (Ptr, alloca, allocaArray, peek, peekArray, with)
 import Foreign.C.String (peekCStringLen)
 import qualified Graphics.GL as GLRaw
 import Graphics.Hree.GL.Types
@@ -53,14 +53,22 @@ instance Hashable ProgramSpec where
 mkProgram :: ProgramSpec -> IO ProgramInfo
 mkProgram (ProgramSpec vspec fspec) = do
     vshader <- mkVertexShader vspec
+    putStrLn "mkVertexShader"
     fshader <- mkFragmentShader fspec
+    putStrLn "mkFragmentShader"
     program <- GL.createProgram
+    putStrLn "createProgram"
     mapM_ (GL.attachShader program) [vshader, fshader]
+    putStrLn "attachShaders"
     GL.linkProgram program
+    putStrLn "linkPrograms"
     checkStatus GL.linkStatus GL.programInfoLog "program link error" program
 
     attribs <- getActiveAttribs (unsafeCoerce program)
+    putStrLn "getActiveAttribs"
+    print attribs
     uniforms <- getActiveUniforms (unsafeCoerce program)
+    putStrLn "getActiveUniforms"
 
     let attribMap = Map.fromList $ zip (map aiAttribName attribs) attribs
         uniformMap = Map.fromList $ zip (map uiUniformName uniforms) uniforms
@@ -110,19 +118,20 @@ getActivePorts ::
     -> GL.GLuint
     -> IO [a]
 getActivePorts construct pname f program = do
-    num  <- alloca $ \p -> GLRaw.glGetProgramiv program pname p >> peek p
-    mapM g [0..(fromIntegral num - 1)]
+    len  <- alloca $ \p -> GLRaw.glGetProgramiv program pname p >> peek p
+    putStrLn $ "plen=" ++ show len
+    mapM g [0..(len - 1)]
 
     where
     maxNameBytes = 64
     g i =
         alloca $ \lp ->
-            alloca $ \sp ->
-                alloca $ \tp ->
-                    allocaArray maxNameBytes $ \np -> do
-                        f program i (fromIntegral maxNameBytes) lp sp tp np
-                        length <- peek lp
-                        size <- peek sp
-                        dataType <- peek tp
-                        name <- ByteString.pack <$> peekCStringLen (np, fromIntegral length)
-                        return $ construct name i (fromIntegral size) dataType
+        alloca $ \sp ->
+        alloca $ \tp ->
+        allocaArray maxNameBytes $ \np -> do
+            f program (fromIntegral i) (fromIntegral maxNameBytes) lp sp tp np
+            length <- peek lp
+            size <- peek sp
+            dataType <- peek tp
+            name <- ByteString.pack <$> peekCStringLen (np, fromIntegral length)
+            return $ construct name (fromIntegral i) (fromIntegral size) dataType

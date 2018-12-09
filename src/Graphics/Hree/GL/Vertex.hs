@@ -81,4 +81,4 @@ instance Vertex BasicVertex where
         positionField = VertexField "position" (AttribFormat 3 GLRaw.GL_FLOAT False positionOffset) bbs
         normalField = VertexField "position" (AttribFormat 3 GLRaw.GL_FLOAT False normalOffset) bbs
         uvField = VertexField "uv" (AttribFormat 2 GLRaw.GL_FLOAT False uvOffset) bbs
-        colorField = VertexField "color" (AttribFormat 3 GLRaw.GL_UNSIGNED_BYTE False colorOffset) bbs
+        colorField = VertexField "color" (AttribFormat 4 GLRaw.GL_UNSIGNED_BYTE False colorOffset) bbs

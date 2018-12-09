@@ -37,7 +37,7 @@ addAttribBindings geo bindingIndex xs bufferSource = geo'
     geo' = geo { geometryAttribBindings = attribBindings, geometryBufferSources = sources }
 
 fromVertexVector :: forall a. (Storable a, Vertex a) => Int -> Vector a -> GL.BufferUsage -> Geometry
-fromVertexVector bindingIndex storage usage = Geometry attribBindings sources Nothing (Vector.length storage)
+fromVertexVector bindingIndex storage usage = Geometry attribBindings sources Nothing num
     where
     sources = IntMap.singleton bindingIndex $ BufferSource storage usage
     VertexSpec fields = vertexSpec (Proxy :: Proxy a)
@@ -45,3 +45,4 @@ fromVertexVector bindingIndex storage usage = Geometry attribBindings sources No
     bindings = map toAttribBinding fields
     toAttribBinding (VertexField name format setting) = AttribBinding bindingIndex format setting
     attribBindings = Map.fromList $ zip keys bindings
+    num = Vector.length storage `div` 3

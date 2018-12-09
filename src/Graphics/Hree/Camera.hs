@@ -40,8 +40,8 @@ data Projection =
     Orthographic
     { orthographicLeft   :: !Float
     , orthographicRight  :: !Float
-    , orthographicTop    :: !Float
     , orthographicBottom :: !Float
+    , orthographicTop    :: !Float
     , orthographicNear   :: !Float
     , orthographicFar    :: !Float
     } deriving (Show, Eq)
@@ -69,7 +69,7 @@ getCameraMatrix (Camera cameraRef) =
 
 projectionMatrix :: Projection -> M44 Float
 projectionMatrix (Perspective fov aspect near far) = Linear.perspective fov aspect near far
-projectionMatrix (Orthographic left right top bottom near far) = Linear.ortho left right top bottom near far
+projectionMatrix (Orthographic left right bottom top near far) = Linear.ortho left right bottom top near far
 
 lookAtMatrix :: LookAt -> M44 Float
 lookAtMatrix (LookAt eye center up) = Linear.lookAt eye center up

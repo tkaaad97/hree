@@ -1,7 +1,6 @@
 module Graphics.Hree.GL
     ( mkBuffer
     , mkVertexArray
-    , render
     , renderMany
     ) where
 
@@ -14,6 +13,7 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (mapMaybe)
 import qualified Data.Vector.Storable as V
 import qualified Foreign (Storable(..), alloca)
 import qualified Graphics.GL as GLRaw
@@ -22,8 +22,8 @@ import qualified Graphics.Rendering.OpenGL as GL
 import System.IO.Error (userError)
 import Unsafe.Coerce (unsafeCoerce)
 
-render :: RenderInfo -> Maybe GL.Program -> IO (Maybe GL.Program)
-render a cur = do
+render :: [(ByteString, Uniform)] -> RenderInfo -> Maybe GL.Program -> IO (Maybe GL.Program)
+render commons a cur = do
     setCurrentProgram cur program
     GL.bindVertexArrayObject GL.$= Just (riVertexArray a)
     bindUniforms uniforms
@@ -31,13 +31,18 @@ render a cur = do
     return . Just $ program
     where
     program = programInfoProgram . riProgram $ a
+    uniformInfos = programInfoUniforms . riProgram $ a
     method = riDrawMethod a
     uniforms = riUniforms a
     setCurrentProgram (Just p0) p1 | p0 == p1 = return ()
-    setCurrentProgram _ p          = GL.currentProgram GL.$= Just p
+    setCurrentProgram _ p = do
+        bindUniforms . mapMaybe toUniformPair $ commons
+        GL.currentProgram GL.$= Just p
+    toUniformPair (k, u) =
+        (,) <$> Map.lookup k uniformInfos <*> Just u
 
-renderMany :: Foldable t => t RenderInfo -> IO ()
-renderMany = void . foldrM render Nothing
+renderMany :: Foldable t => [(ByteString, Uniform)] -> t RenderInfo -> IO ()
+renderMany common = void . foldrM (render common) Nothing
 
 drawWith :: DrawMethod -> IO ()
 drawWith (DrawArrays mode index num) = GL.drawArrays mode index num
@@ -47,10 +52,15 @@ mkBuffer :: GL.BufferTarget -> BufferSource -> IO GL.BufferObject
 mkBuffer target (BufferSource vec usage) = do
     let n = V.length vec
         size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
+    putStrLn $ "n=" ++ show n
+    putStrLn $ "size=" ++ show size
     buffer <- GL.genObjectName
     GL.bindBuffer target GL.$= Just buffer
+    putStrLn "bindBuffer"
     V.unsafeWith vec $ \ptr -> GL.bufferData target GL.$= (size, ptr, usage)
+    putStrLn "unsafeWith"
     GL.bindBuffer target GL.$= Nothing
+    putStrLn "unbindBuffer"
     return buffer
 
 mkVertexArray :: Map ByteString AttribBinding -> IntMap GL.BufferObject -> Maybe GL.BufferObject -> ProgramInfo -> IO GL.VertexArrayObject

@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Graphics.Hree.Scene
     ( MeshInfo(..)
     , Scene(..)
@@ -8,6 +9,7 @@ module Graphics.Hree.Scene
     , renderScene
     ) where
 
+import Data.ByteString (ByteString)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
@@ -46,10 +48,10 @@ renderScene scene camera = do
     GL.clearColor GL.$= GL.Color4 1 1 1 1
     GL.clear [GL.ColorBuffer]
     meshs <- readIORef (sceneMeshs scene)
-    renderMeshs meshs
+    renderMeshs [] meshs
 
-renderMeshs :: IntMap MeshInfo -> IO ()
-renderMeshs = renderMany . fmap toRenderInfo
+renderMeshs :: [(ByteString, Uniform)] -> IntMap MeshInfo ->  IO ()
+renderMeshs uniforms = renderMany uniforms . fmap toRenderInfo
 
 toRenderInfo :: MeshInfo -> RenderInfo
 toRenderInfo m = renderInfo
@@ -72,13 +74,18 @@ resolveDrawMethod geo =
 addMesh :: Scene -> Mesh -> IO Int
 addMesh scene mesh = do
     i <- genMeshId
+    putStrLn "genMeshId"
     bs <- Traversable.mapM (mkBuffer GL.ArrayBuffer) bufferSources
+    putStrLn "mkBuffers"
     maybeIndexBuffer <- maybe (return Nothing) (fmap Just . mkBuffer GL.ElementArrayBuffer . uncurry BufferSource) indexBufferSource
     let bs' = maybe (IntMap.elems bs) (: IntMap.elems bs) maybeIndexBuffer
     program <- mkProgramIfNotExists scene pspec
+    putStrLn "mkProgramInNotExists"
     vao <- mkVertexArray (geometryAttribBindings geo) bs maybeIndexBuffer program
+    putStrLn "mkVertexArray"
     let minfo = MeshInfo i mesh bs' program vao
     insertMeshInfo i minfo
+    putStrLn "insertMesh"
     return i
     where
     mcRef = sceneMeshCounter scene
@@ -117,6 +124,7 @@ mkProgramIfNotExists scene pspec = do
 mkProgramAndInsert :: IORef (Map ProgramSpec ProgramInfo) -> ProgramSpec -> IO ProgramInfo
 mkProgramAndInsert programsRef pspec = do
     program <- mkProgram pspec
+    putStrLn "mkProgram"
     atomicModifyIORef' programsRef (\a -> (Map.insert pspec program a, ()))
     return program
 
