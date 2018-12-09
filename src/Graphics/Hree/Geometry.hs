@@ -1,6 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Hree.Geometry
     ( Geometry(..)
+    , addAttribBindings
+    , empty
+    , fromVertexVector
     ) where
 
 import Data.ByteString (ByteString)
@@ -17,12 +20,14 @@ import Graphics.Hree.GL.Vertex
 import qualified Graphics.Rendering.OpenGL as GL
 
 data Geometry = Geometry
-    { geometryId             :: !Int
-    , geometryAttribBindings :: !(Map ByteString AttribBinding)
+    { geometryAttribBindings :: !(Map ByteString AttribBinding)
     , geometryBufferSources  :: !(IntMap BufferSource)
     , geometryIndexBuffer    :: !(Maybe (Vector GL.GLuint, GL.BufferUsage))
     , geometryCount          :: !Int
     }
+
+empty :: Geometry
+empty = Geometry Map.empty IntMap.empty Nothing 0
 
 addAttribBindings :: Geometry -> Int -> Map ByteString AttribBinding -> BufferSource -> Geometry
 addAttribBindings geo bindingIndex xs bufferSource = geo'
@@ -31,8 +36,8 @@ addAttribBindings geo bindingIndex xs bufferSource = geo'
     sources = IntMap.insert bindingIndex bufferSource (geometryBufferSources geo)
     geo' = geo { geometryAttribBindings = attribBindings, geometryBufferSources = sources }
 
-fromVertexVector :: forall a. (Storable a, Vertex a) => Int -> Int -> Vector a -> GL.BufferUsage -> Geometry
-fromVertexVector index bindingIndex storage usage = Geometry index attribBindings sources Nothing (Vector.length storage)
+fromVertexVector :: forall a. (Storable a, Vertex a) => Int -> Vector a -> GL.BufferUsage -> Geometry
+fromVertexVector bindingIndex storage usage = Geometry attribBindings sources Nothing (Vector.length storage)
     where
     sources = IntMap.singleton bindingIndex $ BufferSource storage usage
     VertexSpec fields = vertexSpec (Proxy :: Proxy a)

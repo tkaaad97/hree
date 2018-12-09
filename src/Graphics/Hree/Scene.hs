@@ -2,13 +2,15 @@ module Graphics.Hree.Scene
     ( MeshInfo(..)
     , Scene(..)
     , addMesh
-    , removeMesh
     , deleteScene
+    , newScene
+    , removeMesh
+    , renderScene
     ) where
 
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import Data.IORef (IORef, atomicModifyIORef', readIORef)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
@@ -117,6 +119,13 @@ mkProgramAndInsert programsRef pspec = do
     program <- mkProgram pspec
     atomicModifyIORef' programsRef (\a -> (Map.insert pspec program a, ()))
     return program
+
+newScene :: IO Scene
+newScene = do
+    counter <- newIORef 1
+    meshes <- newIORef IntMap.empty
+    programs <- newIORef Map.empty
+    return $ Scene counter meshes programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do

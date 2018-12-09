@@ -4,6 +4,7 @@ module Graphics.Hree.Program
     ( VertexShaderSpec(..)
     , FragmentShaderSpec(..)
     , ProgramSpec(..)
+    , basicProgramSpec
     , mkProgram
     ) where
 
@@ -34,6 +35,9 @@ data ProgramSpec = ProgramSpec
     { vertexShaderSpec   :: !VertexShaderSpec
     , fragmentShaderSpec :: !FragmentShaderSpec
     } deriving (Show, Eq, Ord)
+
+basicProgramSpec :: ProgramSpec
+basicProgramSpec = ProgramSpec VertexShaderSpec FragmentShaderSpec
 
 instance Hashable VertexShaderSpec where
     hash _ = 0
@@ -69,7 +73,7 @@ mkVertexShader _ = mkShader "vertexShader" GL.VertexShader shaderSource
     shaderSource = $(embedFile "shader/basic-vertex.glsl")
 
 mkFragmentShader :: FragmentShaderSpec -> IO GL.Shader
-mkFragmentShader _ = mkShader "vertexShader" GL.VertexShader shaderSource
+mkFragmentShader _ = mkShader "vertexShader" GL.FragmentShader shaderSource
     where
     shaderSource = $(embedFile "shader/basic-fragment.glsl")
 

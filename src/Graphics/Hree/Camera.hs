@@ -1,8 +1,9 @@
 module Graphics.Hree.Camera
     ( Camera
+    , lookAt
     , newCamera
-    , perspective
     , orthographic
+    , perspective
     , getCameraMatrix
     , updateProjection
     , updateLookAt

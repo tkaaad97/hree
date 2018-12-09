@@ -15,7 +15,7 @@ uniform mat4 modelMatrix;
 
 void main()
 {
-    fragmentPosition = projectionViewMatrix * modelMatrix * vec4(position, 1.0);
+    fragmentPosition = (projectionViewMatrix * modelMatrix * vec4(position, 1.0)).xyz;
     fragmentNormal = normal;
     fragmentUv = uv;
     fragmentColor = color;
