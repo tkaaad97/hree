@@ -7,6 +7,8 @@ services:
     privileged: true
     environment:
       - DISPLAY=${DISPLAY}
+      - MESA_GL_VERSION_OVERRIDE=4.5
+      - MESA_GLSL_VERSION_OVERRIDE=450
     volumes:
       - "$PWD:$PWD"
       - .stack:/root/.stack

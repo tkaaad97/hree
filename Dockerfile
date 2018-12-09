@@ -3,6 +3,7 @@ FROM tkaaad97/haskell-docker:8.4.3
 # install dev tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        apitrace \
         make \
         pkgconf \
         xz-utils \
