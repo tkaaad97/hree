@@ -1,3 +1,6 @@
 resolver: lts-13.6
 packages:
-- .
+  - .
+extra-deps:
+  - git: git@github.com:tkaaad97/gl-wrapper
+    commit: 0e943408af538b61019dc736297e1e50df4e4e94
