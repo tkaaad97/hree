@@ -53,23 +53,15 @@ instance Hashable ProgramSpec where
 mkProgram :: ProgramSpec -> IO ProgramInfo
 mkProgram (ProgramSpec vspec fspec) = do
     vshader <- mkVertexShader vspec
-    putStrLn "mkVertexShader"
     fshader <- mkFragmentShader fspec
-    putStrLn "mkFragmentShader"
     program <- GL.createProgram
-    putStrLn "createProgram"
     mapM_ (GL.attachShader program) [vshader, fshader]
-    putStrLn "attachShaders"
     GL.linkProgram program
-    putStrLn "linkPrograms"
     checkStatus GL.linkStatus GL.programInfoLog "program link error" program
     GL.deleteObjectNames [vshader, fshader]
 
     attribs <- getActiveAttribs (unsafeCoerce program)
-    putStrLn "getActiveAttribs"
-    print attribs
     uniforms <- getActiveUniforms (unsafeCoerce program)
-    putStrLn "getActiveUniforms"
 
     let attribMap = Map.fromList $ zip (map aiAttribName attribs) attribs
         uniformMap = Map.fromList $ zip (map uiUniformName uniforms) uniforms
@@ -120,7 +112,6 @@ getActivePorts ::
     -> IO [a]
 getActivePorts construct pname f program = do
     len  <- alloca $ \p -> GLRaw.glGetProgramiv program pname p >> peek p
-    putStrLn $ "plen=" ++ show len
     mapM g [0..(len - 1)]
 
     where

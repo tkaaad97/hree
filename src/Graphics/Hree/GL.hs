@@ -52,10 +52,7 @@ mkBuffer :: GL.BufferTarget -> BufferSource -> IO GL.BufferObject
 mkBuffer target (BufferSource vec usage) = do
     let n = V.length vec
         size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
-    putStrLn $ "n=" ++ show n
-    putStrLn $ "size=" ++ show size
     buffer <- Foreign.allocaArray 2 $ \p -> GLRaw.glCreateBuffers 1 p *> Foreign.peek p
-    putStrLn "CreateBuffers"
     V.unsafeWith vec $ \ptr -> GLRaw.glNamedBufferData buffer size ptr GLRaw.GL_STREAM_DRAW
     return (unsafeCoerce buffer)
 
@@ -64,7 +61,6 @@ mkVertexArray attribBindings buffers indexBuffer programInfo =
     Foreign.allocaArray 2 $ \p -> do
         GL.currentProgram GL.$= Just program
         GLRaw.glCreateVertexArrays 1 p
-        GL.errors >>= print
         vaoId <- Foreign.peek p
         mapM_ (setAttrib vaoId) (Map.toList attribBindings)
         mapM_ (setBindingBuffer vaoId) . IntMap.toList $ buffers

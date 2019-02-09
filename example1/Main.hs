@@ -16,8 +16,6 @@ main :: IO ()
 main = do
     withWindow width height "canvas-sample" init onDisplay
 
-    putStrLn "ended!"
-
     where
     width  = 640
     height = 480
@@ -44,11 +42,8 @@ main = do
 
     init = do
         scene <- newScene
-        putStrLn "newScene"
         addMesh scene mesh
-        putStrLn "addMesh"
         camera <- newCamera proj la
-        putStrLn "newCamera"
         return (scene, camera)
 
     onDisplay (s, c) w = do
