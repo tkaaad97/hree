@@ -1,4 +1,4 @@
-FROM tkaaad97/haskell-docker:8.4.3
+FROM tkaaad97/haskell-docker:8.6.3
 
 # install dev tools
 RUN apt-get update && \

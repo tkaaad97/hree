@@ -25,7 +25,6 @@ dependencies:
 - OpenGLRaw
 - bytestring
 - containers
-- extensible
 - file-embed
 - hashable
 - linear
