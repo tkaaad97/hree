@@ -63,6 +63,7 @@ mkProgram (ProgramSpec vspec fspec) = do
     GL.linkProgram program
     putStrLn "linkPrograms"
     checkStatus GL.linkStatus GL.programInfoLog "program link error" program
+    GL.deleteObjectNames [vshader, fshader]
 
     attribs <- getActiveAttribs (unsafeCoerce program)
     putStrLn "getActiveAttribs"

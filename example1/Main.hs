@@ -22,7 +22,7 @@ main = do
     width  = 640
     height = 480
 
-    x = 1000.0
+    x = 1.0
     vs = Vector.fromList
         [ BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
         , BasicVertex (V3 x x 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)

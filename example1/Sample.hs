@@ -15,6 +15,10 @@ withWindow width height title constructor f = do
     GLFW.setErrorCallback $ Just simpleErrorCallback
     r <- GLFW.init
     when r $ do
+        GLFW.windowHint $ GLFW.WindowHint'ContextVersionMajor 4
+        GLFW.windowHint $ GLFW.WindowHint'ContextVersionMinor 5
+        GLFW.windowHint $ GLFW.WindowHint'OpenGLForwardCompat True
+        GLFW.windowHint $ GLFW.WindowHint'OpenGLProfile GLFW.OpenGLProfile'Core
         m <- GLFW.createWindow width height title Nothing Nothing
         case m of
           (Just win) -> do

@@ -15,7 +15,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (mapMaybe)
 import qualified Data.Vector.Storable as V
-import qualified Foreign (Storable(..), alloca)
+import qualified Foreign (Storable(..), alloca, allocaArray)
 import qualified Graphics.GL as GLRaw
 import Graphics.Hree.GL.Types
 import qualified Graphics.Rendering.OpenGL as GL
@@ -54,20 +54,17 @@ mkBuffer target (BufferSource vec usage) = do
         size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
     putStrLn $ "n=" ++ show n
     putStrLn $ "size=" ++ show size
-    buffer <- GL.genObjectName
-    GL.bindBuffer target GL.$= Just buffer
-    putStrLn "bindBuffer"
-    V.unsafeWith vec $ \ptr -> GL.bufferData target GL.$= (size, ptr, usage)
-    putStrLn "unsafeWith"
-    GL.bindBuffer target GL.$= Nothing
-    putStrLn "unbindBuffer"
-    return buffer
+    buffer <- Foreign.allocaArray 2 $ \p -> GLRaw.glCreateBuffers 1 p *> Foreign.peek p
+    putStrLn "CreateBuffers"
+    V.unsafeWith vec $ \ptr -> GLRaw.glNamedBufferData buffer size ptr GLRaw.GL_STREAM_DRAW
+    return (unsafeCoerce buffer)
 
 mkVertexArray :: Map ByteString AttribBinding -> IntMap (GL.BufferObject, BindBufferSetting) -> Maybe GL.BufferObject -> ProgramInfo -> IO GL.VertexArrayObject
 mkVertexArray attribBindings buffers indexBuffer programInfo =
-    Foreign.alloca $ \p -> do
+    Foreign.allocaArray 2 $ \p -> do
         GL.currentProgram GL.$= Just program
         GLRaw.glCreateVertexArrays 1 p
+        GL.errors >>= print
         vaoId <- Foreign.peek p
         mapM_ (setAttrib vaoId) (Map.toList attribBindings)
         mapM_ (setBindingBuffer vaoId) . IntMap.toList $ buffers

@@ -45,4 +45,4 @@ fromVertexVector bindingIndex storage usage = Geometry attribBindings buffers No
     bindings = map toAttribBinding fields
     toAttribBinding (VertexField name format) = AttribBinding bindingIndex format
     attribBindings = Map.fromList $ zip keys bindings
-    num = Vector.length storage `div` 3
+    num = Vector.length storage
