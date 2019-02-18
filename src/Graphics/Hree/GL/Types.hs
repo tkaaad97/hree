@@ -24,36 +24,36 @@ import qualified Data.Vector.Storable as Vector
 import Data.Word (Word8)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable)
-import qualified Graphics.GL as GLRaw
-import qualified Graphics.Rendering.OpenGL as GL
+import qualified GLW
+import qualified Graphics.GL as GL
 
-data Uniform = forall a. (GL.Uniform a, Show a) => Uniform !a
+data Uniform = forall a. (GLW.Uniform a, Show a) => Uniform !a
 deriving instance Show Uniform
 
 data UniformInfo = UniformInfo
     { uiUniformName     :: !ByteString
-    , uiUniformLocation :: !GLRaw.GLuint
-    , uiUniformSize     :: !GLRaw.GLuint
-    , uiUniformDataType :: !GLRaw.GLuint
+    , uiUniformLocation :: !GL.GLuint
+    , uiUniformSize     :: !GL.GLuint
+    , uiUniformDataType :: !GL.GLuint
     }
     deriving (Show)
 
 data AttribFormat = AttribFormat
     { attribFormatSize           :: !Int
-    , attribFormatDataType       :: !GLRaw.GLuint
+    , attribFormatDataType       :: !GL.GLuint
     , attribFormatNormalized     :: !Bool
     , attribFormatRelativeOffset :: !Int
     } deriving (Show, Eq)
 
 data AttribInfo = AttribInfo
     { aiAttribName     :: !ByteString
-    , aiAttribLocation :: !GLRaw.GLuint
-    , aiAttribSize     :: !GLRaw.GLuint
-    , aiAttribDataType :: !GLRaw.GLuint
+    , aiAttribLocation :: !GL.GLuint
+    , aiAttribSize     :: !GL.GLuint
+    , aiAttribDataType :: !GL.GLuint
     } deriving (Show, Eq)
 
 data ProgramInfo = ProgramInfo
-    { programInfoProgram  :: !GL.Program
+    { programInfoProgram  :: !GLW.Program
     , programInfoAttribs  :: !(Map ByteString AttribInfo)
     , programInfoUniforms :: !(Map ByteString UniformInfo)
     } deriving (Show)
@@ -61,17 +61,17 @@ data ProgramInfo = ProgramInfo
 data RenderInfo = RenderInfo
     { riProgram     :: !ProgramInfo
     , riDrawMethod  :: !DrawMethod
-    , riVertexArray :: !GL.VertexArrayObject
+    , riVertexArray :: !GLW.VertexArray
     , riUniforms    :: ![(UniformInfo, Uniform)]
-    , riTexture     :: !(Maybe GL.TextureObject)
+    , riTexture     :: !(Maybe GLW.Texture)
     }
 
 data DrawMethod =
-    DrawArrays !GL.PrimitiveMode !GL.ArrayIndex !GL.NumArrayIndices |
-    DrawElements !GL.PrimitiveMode !GL.NumArrayIndices !GL.DataType !(Ptr GL.NumArrayIndices)
+    DrawArrays !GLW.PrimitiveType !GL.GLint !GL.GLsizei |
+    DrawElements !GLW.PrimitiveType !GL.GLsizei !GL.GLenum !(Ptr ())
     deriving (Show, Eq)
 
-data BufferSource = forall a. Storable a => BufferSource !(Vector a) !GL.BufferUsage
+data BufferSource = forall a. Storable a => BufferSource !(Vector a) !GL.GLenum
 
 type BindingIndex = Int
 
