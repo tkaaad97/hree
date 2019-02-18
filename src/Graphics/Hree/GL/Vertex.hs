@@ -14,10 +14,9 @@ import Data.ByteString (ByteString)
 import Data.Proxy (Proxy)
 import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
-import qualified Graphics.GL as GLRaw
+import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Math
-import qualified Graphics.Rendering.OpenGL as GL
 
 data VertexField = VertexField
     { vertexFieldAttribName   :: !ByteString
@@ -76,10 +75,10 @@ instance Vertex BasicVertex where
     vertexSpec _ = VertexSpec bbs fields
 
         where
-        positionField = VertexField "position" (AttribFormat 3 GLRaw.GL_FLOAT False positionOffset)
-        normalField = VertexField "normal" (AttribFormat 3 GLRaw.GL_FLOAT False normalOffset)
-        uvField = VertexField "uv" (AttribFormat 2 GLRaw.GL_FLOAT False uvOffset)
-        colorField = VertexField "color" (AttribFormat 4 GLRaw.GL_UNSIGNED_BYTE False colorOffset)
+        positionField = VertexField "position" (AttribFormat 3 GL.GL_FLOAT False positionOffset)
+        normalField = VertexField "normal" (AttribFormat 3 GL.GL_FLOAT False normalOffset)
+        uvField = VertexField "uv" (AttribFormat 2 GL.GL_FLOAT False uvOffset)
+        colorField = VertexField "color" (AttribFormat 4 GL.GL_UNSIGNED_BYTE False colorOffset)
         fields = [ positionField
             , normalField
             , uvField
