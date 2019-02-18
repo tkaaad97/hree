@@ -15,14 +15,15 @@ import Data.Proxy (Proxy(..))
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import Foreign.Storable (Storable)
+import qualified GLW
+import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
-import qualified Graphics.Rendering.OpenGL as GL
 
 data Geometry = Geometry
     { geometryAttribBindings :: !(Map ByteString AttribBinding)
     , geometryBuffers        :: !(IntMap (BufferSource, BindBufferSetting))
-    , geometryIndexBuffer    :: !(Maybe (Vector GL.GLuint, GL.BufferUsage))
+    , geometryIndexBuffer    :: !(Maybe (Vector GL.GLuint, GL.GLenum))
     , geometryCount          :: !Int
     }
 
@@ -36,11 +37,11 @@ addAttribBindings geo bindingIndex xs b = geo'
     buffers = IntMap.insert bindingIndex b (geometryBuffers geo)
     geo' = geo { geometryAttribBindings = attribBindings, geometryBuffers = buffers }
 
-fromVertexVector :: forall a. (Storable a, Vertex a) => Int -> Vector a -> GL.BufferUsage -> Geometry
+fromVertexVector :: forall a. (Storable a, Vertex a) => GLW.BindingIndex -> Vector a -> GL.GLenum -> Geometry
 fromVertexVector bindingIndex storage usage = Geometry attribBindings buffers Nothing num
     where
     VertexSpec bbs fields = vertexSpec (Proxy :: Proxy a)
-    buffers = IntMap.singleton bindingIndex (BufferSource storage usage, bbs)
+    buffers = IntMap.singleton (fromIntegral . GLW.unBindingIndex $ bindingIndex) (BufferSource storage usage, bbs)
     keys = map vertexFieldAttribName fields
     bindings = map toAttribBinding fields
     toAttribBinding (VertexField name format) = AttribBinding bindingIndex format

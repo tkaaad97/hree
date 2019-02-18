@@ -1,5 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 module Graphics.Hree.Program
     ( VertexShaderSpec(..)
     , FragmentShaderSpec(..)
@@ -12,18 +16,20 @@ import Control.Exception (throwIO)
 import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as ByteString (pack)
+import qualified Data.ByteString.Char8 as ByteString (pack, useAsCStringLen)
+import Data.Coerce (Coercible(..))
 import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Foreign (Ptr, alloca, allocaArray, peek, peekArray, with)
-import Foreign.C.String (peekCStringLen)
-import qualified Graphics.GL as GLRaw
+import Data.Proxy (Proxy(..))
+import Foreign (Ptr)
+import qualified Foreign (alloca, allocaArray, peek, peekArray, with)
+import qualified Foreign.C.String as Foreign (peekCStringLen)
+import qualified GLW
+import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
-import qualified Graphics.Rendering.OpenGL as GL
 import System.IO.Error (userError)
-import Unsafe.Coerce (unsafeCoerce)
 
 data VertexShaderSpec = VertexShaderSpec
     deriving (Show, Eq, Ord)
@@ -54,76 +60,105 @@ mkProgram :: ProgramSpec -> IO ProgramInfo
 mkProgram (ProgramSpec vspec fspec) = do
     vshader <- mkVertexShader vspec
     fshader <- mkFragmentShader fspec
-    program <- GL.createProgram
-    mapM_ (GL.attachShader program) [vshader, fshader]
-    GL.linkProgram program
-    checkStatus GL.linkStatus GL.programInfoLog "program link error" program
-    GL.deleteObjectNames [vshader, fshader]
+    program <- GLW.createObject (Proxy :: Proxy GLW.Program)
+    GLW.glAttachShader program vshader
+    GLW.glAttachShader program fshader
+    GLW.glLinkProgram program
+    throwIfProgramErrorStatus program GL.GL_LINK_STATUS "program link error"
+    GLW.deleteObject vshader
+    GLW.deleteObject fshader
 
-    attribs <- getActiveAttribs (unsafeCoerce program)
-    uniforms <- getActiveUniforms (unsafeCoerce program)
+    attribs <- getActiveAttribs program
+    uniforms <- getActiveUniforms program
 
     let attribMap = Map.fromList $ zip (map aiAttribName attribs) attribs
         uniformMap = Map.fromList $ zip (map uiUniformName uniforms) uniforms
 
     return $ ProgramInfo program attribMap uniformMap
 
-mkVertexShader :: VertexShaderSpec -> IO GL.Shader
-mkVertexShader _ = mkShader "vertexShader" GL.VertexShader shaderSource
+mkVertexShader :: VertexShaderSpec -> IO (GLW.Shader 'GLW.GL_VERTEX_SHADER)
+mkVertexShader _ = mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) shaderSource
     where
     shaderSource = $(embedFile "shader/basic-vertex.glsl")
 
-mkFragmentShader :: FragmentShaderSpec -> IO GL.Shader
-mkFragmentShader _ = mkShader "vertexShader" GL.FragmentShader shaderSource
+mkFragmentShader :: FragmentShaderSpec -> IO (GLW.Shader 'GLW.GL_FRAGMENT_SHADER)
+mkFragmentShader _ = mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) shaderSource
     where
     shaderSource = $(embedFile "shader/basic-fragment.glsl")
 
-mkShader :: String -> GL.ShaderType -> ByteString -> IO GL.Shader
-mkShader name shaderType src = do
-    shader <- GL.createShader shaderType
-    GL.shaderSourceBS shader GL.$= src
-    GL.compileShader shader
-    checkStatus GL.compileStatus GL.shaderInfoLog ("shader " ++ name ++ " compile error") shader
-    return shader
+mkShader :: forall (k :: GLW.ShaderType). GLW.SingShaderType k => Proxy k -> ByteString -> IO (GLW.Shader k)
+mkShader _ source =
+    ByteString.useAsCStringLen source $ \(source', len) ->
+    Foreign.with source' $ \sp ->
+    Foreign.with (fromIntegral len) $ \lp -> do
+        shader <- GLW.createObject (Proxy :: Proxy (GLW.Shader k))
+        GLW.glShaderSource shader 1 sp lp
+        GLW.glCompileShader shader
+        return shader
 
-checkStatus
-    :: (a -> GL.GettableStateVar Bool)
-    -> (a -> GL.GettableStateVar String)
-    -> String
-    -> a
-    -> IO ()
-checkStatus getStatus getInfoLog message object = do
-    ok <- GL.get . getStatus $ object
-    unless ok $ do
-        log' <- GL.get . getInfoLog $ object
-        throwIO . userError $ message ++ ": " ++ log'
+getActiveAttribs :: GLW.Program -> IO [AttribInfo]
+getActiveAttribs = getActivePorts AttribInfo (GLW.AttribLocation . fromIntegral) GL.GL_ACTIVE_ATTRIBUTES GLW.glGetActiveAttrib
 
-getActiveAttribs :: GL.GLuint -> IO [AttribInfo]
-getActiveAttribs = getActivePorts AttribInfo GLRaw.GL_ACTIVE_ATTRIBUTES GLRaw.glGetActiveAttrib
-
-getActiveUniforms :: GL.GLuint -> IO [UniformInfo]
-getActiveUniforms = getActivePorts UniformInfo GLRaw.GL_ACTIVE_UNIFORMS GLRaw.glGetActiveUniform
+getActiveUniforms :: GLW.Program -> IO [UniformInfo]
+getActiveUniforms = getActivePorts UniformInfo GLW.UniformLocation GL.GL_ACTIVE_UNIFORMS GLW.glGetActiveUniform
 
 getActivePorts ::
-    (ByteString -> GLRaw.GLuint -> GLRaw.GLuint -> GL.GLuint -> a)
-    -> GLRaw.GLenum
-    -> (GLRaw.GLuint -> GLRaw.GLuint -> GLRaw.GLsizei -> Ptr GLRaw.GLsizei -> Ptr GLRaw.GLint -> Ptr GLRaw.GLenum -> Ptr GLRaw.GLchar -> IO ())
-    -> GL.GLuint
+    (ByteString -> location -> GL.GLuint -> GL.GLuint -> a)
+    -> (GL.GLint -> location)
+    -> GL.GLenum
+    -> (GLW.Program -> GL.GLuint -> GL.GLsizei -> Ptr GL.GLsizei -> Ptr GL.GLint -> Ptr GL.GLenum -> Ptr GL.GLchar -> IO ())
+    -> GLW.Program
     -> IO [a]
-getActivePorts construct pname f program = do
-    len  <- alloca $ \p -> GLRaw.glGetProgramiv program pname p >> peek p
+getActivePorts construct toLocation pname f program = do
+    len  <- Foreign.alloca $ \p -> GLW.glGetProgramiv program pname p >> Foreign.peek p
     mapM g [0..(len - 1)]
 
     where
-    maxNameBytes = 64
+    maxNameBytes = 128
     g i =
-        alloca $ \lp ->
-        alloca $ \sp ->
-        alloca $ \tp ->
-        allocaArray maxNameBytes $ \np -> do
+        Foreign.alloca $ \lp ->
+        Foreign.alloca $ \sp ->
+        Foreign.alloca $ \tp ->
+        Foreign.allocaArray maxNameBytes $ \np -> do
             f program (fromIntegral i) (fromIntegral maxNameBytes) lp sp tp np
-            length <- peek lp
-            size <- peek sp
-            dataType <- peek tp
-            name <- ByteString.pack <$> peekCStringLen (np, fromIntegral length)
-            return $ construct name (fromIntegral i) (fromIntegral size) dataType
+            length <- Foreign.peek lp
+            size <- Foreign.peek sp
+            dataType <- Foreign.peek tp
+            name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral length)
+            return $ construct name (toLocation i) (fromIntegral size) dataType
+
+throwIfProgramErrorStatus
+    :: GLW.Program
+    -> GL.GLenum
+    -> String
+    -> IO ()
+throwIfProgramErrorStatus program statusName messagePrefix = Foreign.alloca $ \p -> do
+    GLW.glGetProgramiv program statusName p
+    status <- Foreign.peek p
+    unless (status == GL.GL_TRUE) $
+        Foreign.alloca $ \sizePtr ->
+        Foreign.allocaArray bufSize $ \buf -> do
+            log' <- GLW.glGetProgramInfoLog program (fromIntegral bufSize) sizePtr buf
+            logSize <- Foreign.peek sizePtr
+            log <- Foreign.peekCStringLen (buf, fromIntegral logSize)
+            throwIO . userError $ messagePrefix ++ ": " ++ log
+    where
+    bufSize = 256
+
+throwIfShaderErrorStatus
+    :: GLW.Shader t
+    -> GL.GLenum
+    -> String
+    -> IO ()
+throwIfShaderErrorStatus shader statusName messagePrefix = Foreign.alloca $ \p -> do
+    GLW.glGetShaderiv shader statusName p
+    status <- Foreign.peek p
+    unless (status == GL.GL_TRUE) $
+        Foreign.alloca $ \sizePtr ->
+        Foreign.allocaArray bufSize $ \buf -> do
+            log' <- GLW.glGetShaderInfoLog shader (fromIntegral bufSize) sizePtr buf
+            logSize <- Foreign.peek sizePtr
+            log <- Foreign.peekCStringLen (buf, fromIntegral logSize)
+            throwIO . userError $ messagePrefix ++ ": " ++ log
+    where
+    bufSize = 256

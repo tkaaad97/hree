@@ -6,7 +6,7 @@ module Sample
 
 import Control.Monad (forever, unless, when)
 import Control.Monad.IO.Class (liftIO)
-import qualified Graphics.Rendering.OpenGL as GL
+import qualified GLW
 import qualified Graphics.UI.GLFW as GLFW
 import System.Exit (ExitCode(..), exitSuccess)
 
@@ -43,4 +43,4 @@ shutdown win = do
 
 resizeWindow :: GLFW.WindowSizeCallback
 resizeWindow win w h =
-    GL.viewport   GL.$= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
+    GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)

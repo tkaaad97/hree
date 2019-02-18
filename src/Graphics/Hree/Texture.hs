@@ -3,21 +3,22 @@ module Graphics.Hree.Texture
     ) where
 
 import Data.ByteString (ByteString)
-import qualified Graphics.GL as GLRaw
-import qualified Graphics.Rendering.OpenGL as GL
+import qualified GLW
+import qualified Graphics.GL as GL
 
 data TextureConfig = TextureConfig
-    { target         :: !GL.TextureTarget2D
-    , level          :: !GLRaw.GLuint
-    , internalFormat :: !GL.PixelInternalFormat
-    , size           :: !GL.TextureSize2D
-    , border         :: !GLRaw.GLuint
-    , format         :: !GL.PixelFormat
-    , dataType       :: !GL.DataType
-    , magFilter      :: !GL.MagnificationFilter
-    , minFilter      :: !GL.MinificationFilter
-    , wrapS          :: !GLRaw.GLuint
-    , wrapT          :: !GLRaw.GLuint
+    { target         :: !GLW.TextureTarget
+    , level          :: !GL.GLint
+    , internalFormat :: !GL.GLint
+    , width          :: !GL.GLsizei
+    , height         :: !GL.GLsizei
+    , border         :: !GL.GLint
+    , format         :: !GLW.PixelFormat
+    , dataType       :: !GL.GLenum
+    , magFilter      :: !GLW.TextureMagFilter
+    , minFilter      :: !GLW.TextureMinFilter
+    , wrapS          :: !GL.GLint
+    , wrapT          :: !GL.GLint
     } deriving (Show, Eq)
 
 data Texture = Texture

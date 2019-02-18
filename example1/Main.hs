@@ -1,13 +1,14 @@
 module Main where
 
 import qualified Data.Vector.Storable as Vector
+import qualified GLW
+import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.GL.Vertex
 import qualified Graphics.Hree.Material as Material
 import Graphics.Hree.Mesh (Mesh(..))
 import Graphics.Hree.Scene
-import qualified Graphics.Rendering.OpenGL as GL
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
 import Sample
@@ -30,7 +31,7 @@ main = do
         , BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
         ]
 
-    geometry = Geometry.fromVertexVector 0 vs GL.StreamDraw
+    geometry = Geometry.fromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW
 
     material = Material.basicMaterial
 

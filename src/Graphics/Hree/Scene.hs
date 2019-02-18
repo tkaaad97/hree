@@ -18,22 +18,24 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
 import qualified Data.Traversable as Traversable (mapM)
 import qualified Foreign (nullPtr, with)
-import qualified Graphics.GL as GLRaw
+import qualified GLW
+import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit)
+import qualified GLW.Groups.PrimitiveType as PrimitiveType
+import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.Geometry
 import Graphics.Hree.GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
-import qualified Graphics.Rendering.OpenGL as GL
 import Unsafe.Coerce (unsafeCoerce)
 
 data MeshInfo = MeshInfo
     { mishInfoId          :: !Int
     , meshInfoMesh        :: !Mesh
-    , meshInfoBuffers     :: ![GL.BufferObject]
+    , meshInfoBuffers     :: ![GLW.Buffer]
     , meshInfoProgram     :: !ProgramInfo
-    , meshInfoVertexArray :: !GL.VertexArrayObject
+    , meshInfoVertexArray :: !GLW.VertexArray
     }
 
 data Scene = Scene
@@ -45,8 +47,8 @@ data Scene = Scene
 renderScene :: Scene -> Camera -> IO ()
 renderScene scene camera = do
     projectionViewMatrix <- getCameraMatrix camera
-    GL.clearColor GL.$= GL.Color4 1 1 1 1
-    GL.clear [GL.ColorBuffer]
+    GLW.glClearColor 1 1 1 1
+    GLW.glClear GLW.glColorBufferBit
     meshs <- readIORef (sceneMeshs scene)
     renderMeshs [] meshs
 
@@ -66,21 +68,21 @@ toRenderInfo m = renderInfo
 resolveDrawMethod :: Geometry -> DrawMethod
 resolveDrawMethod geo | isNothing (geometryIndexBuffer geo) =
     let count = fromIntegral . geometryCount $ geo
-    in DrawArrays GL.Triangles 0 count
+    in DrawArrays PrimitiveType.glTriangles 0 count
 resolveDrawMethod geo =
     let count = fromIntegral . geometryCount $ geo
-    in DrawElements GL.Triangles count GL.UnsignedInt Foreign.nullPtr
+    in DrawElements PrimitiveType.glTriangles count GL.GL_UNSIGNED_INT Foreign.nullPtr
 
 addMesh :: Scene -> Mesh -> IO Int
 addMesh scene mesh = do
     i <- genMeshId
 
     program <- mkProgramIfNotExists scene pspec
-    GL.currentProgram GL.$= Just (programInfoProgram program)
+    GLW.glUseProgram (programInfoProgram program)
 
     bs <- Traversable.mapM mkBuffer' buffers
     let bos = map fst . IntMap.elems $ bs
-    maybeIndexBuffer <- maybe (return Nothing) (fmap Just . mkBuffer GL.ElementArrayBuffer . uncurry BufferSource) indexBufferSource
+    maybeIndexBuffer <- maybe (return Nothing) (fmap Just . mkBuffer . uncurry BufferSource) indexBufferSource
     let bs' = maybe bos (: bos) maybeIndexBuffer
     vao <- mkVertexArray (geometryAttribBindings geo) bs maybeIndexBuffer program
     let minfo = MeshInfo i mesh bs' program vao
@@ -97,16 +99,16 @@ addMesh scene mesh = do
     indexBufferSource = geometryIndexBuffer geo
     pspec = resolveProgramSpec mesh
     mkBuffer' (source, setting) = do
-        b <- mkBuffer GL.ArrayBuffer source
+        b <- mkBuffer source
         return (b, setting)
 
 removeMesh :: Scene -> Int -> IO ()
 removeMesh scene i = do
     minfo <- atomicModifyIORef' meshesRef del
     case minfo of
-        Just (MeshInfo _ _ bs vao _) -> do
-            GL.deleteObjectNames bs
-            Foreign.with (unsafeCoerce vao) (GLRaw.glDeleteVertexArrays 1)
+        Just (MeshInfo _ _ bs _ vao) -> do
+            GLW.deleteObjects bs
+            GLW.deleteObject vao
         Nothing -> return ()
     where
     meshesRef = sceneMeshs scene
@@ -140,7 +142,7 @@ newScene = do
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
     meshes <- atomicModifyIORef' meshesRef $ \a -> (IntMap.empty, a)
-    mapM_ (mapM_ GL.deleteObjectName . meshInfoBuffers) meshes
+    mapM_ (mapM_ GLW.deleteObject . meshInfoBuffers) meshes
     where
     mcRef = sceneMeshCounter scene
     meshesRef = sceneMeshs scene

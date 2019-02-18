@@ -8,6 +8,7 @@ import Control.Exception (throwIO)
 import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString
+import Data.Coerce (coerce)
 import Data.Foldable (foldrM)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -16,7 +17,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (mapMaybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Storable as V
-import qualified Foreign (Storable(..), alloca, allocaArray)
+import qualified Foreign (Storable(..), alloca, allocaArray, castPtr)
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
@@ -26,7 +27,7 @@ import Unsafe.Coerce (unsafeCoerce)
 render :: [(ByteString, Uniform)] -> RenderInfo -> Maybe GLW.Program -> IO (Maybe GLW.Program)
 render commons a cur = do
     setCurrentProgram cur program
-    GL.glBindVertexArray (riVertexArray a)
+    GLW.glBindVertexArray (riVertexArray a)
     bindUniforms uniforms
     drawWith method
     return . Just $ program
@@ -38,7 +39,7 @@ render commons a cur = do
     setCurrentProgram (Just p0) p1 | p0 == p1 = return ()
     setCurrentProgram _ p = do
         bindUniforms . mapMaybe toUniformPair $ commons
-        GLW.glCurrentProgram p
+        GLW.glUseProgram p
     toUniformPair (k, u) =
         (,) <$> Map.lookup k uniformInfos <*> Just u
 
@@ -47,24 +48,24 @@ renderMany common = void . foldrM (render common) Nothing
 
 drawWith :: DrawMethod -> IO ()
 drawWith (DrawArrays mode index num) = GLW.glDrawArrays mode index num
-drawWith (DrawElements mode num dataType indicesOffset) = GL.glDrawElements mode num dataType indicesOffset
+drawWith (DrawElements mode num dataType indicesOffset) = GLW.glDrawElements mode num dataType indicesOffset
 
 mkBuffer :: BufferSource -> IO GLW.Buffer
-mkBuffer target (BufferSource vec usage) = do
+mkBuffer (BufferSource vec usage) = do
     let n = V.length vec
         size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
-    buffer <- GLW.createObject (Proxy :: Proxy GLW.Object)
-    V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size ptr usage
+    buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
+    V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
     return (unsafeCoerce buffer)
 
 mkVertexArray :: Map ByteString AttribBinding -> IntMap (GLW.Buffer, BindBufferSetting) -> Maybe GLW.Buffer -> ProgramInfo -> IO GLW.VertexArray
 mkVertexArray attribBindings buffers indexBuffer programInfo = do
-    GL.glCurrentProgram program
+    GLW.glUseProgram program
     vao <- GLW.createObject (Proxy :: Proxy GLW.VertexArray)
     mapM_ (setAttrib vao) (Map.toList attribBindings)
     mapM_ (setBindingBuffer vao) . IntMap.toList $ buffers
-    setIndexBuffer vaoId (unsafeCoerce indexBuffer)
-    GL.glCurrentProgram GLW.zero
+    setIndexBuffer vao (unsafeCoerce indexBuffer)
+    GLW.glUseProgram GLW.zero
     return vao
 
     where
@@ -72,29 +73,28 @@ mkVertexArray attribBindings buffers indexBuffer programInfo = do
 
     attribInfos = programInfoAttribs programInfo
 
-    setAttrib vaoId (k, a) = do
+    setAttrib vao (k, a) = do
         let binding = attribBindingIndex a
-        buffer <- maybe (throwIO . userError $ "binding buffer not found") return (IntMap.lookup binding buffers)
+        buffer <- maybe (throwIO . userError $ "binding buffer not found") return (IntMap.lookup (fromIntegral . GLW.unBindingIndex $ binding) buffers)
         location <- maybe (throwIO . userError $ "attrib not found") (return . aiAttribLocation) (Map.lookup k attribInfos)
-        setVertexArrayAttribFormatAndBinding vaoId location a
+        setVertexArrayAttribFormatAndBinding vao location a
 
-    setBindingBuffer vaoId (i, (b, BindBufferSetting offset stride)) =
-        GLW.glVertexArrayVertexBuffer vao (fromIntegral i) (unsafeCoerce b) (fromIntegral offset) (fromIntegral stride)
+    setBindingBuffer vao (i, (b, BindBufferSetting offset stride)) =
+        GLW.glVertexArrayVertexBuffer vao (GLW.BindingIndex . fromIntegral $ i) (unsafeCoerce b) (fromIntegral offset) (fromIntegral stride)
 
-    setIndexBuffer vaoId (Just b) =
+    setIndexBuffer vao (Just b) =
         GLW.glVertexArrayElementBuffer vao b
 
     setIndexBuffer _ Nothing = return ()
 
 
 setVertexArrayAttribFormatAndBinding :: GLW.VertexArray -> GLW.AttribLocation -> AttribBinding -> IO ()
-setVertexArrayAttribFormatAndBinding vaoId attribLocation (AttribBinding binding' format) = do
-    GLW.glVertexArrayAttribBinding vaoId attribLocation binding
-    GLW.glVertexArrayAttribFormat vaoId attribLocation formatSize formatDataType formatNormalized formatRelativeOffset
-    GLW.glEnableVertexArrayAttrib vaoId attribLocation
+setVertexArrayAttribFormatAndBinding vao attribLocation (AttribBinding binding format) = do
+    GLW.glVertexArrayAttribBinding vao attribLocation binding
+    GLW.glVertexArrayAttribFormat vao attribLocation formatSize formatDataType formatNormalized formatRelativeOffset
+    GLW.glEnableVertexArrayAttrib vao attribLocation
 
     where
-    binding = fromIntegral binding'
     AttribFormat fsize formatDataType fnormalized foffset = format
     formatSize = fromIntegral fsize
     formatNormalized = fromIntegral . fromEnum $ fnormalized

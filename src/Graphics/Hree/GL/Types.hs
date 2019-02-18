@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE StandaloneDeriving        #-}
@@ -32,7 +33,7 @@ deriving instance Show Uniform
 
 data UniformInfo = UniformInfo
     { uiUniformName     :: !ByteString
-    , uiUniformLocation :: !GL.GLuint
+    , uiUniformLocation :: !GLW.UniformLocation
     , uiUniformSize     :: !GL.GLuint
     , uiUniformDataType :: !GL.GLuint
     }
@@ -47,7 +48,7 @@ data AttribFormat = AttribFormat
 
 data AttribInfo = AttribInfo
     { aiAttribName     :: !ByteString
-    , aiAttribLocation :: !GL.GLuint
+    , aiAttribLocation :: !GLW.AttribLocation
     , aiAttribSize     :: !GL.GLuint
     , aiAttribDataType :: !GL.GLuint
     } deriving (Show, Eq)
@@ -63,7 +64,7 @@ data RenderInfo = RenderInfo
     , riDrawMethod  :: !DrawMethod
     , riVertexArray :: !GLW.VertexArray
     , riUniforms    :: ![(UniformInfo, Uniform)]
-    , riTexture     :: !(Maybe GLW.Texture)
+    , riTexture     :: !(Maybe (GLW.Texture 'GLW.GL_TEXTURE_2D))
     }
 
 data DrawMethod =
@@ -81,6 +82,6 @@ data BindBufferSetting = BindBufferSetting
     } deriving (Show, Eq)
 
 data AttribBinding = AttribBinding
-    { attribBindingIndex        :: !Int
+    { attribBindingIndex        :: !GLW.BindingIndex
     , attribBindingAttribFormat :: !AttribFormat
     } deriving (Show, Eq)

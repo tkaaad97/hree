@@ -25,6 +25,7 @@ dependencies:
 - containers
 - file-embed
 - gl
+- gl-wrapper
 - hashable
 - linear
 - resourcet
