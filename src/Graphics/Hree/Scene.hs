@@ -50,7 +50,7 @@ renderScene scene camera = do
     GLW.glClearColor 1 1 1 1
     GLW.glClear GLW.glColorBufferBit
     meshs <- readIORef (sceneMeshs scene)
-    renderMeshs [] meshs
+    renderMeshs [("projectionViewMatrix", Uniform projectionViewMatrix)] meshs
 
 renderMeshs :: [(ByteString, Uniform)] -> IntMap MeshInfo ->  IO ()
 renderMeshs uniforms = renderMany uniforms . fmap toRenderInfo
