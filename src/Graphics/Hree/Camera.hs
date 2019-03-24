@@ -1,15 +1,17 @@
 module Graphics.Hree.Camera
     ( Camera
+    , LookAt(..)
     , lookAt
     , newCamera
     , orthographic
     , perspective
+    , getCameraLookAt
     , getCameraMatrix
     , updateProjection
     , updateLookAt
     ) where
 
-import Data.IORef (IORef, atomicModifyIORef', newIORef)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Linear (M44, V3, (!*!))
 import qualified Linear (identity, lookAt, ortho, perspective)
 
@@ -85,3 +87,6 @@ updateLookAt (Camera cameraRef) l =
     atomicModifyIORef' cameraRef f
     where
     f (CameraState p _ m _) = (CameraState p l m True, ())
+
+getCameraLookAt :: Camera -> IO LookAt
+getCameraLookAt (Camera cameraRef) = cameraLookAt <$> readIORef cameraRef

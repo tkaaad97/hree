@@ -10,7 +10,7 @@ import qualified GLW
 import qualified Graphics.UI.GLFW as GLFW
 import System.Exit (ExitCode(..), exitSuccess)
 
-withWindow :: Int -> Int -> String -> IO a -> (a -> GLFW.Window -> IO ()) -> IO ()
+withWindow :: Int -> Int -> String -> (GLFW.Window -> IO a) -> (a -> GLFW.Window -> IO ()) -> IO ()
 withWindow width height title constructor f = do
     GLFW.setErrorCallback $ Just simpleErrorCallback
     r <- GLFW.init
@@ -25,7 +25,7 @@ withWindow width height title constructor f = do
               GLFW.makeContextCurrent m
               GLFW.setWindowSizeCallback win (Just resizeWindow)
               GLFW.setWindowCloseCallback win (Just shutdown)
-              constructor >>= liftIO . flip f win
+              constructor win >>= liftIO . flip f win
               GLFW.setErrorCallback $ Just simpleErrorCallback
               GLFW.destroyWindow win
           Nothing -> return ()

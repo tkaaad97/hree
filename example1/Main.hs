@@ -4,6 +4,7 @@ import qualified Data.Vector.Storable as Vector
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
+import Graphics.Hree.CameraControl.SphericalControl
 import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.GL.Vertex
 import qualified Graphics.Hree.Material as Material
@@ -21,7 +22,7 @@ main = do
     width  = 640
     height = 480
 
-    x = 1.0
+    x = 0.8
     vs = Vector.fromList
         [ BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
         , BasicVertex (V3 x x 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
@@ -41,10 +42,13 @@ main = do
 
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
-    init = do
+    init w = do
         scene <- newScene
         addMesh scene mesh
         camera <- newCamera proj la
+        control <- newSphericalControlDefault camera
+        setEnterOrLeaveEventCallback w (enterSphericalControl control) (leaveSphericalControl control)
+        setCursorMoveEventCallback w (updateSphericalControl control)
         return (scene, camera)
 
     onDisplay (s, c) w = do
@@ -56,3 +60,28 @@ main = do
         render = do
             renderScene s c
             GLFW.swapBuffers w
+
+    setEnterOrLeaveEventCallback w onEnter onLeave =
+        let callback w' GLFW.CursorState'InWindow    = go w' onEnter
+            callback w' GLFW.CursorState'NotInWindow = go w' onLeave
+            go w' f = do
+                (width, height) <- GLFW.getWindowSize w'
+                (x, y) <- GLFW.getCursorPos w'
+                f (calcControlPosition width height x y)
+        in GLFW.setCursorEnterCallback w (Just callback)
+
+    setCursorMoveEventCallback w onMove =
+        let callback w' x y = do
+                (width, height) <- GLFW.getWindowSize w'
+                onMove (calcControlPosition width height x y)
+        in GLFW.setCursorPosCallback w (Just callback)
+
+    calcControlPosition :: Int -> Int -> Double -> Double -> V2 Float
+    calcControlPosition width height x y =
+        let x' = if width > 0
+                then max 0 (min (fromIntegral width) (realToFrac x)) / fromIntegral width
+                else 0
+            y' = if height > 0
+                then max 0 (min (fromIntegral height) (realToFrac y)) / fromIntegral height
+                else 0
+        in V2 x' y'
