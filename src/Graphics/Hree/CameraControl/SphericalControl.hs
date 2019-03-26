@@ -11,8 +11,9 @@ module Graphics.Hree.CameraControl.SphericalControl
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef, writeIORef)
 import Data.Maybe (maybe)
+import Debug.Trace (traceShow, traceShowId)
 import Graphics.Hree.Camera
-import Linear (Additive((^+^), (^-^)), Quaternion(..), V2(..), V3(..))
+import Linear (Additive((^+^), (^-^)), Quaternion(..), V2(..), V3(..), (*^))
 import qualified Linear
 
 data SphericalControl = SphericalControl
@@ -56,16 +57,19 @@ updateSphericalControl (SphericalControl settings camera ref) cp1 = do
     where
     go _ Nothing = (Nothing, Nothing)
     go (LookAt eye center up) (Just (SphericalControlState cp0)) =
-        let (V2 dx dy) = cp1 ^-^ cp0
-            deltaPhi = dx * polarAngleFactor settings
-            deltaTheta = dy * azimuthAngleFactor settings
+        let (V2 dx dy) = cp0 ^-^ cp1
             offset = eye ^-^ center
-            axis = if Linear.nearZero . abs $ up `Linear.dot` offset
-                then rotationBetween (V3 0 1 0) up `Linear.rotate` V3 (-1) 0 0
-                else Linear.normalize $ offset `Linear.cross` up
-            qa = Linear.axisAngle up deltaPhi
-            qp = Linear.axisAngle axis deltaTheta
-            v = (qa * qp) `Linear.rotate` offset
+            quat = rotationBetween up (V3 0 1 0)
+            quatInv = Linear.conjugate quat
+            offset' = quat `Linear.rotate` offset
+            (r, phi0, theta0) = calcSpherical offset'
+            deltaPhi = dy * polarAngleFactor settings
+            deltaTheta = dx * azimuthAngleFactor settings
+            phi = min pi $ max 0 (phi0 + deltaPhi)
+            theta = theta0 + deltaTheta
+            qp = Linear.axisAngle (V3 1 0 0) phi
+            qa = Linear.axisAngle (V3 0 1 0) theta
+            v = (quatInv * qa * qp) `Linear.rotate` (r *^ V3 0 1 0)
             eye' = v ^+^ center
         in (Just (SphericalControlState cp1), Just (LookAt eye' center up))
 
@@ -80,5 +84,13 @@ rotationBetween v0 v1 = q
     v0' = Linear.normalize v0
     v1' = Linear.normalize v1
     axis = v0' `Linear.cross` v1'
-    theta = v0 `Linear.dot` v1
+    theta = acos $ v0' `Linear.dot` v1'
     q = Linear.axisAngle axis theta
+
+calcSpherical :: V3 Float -> (Float, Float, Float)
+calcSpherical v @ (V3 x y z) =
+    if Linear.nearZero r
+        then (r, 0, 0)
+        else (r, acos (y / r), atan2 x z)
+    where
+    r = Linear.norm v

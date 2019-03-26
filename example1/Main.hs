@@ -38,7 +38,8 @@ main = do
 
     mesh = Mesh geometry material
 
-    proj = orthographic 0 1 0 1 (-10) 10
+    --proj = orthographic 0 1 0 1 (-10) 10
+    proj = perspective 90 1.0 0.1 10.0
 
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
@@ -47,7 +48,8 @@ main = do
         addMesh scene mesh
         camera <- newCamera proj la
         control <- newSphericalControlDefault camera
-        setEnterOrLeaveEventCallback w (enterSphericalControl control) (leaveSphericalControl control)
+        setMouseButtonEventCallback w (enterSphericalControl control) (leaveSphericalControl control)
+        setEnterOrLeaveEventCallback w (const $ return ()) (leaveSphericalControl control)
         setCursorMoveEventCallback w (updateSphericalControl control)
         return (scene, camera)
 
@@ -60,6 +62,16 @@ main = do
         render = do
             renderScene s c
             GLFW.swapBuffers w
+
+    setMouseButtonEventCallback w onPress onRelease =
+        let callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Pressed _ = go w' onPress
+            callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Released _ = go w' onRelease
+            callback _ _ _ _ = return ()
+            go w' f = do
+                (width, height) <- GLFW.getWindowSize w'
+                (x, y) <- GLFW.getCursorPos w'
+                f (calcControlPosition width height x y)
+        in GLFW.setMouseButtonCallback w (Just callback)
 
     setEnterOrLeaveEventCallback w onEnter onLeave =
         let callback w' GLFW.CursorState'InWindow    = go w' onEnter

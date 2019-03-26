@@ -13,7 +13,7 @@ module Graphics.Hree.Camera
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Linear (M44, V3, (!*!))
-import qualified Linear (identity, lookAt, ortho, perspective)
+import qualified Linear (identity, lookAt, normalize, ortho, perspective)
 
 newtype Camera = Camera
     { unCamera :: IORef CameraState
@@ -55,7 +55,7 @@ orthographic :: Float -> Float -> Float -> Float -> Float -> Float -> Projection
 orthographic = Orthographic
 
 lookAt :: V3 Float -> V3 Float -> V3 Float -> LookAt
-lookAt = LookAt
+lookAt eye center up = LookAt eye center (Linear.normalize up)
 
 newCamera :: Projection -> LookAt -> IO Camera
 newCamera p l = Camera <$> newIORef (CameraState p l Linear.identity True)
