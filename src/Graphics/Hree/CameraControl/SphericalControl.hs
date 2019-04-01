@@ -1,5 +1,6 @@
 module Graphics.Hree.CameraControl.SphericalControl
     ( SphericalControl
+    , SphericalControlMode(..)
     , SphericalControlSettings(..)
     , defaultSphericalControlSettings
     , newSphericalControl
@@ -16,6 +17,11 @@ import Graphics.Hree.Camera
 import Linear (Additive((^+^), (^-^)), Quaternion(..), V2(..), V3(..), (*^))
 import qualified Linear
 
+data SphericalControlMode =
+    SphericalControlModeOrbit |
+    SphericalControlModeZoom
+    deriving (Show, Eq)
+
 data SphericalControl = SphericalControl
     { orbitControlSettings :: !SphericalControlSettings
     , orbitControlCamera   :: !Camera
@@ -28,7 +34,8 @@ data SphericalControlSettings = SphericalControlSettings
     } deriving (Show, Eq)
 
 data SphericalControlState = SphericalControlState
-    { prevControlPosition :: !(V2 Float)
+    { currentControlMode  :: !SphericalControlMode
+    , prevControlPosition :: !(V2 Float)
     } deriving (Show, Eq)
 
 defaultSphericalControlSettings :: SphericalControlSettings
@@ -43,10 +50,10 @@ newSphericalControl settings camera =
 newSphericalControlDefault :: Camera -> IO SphericalControl
 newSphericalControlDefault = newSphericalControl defaultSphericalControlSettings
 
-enterSphericalControl :: SphericalControl -> V2 Float -> IO ()
-enterSphericalControl (SphericalControl settings camera ref) cp = do
+enterSphericalControl :: SphericalControl -> SphericalControlMode -> V2 Float -> IO ()
+enterSphericalControl (SphericalControl settings camera ref) mode cp = do
     LookAt eye center up <- getCameraLookAt camera
-    let s = SphericalControlState cp
+    let s = SphericalControlState mode cp
     writeIORef ref (Just s)
 
 updateSphericalControl :: SphericalControl -> V2 Float -> IO ()
@@ -56,7 +63,7 @@ updateSphericalControl (SphericalControl settings camera ref) cp1 = do
     maybe (return ()) (updateLookAt camera) updatedLookAt
     where
     go _ Nothing = (Nothing, Nothing)
-    go (LookAt eye center up) (Just (SphericalControlState cp0)) =
+    go (LookAt eye center up) (Just (SphericalControlState SphericalControlModeOrbit cp0)) =
         let (V2 dx dy) = cp0 ^-^ cp1
             offset = eye ^-^ center
             quat = rotationBetween up (V3 0 1 0)
@@ -71,7 +78,17 @@ updateSphericalControl (SphericalControl settings camera ref) cp1 = do
             qa = Linear.axisAngle (V3 0 1 0) theta
             v = (quatInv * qa * qp) `Linear.rotate` (r *^ V3 0 1 0)
             eye' = v ^+^ center
-        in (Just (SphericalControlState cp1), Just (LookAt eye' center up))
+        in (Just (SphericalControlState SphericalControlModeOrbit cp1), Just (LookAt eye' center up))
+
+    go (LookAt eye center up) (Just (SphericalControlState SphericalControlModeZoom cp0)) =
+        let V2 _ y0 = cp0
+            V2 _ y1 = cp1
+            dy = y1 - y0
+            f = 1.0 + dy * 10.0
+            offset = eye ^-^ center
+            offset' = f *^ offset
+            eye' = offset' ^+^ center
+        in (Just (SphericalControlState SphericalControlModeZoom cp1), Just (LookAt eye' center up))
 
 leaveSphericalControl :: SphericalControl -> V2 Float -> IO ()
 leaveSphericalControl control cp1 = do

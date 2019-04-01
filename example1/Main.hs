@@ -64,8 +64,10 @@ main = do
             GLFW.swapBuffers w
 
     setMouseButtonEventCallback w onPress onRelease =
-        let callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Pressed _ = go w' onPress
+        let callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Pressed _ = go w' (onPress SphericalControlModeOrbit)
+            callback w' GLFW.MouseButton'2 GLFW.MouseButtonState'Pressed _ = go w' (onPress SphericalControlModeZoom)
             callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Released _ = go w' onRelease
+            callback w' GLFW.MouseButton'2 GLFW.MouseButtonState'Released _ = go w' onRelease
             callback _ _ _ _ = return ()
             go w' f = do
                 (width, height) <- GLFW.getWindowSize w'
