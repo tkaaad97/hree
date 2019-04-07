@@ -32,11 +32,7 @@ main = do
         , BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
         ]
 
-    geometry = Geometry.fromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW
-
     material = Material.basicMaterial
-
-    mesh = Mesh geometry material
 
     --proj = orthographic 0 1 0 1 (-10) 10
     proj = perspective 90 1.0 0.1 10.0
@@ -45,6 +41,8 @@ main = do
 
     init w = do
         scene <- newScene
+        geometry <- geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+        let mesh = Mesh geometry material
         addMesh scene mesh
         camera <- newCamera proj la
         control <- newSphericalControlDefault camera
