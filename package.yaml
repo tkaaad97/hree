@@ -58,3 +58,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - hree
+    - hspec
+    - GLFW-b
