@@ -1,4 +1,6 @@
-FROM tkaaad97/haskell-docker:8.6.3
+FROM tkaaad97/haskell-docker:8.6.4
+
+ENV DEBIAN_FRONTEND noninteractive
 
 # install dev tools
 RUN apt-get update && \
