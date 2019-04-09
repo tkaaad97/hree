@@ -16,7 +16,8 @@ RUN apt-get update && \
         libxinerama-dev \
         libxcursor-dev \
         libxi-dev \
-        libxxf86vm-dev
+        libxxf86vm-dev \
+        libosmesa6-dev
 
 WORKDIR /app/
 
