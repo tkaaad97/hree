@@ -60,3 +60,5 @@ tests:
     - hree
     - hspec
     - GLFW-b
+    extra-libraries:
+    - OSMesa
