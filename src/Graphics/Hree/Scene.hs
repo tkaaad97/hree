@@ -118,19 +118,21 @@ addMesh scene mesh = do
 
 removeMesh :: Scene -> Int -> IO ()
 removeMesh scene i = do
-    minfo <- atomicModifyIORef' meshesRef delMesh
-    case minfo of
-        Just (MeshInfo _ _ bs _ vao) -> do
-            GLW.deleteObject vao
-            ds <- decrementBufferRefCounter bs
-            GLW.deleteObjects ds
-        Nothing -> return ()
+    minfo <- atomicModifyIORef' meshesRef del
+    maybe (return ()) (deleteMesh scene) minfo
     where
     meshesRef = sceneMeshes scene
-    sceneBufferRef = sceneBufferRefCounter scene
-    delMesh m =
+    del m =
         let (x, m') = IntMap.updateLookupWithKey (const $ const Nothing) i m
         in (m', x)
+
+deleteMesh :: Scene -> MeshInfo -> IO ()
+deleteMesh scene (MeshInfo _ _ bs _ vao) = do
+    GLW.deleteObject vao
+    ds <- decrementBufferRefCounter bs
+    GLW.deleteObjects ds
+    where
+    sceneBufferRef = sceneBufferRefCounter scene
     updateLookupWith' f k (xs, m) =
         let (x, m') = IntMap.updateLookupWithKey f k m
         in (x : xs, m')
@@ -186,8 +188,13 @@ newScene = do
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
+    -- removeMeshes
     meshes <- atomicModifyIORef' meshesRef $ \a -> (IntMap.empty, a)
-    mapM_ (mapM_ GLW.deleteObject . meshInfoBuffers) meshes
+    mapM_ (deleteMesh scene) meshes
+    -- delete unreferenced orphan buffers
+    bufferIds <- atomicModifyIORef' bufferRefCounter $ \a -> (IntMap.empty, IntMap.keys a)
+    mapM_ (GLW.deleteObject . GLW.Buffer . fromIntegral) bufferIds
     where
     mcRef = sceneMeshCounter scene
     meshesRef = sceneMeshes scene
+    bufferRefCounter = sceneBufferRefCounter scene
