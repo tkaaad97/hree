@@ -94,6 +94,7 @@ mkShader _ source =
         shader <- GLW.createObject (Proxy :: Proxy (GLW.Shader k))
         GLW.glShaderSource shader 1 sp lp
         GLW.glCompileShader shader
+        throwIfShaderErrorStatus shader GL.GL_COMPILE_STATUS "shader compile error"
         return shader
 
 getActiveAttribs :: GLW.Program -> IO [AttribInfo]
