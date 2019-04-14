@@ -19,7 +19,7 @@ data Geometry = Geometry
     , geometryBuffers        :: !(IntMap (GLW.Buffer, BindBufferSetting))
     , geometryIndexBuffer    :: !(Maybe GLW.Buffer)
     , geometryCount          :: !Int
-    }
+    } deriving (Show)
 
 empty :: Geometry
 empty = Geometry Map.empty IntMap.empty Nothing 0

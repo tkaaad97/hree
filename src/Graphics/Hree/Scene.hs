@@ -47,11 +47,11 @@ data MeshInfo = MeshInfo
     , meshInfoBuffers     :: ![GLW.Buffer]
     , meshInfoProgram     :: !ProgramInfo
     , meshInfoVertexArray :: !GLW.VertexArray
-    }
+    } deriving (Show)
 
 data Scene = Scene
     { sceneMeshCounter      :: !(IORef Int)
-    , sceneMeshs            :: !(IORef (IntMap MeshInfo))
+    , sceneMeshes           :: !(IORef (IntMap MeshInfo))
     , sceneBufferRefCounter :: !(IORef (IntMap Int))
     , scenePrograms         :: !(IORef (Map ProgramSpec ProgramInfo))
     }
@@ -61,11 +61,11 @@ renderScene scene camera = do
     projectionViewMatrix <- getCameraMatrix camera
     GLW.glClearColor 1 1 1 1
     GLW.glClear GLW.glColorBufferBit
-    meshs <- readIORef (sceneMeshs scene)
-    renderMeshs [("projectionViewMatrix", Uniform projectionViewMatrix)] meshs
+    meshs <- readIORef (sceneMeshes scene)
+    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] meshs
 
-renderMeshs :: [(ByteString, Uniform)] -> IntMap MeshInfo ->  IO ()
-renderMeshs uniforms = renderMany uniforms . fmap toRenderInfo
+renderMeshes :: [(ByteString, Uniform)] -> IntMap MeshInfo ->  IO ()
+renderMeshes uniforms = renderMany uniforms . fmap toRenderInfo
 
 toRenderInfo :: MeshInfo -> RenderInfo
 toRenderInfo m = renderInfo
@@ -102,7 +102,7 @@ addMesh scene mesh = do
 
     where
     mcRef = sceneMeshCounter scene
-    meshesRef = sceneMeshs scene
+    meshesRef = sceneMeshes scene
     sceneBufferRef = sceneBufferRefCounter scene
     genMeshId = atomicModifyIORef' mcRef (\a -> (a + 1, a))
     insertMeshInfo i minfo = atomicModifyIORef' meshesRef $ \a -> (IntMap.insert i minfo a, ())
@@ -118,7 +118,7 @@ addMesh scene mesh = do
 
 removeMesh :: Scene -> Int -> IO ()
 removeMesh scene i = do
-    minfo <- atomicModifyIORef' meshesRef del
+    minfo <- atomicModifyIORef' meshesRef delMesh
     case minfo of
         Just (MeshInfo _ _ bs _ vao) -> do
             GLW.deleteObject vao
@@ -126,11 +126,11 @@ removeMesh scene i = do
             GLW.deleteObjects ds
         Nothing -> return ()
     where
-    meshesRef = sceneMeshs scene
+    meshesRef = sceneMeshes scene
     sceneBufferRef = sceneBufferRefCounter scene
-    del a =
-        let x = IntMap.lookup i a
-        in maybe (a, Nothing) ((,) (IntMap.delete i a) . Just) x
+    delMesh m =
+        let (x, m') = IntMap.updateLookupWithKey (const $ const Nothing) i m
+        in (m', x)
     updateLookupWith' f k (xs, m) =
         let (x, m') = IntMap.updateLookupWithKey f k m
         in (x : xs, m')
@@ -139,7 +139,7 @@ removeMesh scene i = do
             decrementOrDelete a
                 | a <= 1 = Nothing
                 | otherwise = Just (a - 1)
-            (xs, m') = foldr' (updateLookupWith' (const . decrementOrDelete)) ([], m) ks
+            (xs, m') = foldr' (updateLookupWith' (const decrementOrDelete)) ([], m) ks
             ds = map fst . filter ((== Just 1) . snd) $ (ks `zip` xs)
             ds' = map (GLW.Buffer . fromIntegral) ds
         in (m', ds')
@@ -190,4 +190,4 @@ deleteScene scene = do
     mapM_ (mapM_ GLW.deleteObject . meshInfoBuffers) meshes
     where
     mcRef = sceneMeshCounter scene
-    meshesRef = sceneMeshs scene
+    meshesRef = sceneMeshes scene
