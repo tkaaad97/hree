@@ -13,4 +13,4 @@ data Mesh = Mesh
     }
 
 resolveProgramSpec :: Mesh -> ProgramSpec
-resolveProgramSpec _ = ProgramSpec VertexShaderSpec FragmentShaderSpec
+resolveProgramSpec = materialProgramSpecifier . meshMaterial

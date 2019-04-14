@@ -1,6 +1,7 @@
 module Graphics.Hree.Material
     ( Material(..)
     , basicMaterial
+    , testMaterial
     ) where
 
 import Data.ByteString (ByteString)
@@ -22,3 +23,10 @@ basicMaterial = Material u t p
     u = Map.empty
     t = []
     p = basicProgramSpec
+
+testMaterial :: Material
+testMaterial = Material u t p
+    where
+    u = Map.empty
+    t = []
+    p = testProgramSpec

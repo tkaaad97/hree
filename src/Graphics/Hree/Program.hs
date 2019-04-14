@@ -9,6 +9,7 @@ module Graphics.Hree.Program
     , FragmentShaderSpec(..)
     , ProgramSpec(..)
     , basicProgramSpec
+    , testProgramSpec
     , mkProgram
     ) where
 
@@ -31,10 +32,14 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
 
-data VertexShaderSpec = VertexShaderSpec
+data VertexShaderSpec =
+    BasicVertexShader |
+    TestVertexShader
     deriving (Show, Eq, Ord)
 
-data FragmentShaderSpec = FragmentShaderSpec
+data FragmentShaderSpec =
+    BasicFragmentShader |
+    TestFragmentShader
     deriving (Show, Eq, Ord)
 
 data ProgramSpec = ProgramSpec
@@ -43,7 +48,10 @@ data ProgramSpec = ProgramSpec
     } deriving (Show, Eq, Ord)
 
 basicProgramSpec :: ProgramSpec
-basicProgramSpec = ProgramSpec VertexShaderSpec FragmentShaderSpec
+basicProgramSpec = ProgramSpec BasicVertexShader BasicFragmentShader
+
+testProgramSpec :: ProgramSpec
+testProgramSpec = ProgramSpec TestVertexShader TestFragmentShader
 
 instance Hashable VertexShaderSpec where
     hash _ = 0
@@ -77,14 +85,16 @@ mkProgram (ProgramSpec vspec fspec) = do
     return $ ProgramInfo program attribMap uniformMap
 
 mkVertexShader :: VertexShaderSpec -> IO (GLW.Shader 'GLW.GL_VERTEX_SHADER)
-mkVertexShader _ = mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) shaderSource
-    where
-    shaderSource = $(embedFile "shader/basic-vertex.glsl")
+mkVertexShader BasicVertexShader =
+    mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) $(embedFile "shader/basic-vertex.glsl")
+mkVertexShader TestVertexShader =
+    mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) $(embedFile "shader/test-vertex.glsl")
 
 mkFragmentShader :: FragmentShaderSpec -> IO (GLW.Shader 'GLW.GL_FRAGMENT_SHADER)
-mkFragmentShader _ = mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) shaderSource
-    where
-    shaderSource = $(embedFile "shader/basic-fragment.glsl")
+mkFragmentShader BasicFragmentShader =
+    mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/basic-fragment.glsl")
+mkFragmentShader TestFragmentShader =
+    mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/test-fragment.glsl")
 
 mkShader :: forall (k :: GLW.ShaderType). GLW.SingShaderType k => Proxy k -> ByteString -> IO (GLW.Shader k)
 mkShader _ source =
