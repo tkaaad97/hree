@@ -76,8 +76,10 @@ mkVertexArray attribBindings buffers indexBuffer programInfo = do
     setAttrib vao (k, a) = do
         let binding = attribBindingIndex a
         buffer <- maybe (throwIO . userError $ "binding buffer not found") return (IntMap.lookup (fromIntegral . GLW.unBindingIndex $ binding) buffers)
-        location <- maybe (throwIO . userError $ "attrib not found") (return . aiAttribLocation) (Map.lookup k attribInfos)
-        setVertexArrayAttribFormatAndBinding vao location a
+        let maybeLocation = aiAttribLocation <$> Map.lookup k attribInfos
+        maybe (return ())
+            (\location -> setVertexArrayAttribFormatAndBinding vao location a)
+            maybeLocation
 
     setBindingBuffer vao (i, (b, BindBufferSetting offset stride)) =
         GLW.glVertexArrayVertexBuffer vao (GLW.BindingIndex . fromIntegral $ i) (unsafeCoerce b) (fromIntegral offset) (fromIntegral stride)
