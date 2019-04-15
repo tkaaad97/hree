@@ -149,9 +149,16 @@ deleteMesh scene (MeshInfo _ _ bs _ vao) = do
     decrementBufferRefCounter bs =
         atomicModifyIORef' sceneBufferRef (decrementAndLookupDeletion bs)
 
+addBuffer :: Scene -> BufferSource -> IO GLW.Buffer
+addBuffer scene bufferSource = do
+    buffer <- mkBuffer bufferSource
+    let bufferId = fromIntegral . GLW.unBuffer $ buffer
+    atomicModifyIORef' (sceneBufferRefCounter scene) (\a -> (IntMap.insert bufferId 0 a, ()))
+    return buffer
+
 geometryFromVertexVector :: forall a. (Storable a, Vertex a) => GLW.BindingIndex -> Vector a -> GL.GLenum -> Scene -> IO Geometry
 geometryFromVertexVector bindingIndex storage usage scene = do
-    buffer <- mkBuffer (BufferSource storage usage)
+    buffer <- addBuffer scene (BufferSource storage usage)
     let buffers = IntMap.singleton (fromIntegral . GLW.unBindingIndex $ bindingIndex) (buffer, bbs)
     return (Geometry attribBindings buffers Nothing num)
     where

@@ -54,7 +54,7 @@ spec = do
             bufferRefCounter <- readIORef . Hree.sceneBufferRefCounter $ scene
             bufferRefCounter `shouldBe` IntMap.fromList []
 
-        specify "buffer will be released when all reference removed"  . runOnOSMesaContext width height $ do
+        specify "buffer will be released when all reference removed" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
             geometry <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material
@@ -65,6 +65,35 @@ spec = do
             (`shouldBe` IntMap.fromList [(1, 1)]) =<< readIORef (Hree.sceneBufferRefCounter scene)
             Hree.removeMesh scene meshId2
             (`shouldBe` IntMap.fromList []) =<< readIORef (Hree.sceneBufferRefCounter scene)
+
+    describe "deleteScene" $ do
+        it "delete meshes" . runOnOSMesaContext width height $ do
+            scene <- Hree.newScene
+            geometry1 <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+            geometry2 <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+            let mesh1 = Hree.Mesh geometry1 material
+                mesh2 = Hree.Mesh geometry2 material
+            meshId1 <- Hree.addMesh scene mesh1
+            meshId2 <- Hree.addMesh scene mesh2
+            meshes <- readIORef . Hree.sceneMeshes $ scene
+            IntMap.size meshes `shouldBe` 2
+            bufferRefCounter <- readIORef . Hree.sceneBufferRefCounter $ scene
+            bufferRefCounter `shouldBe` IntMap.fromList [(1, 1), (2, 1)]
+            Hree.deleteScene scene
+            meshesAfter <- readIORef . Hree.sceneMeshes $ scene
+            IntMap.size meshesAfter `shouldBe` 0
+            bufferRefCounterAfter <- readIORef . Hree.sceneBufferRefCounter $ scene
+            bufferRefCounterAfter `shouldBe` IntMap.empty
+
+        it "delete unreferenced orphan buffers" . runOnOSMesaContext width height $ do
+            scene <- Hree.newScene
+            geometry <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+            let mesh = Hree.Mesh geometry material
+            bufferRefCounter <- readIORef . Hree.sceneBufferRefCounter $ scene
+            bufferRefCounter `shouldBe` IntMap.fromList [(1, 0)]
+            Hree.deleteScene scene
+            bufferRefCounterAfter <- readIORef . Hree.sceneBufferRefCounter $ scene
+            bufferRefCounterAfter `shouldBe` IntMap.empty
 
     where
     width = 1
