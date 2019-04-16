@@ -3,6 +3,7 @@
 module Graphics.Hree.Scene
     ( MeshInfo(..)
     , Scene(..)
+    , SceneState(..)
     , addMesh
     , deleteScene
     , geometryFromVertexVector
@@ -20,7 +21,7 @@ import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import qualified Data.List as List (nub)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, mapMaybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Traversable as Traversable (mapM)
 import Data.Vector.Storable (Vector)
@@ -49,11 +50,13 @@ data MeshInfo = MeshInfo
     , meshInfoVertexArray :: !GLW.VertexArray
     } deriving (Show)
 
-data Scene = Scene
-    { sceneMeshCounter      :: !(IORef Int)
-    , sceneMeshes           :: !(IORef (IntMap MeshInfo))
-    , sceneBufferRefCounter :: !(IORef (IntMap Int))
-    , scenePrograms         :: !(IORef (Map ProgramSpec ProgramInfo))
+newtype Scene = Scene { unScene :: IORef SceneState }
+
+data SceneState = SceneState
+    { ssMeshCounter      :: !Int
+    , ssMeshes           :: !(IntMap MeshInfo)
+    , ssBufferRefCounter :: !(IntMap Int)
+    , ssPrograms         :: !(Map ProgramSpec ProgramInfo)
     }
 
 renderScene :: Scene -> Camera -> IO ()
@@ -61,8 +64,8 @@ renderScene scene camera = do
     projectionViewMatrix <- getCameraMatrix camera
     GLW.glClearColor 1 1 1 1
     GLW.glClear GLW.glColorBufferBit
-    meshs <- readIORef (sceneMeshes scene)
-    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] meshs
+    meshes <- fmap ssMeshes . readIORef . unScene $ scene
+    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] meshes
 
 renderMeshes :: [(ByteString, Uniform)] -> IntMap MeshInfo ->  IO ()
 renderMeshes uniforms = renderMany uniforms . fmap toRenderInfo
@@ -87,55 +90,57 @@ resolveDrawMethod geo =
 
 addMesh :: Scene -> Mesh -> IO Int
 addMesh scene mesh = do
-    i <- genMeshId
-
-    program <- mkProgramIfNotExists scene pspec
+    (program, programAdded) <- mkProgramIfNotExists scene pspec
     GLW.glUseProgram (programInfoProgram program)
-
-    let bos = map fst . IntMap.elems $ buffers
-    let bs' = maybe bos (: bos) maybeIndexBuffer
     vao <- mkVertexArray (geometryAttribBindings geo) buffers maybeIndexBuffer program
-    let minfo = MeshInfo i mesh bs' program vao
-    insertMeshInfo i minfo
-    incrementBufferRefCounter bs'
-    return i
+    atomicModifyIORef' (unScene scene) (addMeshFunc program programAdded vao)
 
     where
-    mcRef = sceneMeshCounter scene
-    meshesRef = sceneMeshes scene
-    sceneBufferRef = sceneBufferRefCounter scene
-    genMeshId = atomicModifyIORef' mcRef (\a -> (a + 1, a))
-    insertMeshInfo i minfo = atomicModifyIORef' meshesRef $ \a -> (IntMap.insert i minfo a, ())
-    insertsWith f = foldr' (uncurry $ IntMap.insertWith f)
-    incrementBufferRefCounter bs =
-        let bs' = List.nub . map (fromIntegral . GLW.unBuffer) $ bs
-        in atomicModifyIORef' sceneBufferRef $
-            \a -> (insertsWith (+) a (bs' `zip` repeat 1), ())
+    insertsWith f kvs m = foldr' (uncurry $ IntMap.insertWith f) m kvs
+    addMeshFunc program programAdded vao state =
+        let meshId = ssMeshCounter state
+            meshCounter = meshId + 1
+            bos = map fst . IntMap.elems $ buffers
+            bos' = maybe bos (: bos) maybeIndexBuffer
+            nubBufferIds = List.nub . map (fromIntegral . GLW.unBuffer) $ bos'
+            minfo = MeshInfo meshId mesh bos' program vao
+            meshes = IntMap.insert meshId minfo (ssMeshes state)
+            bufferRefCounter =
+                insertsWith (+) (nubBufferIds `zip` repeat 1) (ssBufferRefCounter state)
+            programs = if programAdded
+                        then Map.insert pspec program (ssPrograms state)
+                        else ssPrograms state
+            newState = SceneState meshCounter meshes bufferRefCounter programs
+        in (newState, meshId)
+
     geo = meshGeometry mesh
     buffers = geometryBuffers geo
     maybeIndexBuffer = geometryIndexBuffer geo
     pspec = resolveProgramSpec mesh
 
 removeMesh :: Scene -> Int -> IO ()
-removeMesh scene i = do
-    minfo <- atomicModifyIORef' meshesRef del
-    maybe (return ()) (deleteMesh scene) minfo
+removeMesh scene meshId = do
+    (vao, deletedBuffers) <- atomicModifyIORef' state (removeMeshFunc meshId)
+    maybe (return ()) GLW.deleteObject vao
+    GLW.deleteObjects deletedBuffers
     where
-    meshesRef = sceneMeshes scene
-    del m =
-        let (x, m') = IntMap.updateLookupWithKey (const $ const Nothing) i m
-        in (m', x)
+    state = unScene scene
 
-deleteMesh :: Scene -> MeshInfo -> IO ()
-deleteMesh scene (MeshInfo _ _ bs _ vao) = do
-    GLW.deleteObject vao
-    ds <- decrementBufferRefCounter bs
-    GLW.deleteObjects ds
+removeMeshFunc :: Int -> SceneState -> (SceneState, (Maybe GLW.VertexArray, [GLW.Buffer]))
+removeMeshFunc meshId state =
+    let (result, meshes) = IntMap.updateLookupWithKey (const $ const Nothing) meshId (ssMeshes state)
+        vao = fmap meshInfoVertexArray result
+        bos = maybe [] meshInfoBuffers result
+        (bufferRefCounter, deletedBuffers) = decrementAndLookupDeletion bos (ssBufferRefCounter state)
+        newState = state { ssMeshes = meshes, ssBufferRefCounter = bufferRefCounter }
+    in (newState, (vao, deletedBuffers))
     where
-    sceneBufferRef = sceneBufferRefCounter scene
+
     updateLookupWith' f k (xs, m) =
         let (x, m') = IntMap.updateLookupWithKey f k m
         in (x : xs, m')
+
+    decrementAndLookupDeletion [] m = (m, [])
     decrementAndLookupDeletion bs m =
         let ks = List.nub . map (fromIntegral . GLW.unBuffer) $ bs
             decrementOrDelete a
@@ -146,15 +151,16 @@ deleteMesh scene (MeshInfo _ _ bs _ vao) = do
             ds' = map (GLW.Buffer . fromIntegral) ds
         in (m', ds')
 
-    decrementBufferRefCounter bs =
-        atomicModifyIORef' sceneBufferRef (decrementAndLookupDeletion bs)
-
 addBuffer :: Scene -> BufferSource -> IO GLW.Buffer
 addBuffer scene bufferSource = do
     buffer <- mkBuffer bufferSource
     let bufferId = fromIntegral . GLW.unBuffer $ buffer
-    atomicModifyIORef' (sceneBufferRefCounter scene) (\a -> (IntMap.insert bufferId 0 a, ()))
+    atomicModifyIORef' (unScene scene) (addBufferFunc bufferId)
     return buffer
+    where
+    addBufferFunc bufferId state =
+        let bufferRefCounter = IntMap.insert bufferId 0 (ssBufferRefCounter state)
+        in (state { ssBufferRefCounter = bufferRefCounter }, ())
 
 geometryFromVertexVector :: forall a. (Storable a, Vertex a) => GLW.BindingIndex -> Vector a -> GL.GLenum -> Scene -> IO Geometry
 geometryFromVertexVector bindingIndex storage usage scene = do
@@ -171,37 +177,48 @@ geometryFromVertexVector bindingIndex storage usage scene = do
 
 --setBackground
 
-mkProgramIfNotExists :: Scene -> ProgramSpec -> IO ProgramInfo
+mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)
 mkProgramIfNotExists scene pspec = do
-    programs <- readIORef programsRef
+    programs <- fmap ssPrograms . readIORef . unScene $ scene
     let maybeProgram = Map.lookup pspec programs
-    maybe (mkProgramAndInsert programsRef pspec) return maybeProgram
-    where
-    programsRef = scenePrograms scene
+    maybe (flip (,) True <$> mkProgramAndInsert scene pspec) (return . flip (,) False) maybeProgram
 
-mkProgramAndInsert :: IORef (Map ProgramSpec ProgramInfo) -> ProgramSpec -> IO ProgramInfo
-mkProgramAndInsert programsRef pspec = do
+mkProgramAndInsert :: Scene -> ProgramSpec -> IO ProgramInfo
+mkProgramAndInsert scene pspec = do
     program <- mkProgram pspec
-    atomicModifyIORef' programsRef (\a -> (Map.insert pspec program a, ()))
+    atomicModifyIORef' (unScene scene) (insertProgram program)
     return program
+    where
+    insertProgram program state =
+        let programs = Map.insert pspec program (ssPrograms state)
+            newState = state { ssPrograms = programs }
+        in (newState, ())
 
 newScene :: IO Scene
-newScene = do
-    counter <- newIORef 1
-    meshes <- newIORef IntMap.empty
-    buffers <- newIORef IntMap.empty
-    programs <- newIORef Map.empty
-    return $ Scene counter meshes buffers programs
+newScene = Scene <$> newIORef initialSceneState
+
+initialSceneState :: SceneState
+initialSceneState =
+    let counter = 1
+        meshes = IntMap.empty
+        buffers = IntMap.empty
+        programs = Map.empty
+    in SceneState counter meshes buffers programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
-    -- removeMeshes
-    meshes <- atomicModifyIORef' meshesRef $ \a -> (IntMap.empty, a)
-    mapM_ (deleteMesh scene) meshes
-    -- delete unreferenced orphan buffers
-    bufferIds <- atomicModifyIORef' bufferRefCounter $ \a -> (IntMap.empty, IntMap.keys a)
-    mapM_ (GLW.deleteObject . GLW.Buffer . fromIntegral) bufferIds
+    (vaos, buffers) <- atomicModifyIORef' (unScene scene) deleteSceneFunc
+    GLW.deleteObjects vaos
+    GLW.deleteObjects buffers
+
     where
-    mcRef = sceneMeshCounter scene
-    meshesRef = sceneMeshes scene
-    bufferRefCounter = sceneBufferRefCounter scene
+    deleteSceneFunc state =
+        let meshIds = IntMap.keys . ssMeshes $ state
+            (state', xs) = foldr' removeMeshFunc' (state, []) meshIds
+            vaos = mapMaybe fst xs
+            buffers = map (GLW.Buffer . fromIntegral) . IntMap.keys . ssBufferRefCounter $ state'
+        in (initialSceneState, (vaos, buffers))
+
+    removeMeshFunc' i (s, xs) =
+        let (s', x) = removeMeshFunc i s
+        in (s, x : xs)
