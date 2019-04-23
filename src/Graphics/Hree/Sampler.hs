@@ -1,10 +1,11 @@
 module Graphics.Hree.Sampler
-    (
+    ( SamplerSettings(..)
+    , defaultSamplerSettings
     ) where
 
 import qualified GLW
 import qualified Graphics.GL as GL
-import Linear (V4)
+import Linear (V4(..))
 
 data SamplerSettings = SamplerSettings
     { minFilter   :: !GL.GLint
@@ -32,8 +33,3 @@ defaultSamplerSettings = SamplerSettings
     , compareMode = GL.GL_NONE
     , compareFunc = GL.GL_LEQUAL
     }
-
-data Sampler2D = Sampler2D
-    { samplerTexture :: !GLW.Texture
-    , samplerSetting :: !SamplerSetting
-    } deriving (Show, Eq)

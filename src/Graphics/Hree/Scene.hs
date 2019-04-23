@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Hree.Scene
@@ -56,6 +57,8 @@ data SceneState = SceneState
     { ssMeshCounter      :: !Int
     , ssMeshes           :: !(IntMap MeshInfo)
     , ssBufferRefCounter :: !(IntMap Int)
+    , ssTextures         :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
+    , ssSamplers         :: !(Map ByteString GLW.Sampler)
     , ssPrograms         :: !(Map ProgramSpec ProgramInfo)
     }
 
@@ -110,7 +113,9 @@ addMesh scene mesh = do
             programs = if programAdded
                         then Map.insert pspec program (ssPrograms state)
                         else ssPrograms state
-            newState = SceneState meshCounter meshes bufferRefCounter programs
+            textures = ssTextures state
+            samplers = ssSamplers state
+            newState = SceneState meshCounter meshes bufferRefCounter textures samplers programs
         in (newState, meshId)
 
     geo = meshGeometry mesh
@@ -202,8 +207,10 @@ initialSceneState =
     let counter = 1
         meshes = IntMap.empty
         buffers = IntMap.empty
+        textures = Map.empty
+        samplers = Map.empty
         programs = Map.empty
-    in SceneState counter meshes buffers programs
+    in SceneState counter meshes buffers textures samplers programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
