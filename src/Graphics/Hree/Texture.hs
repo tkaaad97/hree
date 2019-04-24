@@ -1,12 +1,12 @@
 module Graphics.Hree.Texture
-    ( Texture(..)
+    ( TextureSettings(..)
     ) where
 
 import Data.ByteString (ByteString)
 import qualified GLW
 import qualified Graphics.GL as GL
 
-data TextureConfig = TextureConfig
+data TextureSettings = TextureSettings
     { target         :: !GLW.TextureTarget
     , level          :: !GL.GLint
     , internalFormat :: !GL.GLint
@@ -19,9 +19,4 @@ data TextureConfig = TextureConfig
     , minFilter      :: !GLW.TextureMinFilter
     , wrapS          :: !GL.GLint
     , wrapT          :: !GL.GLint
-    } deriving (Show, Eq)
-
-data Texture = Texture
-    { texturePath   :: !ByteString
-    , textureConfig :: !TextureConfig
     } deriving (Show, Eq)

@@ -1,5 +1,7 @@
+{-# LANGUAGE DataKinds #-}
 module Graphics.Hree.Material
     ( Material(..)
+    , Texture(..)
     , basicMaterial
     , testMaterial
     ) where
@@ -7,9 +9,14 @@ module Graphics.Hree.Material
 import Data.ByteString (ByteString)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified GLW
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Program
-import Graphics.Hree.Texture
+
+data Texture = Texture
+    { textureSource  :: !(GLW.Texture 'GLW.GL_TEXTURE_2D)
+    , textureSampler :: !GLW.Sampler
+    } deriving (Show, Eq)
 
 data Material = Material
     { materialUniforms         :: !(Map ByteString Uniform)
