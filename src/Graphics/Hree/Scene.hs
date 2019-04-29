@@ -15,6 +15,9 @@ module Graphics.Hree.Scene
 
 import Control.Monad (when)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString (index, length)
+import qualified Data.ByteString.Char8 as ByteString (pack)
+import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
 import Data.Foldable (foldr')
 import Data.IntMap.Strict (IntMap)
@@ -28,8 +31,9 @@ import Data.Proxy (Proxy(..))
 import qualified Data.Traversable as Traversable (mapM)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
+import Data.Word (Word8)
 import Foreign (Ptr, Storable)
-import qualified Foreign (castPtr, nullPtr, with)
+import qualified Foreign (castPtr, copyArray, nullPtr, with)
 import qualified GLW
 import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit)
 import qualified GLW.Groups.PrimitiveType as PrimitiveType
@@ -44,6 +48,8 @@ import Graphics.Hree.GL.Vertex
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
 import Graphics.Hree.Texture
+import qualified System.Random.MWC as Random (asGenIO, uniformR,
+                                              withSystemRandom)
 import Unsafe.Coerce (unsafeCoerce)
 
 data MeshInfo = MeshInfo
@@ -251,3 +257,17 @@ deleteScene scene = do
     removeMeshFunc' i (s, xs) =
         let (s', x) = removeMeshFunc i s
         in (s, x : xs)
+
+genRandomName :: ByteString -> Int -> IO ByteString
+genRandomName prefix len = do
+        v <- Vector.generateM len (const randomCharacter)
+        Vector.unsafeWith v $ \source ->
+            ByteString.create len $ \dest -> Foreign.copyArray dest source len
+    where
+    charsLen = ByteString.length charactersForRandomName
+    randomCharacter = Random.withSystemRandom . Random.asGenIO $ \gen -> do
+        i <- Random.uniformR (0, charsLen - 1) gen
+        return $ ByteString.index charactersForRandomName i
+
+charactersForRandomName :: ByteString
+charactersForRandomName = ByteString.pack $ ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
