@@ -28,7 +28,7 @@ dependencies:
 - gl-wrapper
 - hashable
 - linear
-- resourcet
+- mwc-random
 - text
 - transformers
 - vector
