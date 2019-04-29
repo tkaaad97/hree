@@ -13,6 +13,7 @@ module Graphics.Hree.Scene
     , renderScene
     ) where
 
+import Control.Monad (when)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Foldable (foldr')
@@ -27,11 +28,12 @@ import Data.Proxy (Proxy(..))
 import qualified Data.Traversable as Traversable (mapM)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
-import Foreign (Storable)
-import qualified Foreign (nullPtr, with)
+import Foreign (Ptr, Storable)
+import qualified Foreign (castPtr, nullPtr, with)
 import qualified GLW
 import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit)
 import qualified GLW.Groups.PrimitiveType as PrimitiveType
+import qualified GLW.Internal.Groups as GLW (PixelFormat(..))
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
@@ -41,6 +43,7 @@ import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
+import Graphics.Hree.Texture
 import Unsafe.Coerce (unsafeCoerce)
 
 data MeshInfo = MeshInfo
@@ -179,6 +182,25 @@ geometryFromVertexVector bindingIndex storage usage scene = do
     toAttribBinding (VertexField name format) = AttribBinding bindingIndex format
     attribBindings = Map.fromList $ zip keys bindings
     num = Vector.length storage
+
+addTexture :: Scene -> TextureSettings -> TextureSourceData -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D)
+addTexture scene settings source = do
+    texture <- GLW.createObject Proxy
+    GLW.glTextureStorage2D texture levels internalFormat width height
+    when (pixels /= Foreign.nullPtr) $ GLW.glTextureSubImage2D texture 0 0 0 swidth sheight format dataType pixels
+    when (levels > 0 && generateMipmap) $ GLW.glGenerateTextureMipmap texture
+    return texture
+    where
+    levels = textureLevels settings
+    internalFormat = textureInternalFormat settings
+    width = textureWidth settings
+    height = textureHeight settings
+    generateMipmap = textureGenerateMipmap settings
+    swidth = sourceWidth source
+    sheight = sourceHeight source
+    format = coerce $ sourceFormat source
+    dataType = sourceDataType source
+    pixels = sourcePixels source
 
 --setBackground
 
