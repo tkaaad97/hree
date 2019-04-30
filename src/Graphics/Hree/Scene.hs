@@ -273,9 +273,10 @@ initialSceneState =
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
-    (vaos, buffers) <- atomicModifyIORef' (unScene scene) deleteSceneFunc
+    (vaos, buffers, textures) <- atomicModifyIORef' (unScene scene) deleteSceneFunc
     GLW.deleteObjects vaos
     GLW.deleteObjects buffers
+    GLW.deleteObjects textures
 
     where
     deleteSceneFunc state =
@@ -283,7 +284,8 @@ deleteScene scene = do
             (state', xs) = foldr' removeMeshFunc' (state, []) meshIds
             vaos = mapMaybe fst xs
             buffers = map (GLW.Buffer . fromIntegral) . IntMap.keys . ssBufferRefCounter $ state'
-        in (initialSceneState, (vaos, buffers))
+            textures = Map.elems . ssTextures $ state'
+        in (initialSceneState, (vaos, buffers, textures))
 
     removeMeshFunc' i (s, xs) =
         let (s', x) = removeMeshFunc i s
