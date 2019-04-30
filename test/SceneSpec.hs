@@ -1,17 +1,24 @@
+{-# LANGUAGE OverloadedStrings #-}
 module SceneSpec
     ( spec
     ) where
 
 import qualified Data.IntMap as IntMap
 import Data.IORef (readIORef)
+import qualified Data.Map.Strict as Map
 import qualified Data.Vector.Storable as Vector
+import Data.Word (Word8)
+import Foreign (Ptr)
+import qualified Foreign (castPtr, withArray)
 import GLContext
 import qualified GLW
+import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree.GL.Vertex as Hree
 import qualified Graphics.Hree.Material as Hree
 import qualified Graphics.Hree.Mesh as Hree (Mesh(..))
 import qualified Graphics.Hree.Scene as Hree
+import qualified Graphics.Hree.Texture as Hree
 import Linear (V2(..), V3(..), V4(..))
 import Test.Hspec
 
@@ -69,6 +76,25 @@ spec = do
             Hree.removeMesh scene meshId2
             (`shouldBe` IntMap.fromList []) =<< getSceneProp scene Hree.ssBufferRefCounter
 
+    describe "addTexture" $ do
+        it "change scene state" . runOnOSMesaContext width height . Foreign.withArray [0, 0, 0, 0] $ \p -> do
+            scene <- Hree.newScene
+            let textureSettings = Hree.TextureSettings 0 GL.GL_RGBA8 1 1 False
+                source = Hree.TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
+            r <- Hree.addTexture scene "texture1" textureSettings source
+            textures <- getSceneProp scene Hree.ssTextures
+            textures `shouldBe` Map.fromList [r]
+
+        it "use a random name on name conflict" . runOnOSMesaContext width height . Foreign.withArray [0, 0, 0, 0] $ \p -> do
+            scene <- Hree.newScene
+            let textureSettings = Hree.TextureSettings 0 GL.GL_RGBA8 1 1 False
+                source = Hree.TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
+            r1 <- Hree.addTexture scene "texture" textureSettings source
+            r2 <- Hree.addTexture scene "texture" textureSettings source
+            textures <- getSceneProp scene Hree.ssTextures
+            Map.size textures `shouldBe` 2
+            textures `shouldBe` Map.fromList [r1, r2]
+
     describe "deleteScene" $ do
         it "delete meshes" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
@@ -97,6 +123,17 @@ spec = do
             Hree.deleteScene scene
             bufferRefCounterAfter <- getSceneProp scene Hree.ssBufferRefCounter
             bufferRefCounterAfter `shouldBe` IntMap.empty
+
+        it "delete textures" . runOnOSMesaContext width height . Foreign.withArray [0, 0, 0, 0] $ \p -> do
+            scene <- Hree.newScene
+            let textureSettings = Hree.TextureSettings 0 GL.GL_RGBA8 1 1 False
+                source = Hree.TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
+            r <- Hree.addTexture scene "texture1" textureSettings source
+            textures <- getSceneProp scene Hree.ssTextures
+            textures `shouldBe` Map.fromList [r]
+            Hree.deleteScene scene
+            textures <- getSceneProp scene Hree.ssTextures
+            textures `shouldBe` Map.empty
 
     where
     width = 1

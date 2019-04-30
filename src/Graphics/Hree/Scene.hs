@@ -8,6 +8,7 @@ module Graphics.Hree.Scene
     , addMesh
     , deleteScene
     , geometryFromVertexVector
+    , addTexture
     , newScene
     , removeMesh
     , renderScene
