@@ -13,6 +13,7 @@ module Graphics.Hree.Scene
     , renderScene
     ) where
 
+import Control.Exception (bracketOnError, throwIO)
 import Control.Monad (when)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (index, length)
@@ -189,13 +190,13 @@ geometryFromVertexVector bindingIndex storage usage scene = do
     attribBindings = Map.fromList $ zip keys bindings
     num = Vector.length storage
 
-addTexture :: Scene -> TextureSettings -> TextureSourceData -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D)
-addTexture scene settings source = do
-    texture <- GLW.createObject Proxy
-    GLW.glTextureStorage2D texture levels internalFormat width height
-    when (pixels /= Foreign.nullPtr) $ GLW.glTextureSubImage2D texture 0 0 0 swidth sheight format dataType pixels
-    when (levels > 0 && generateMipmap) $ GLW.glGenerateTextureMipmap texture
-    return texture
+addTexture :: Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D)
+addTexture scene name settings source =
+    bracketOnError
+        (GLW.createObject Proxy)
+        GLW.deleteObject
+        addTextureAction
+
     where
     levels = textureLevels settings
     internalFormat = textureInternalFormat settings
@@ -207,6 +208,36 @@ addTexture scene settings source = do
     format = coerce $ sourceFormat source
     dataType = sourceDataType source
     pixels = sourcePixels source
+
+    tryCount = 10
+
+    addTextureAction texture = do
+        r <- atomicModifyIORef' (unScene scene) (addTextureFunc name texture)
+        name' <- maybe (tryAddTexture name texture tryCount) return r
+        initializeTexture texture
+        return (name', texture)
+
+    initializeTexture texture = do
+        GLW.glTextureStorage2D texture levels internalFormat width height
+        when (pixels /= Foreign.nullPtr) $ GLW.glTextureSubImage2D texture 0 0 0 swidth sheight format dataType pixels
+        when (levels > 0 && generateMipmap) $ GLW.glGenerateTextureMipmap texture
+        return texture
+
+    addTextureFunc name' texture state =
+        let (maybeHit, textures') = Map.insertLookupWithKey (\_ _ a -> a) name' texture (ssTextures state)
+        in maybe
+            (state { ssTextures = textures' }, Just name')
+            (const (state, Nothing))
+            maybeHit
+
+    randomLen = 8
+
+    tryAddTexture prefix texture count
+        | count == 0 = throwIO . userError $ "failed to addTexture"
+        | otherwise = do
+            name' <- genRandomName prefix randomLen
+            r <- atomicModifyIORef' (unScene scene) (addTextureFunc name' texture)
+            maybe (tryAddTexture prefix texture (count - 1)) return r
 
 --setBackground
 
@@ -261,13 +292,13 @@ deleteScene scene = do
 genRandomName :: ByteString -> Int -> IO ByteString
 genRandomName prefix len = do
         v <- Vector.generateM len (const randomCharacter)
-        Vector.unsafeWith v $ \source ->
+        a <- Vector.unsafeWith v $ \source ->
             ByteString.create len $ \dest -> Foreign.copyArray dest source len
+        return (prefix `mappend` a)
     where
     charsLen = ByteString.length charactersForRandomName
-    randomCharacter = Random.withSystemRandom . Random.asGenIO $ \gen -> do
-        i <- Random.uniformR (0, charsLen - 1) gen
-        return $ ByteString.index charactersForRandomName i
+    randomCharacter = Random.withSystemRandom . Random.asGenIO $
+        fmap (ByteString.index charactersForRandomName) . Random.uniformR (0, charsLen - 1)
 
 charactersForRandomName :: ByteString
 charactersForRandomName = ByteString.pack $ ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
