@@ -47,6 +47,7 @@ import Graphics.Hree.Geometry
 import Graphics.Hree.GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
+import Graphics.Hree.Material
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
 import Graphics.Hree.Texture
@@ -87,10 +88,16 @@ renderMeshes uniforms = renderMany uniforms . fmap toRenderInfo
 toRenderInfo :: MeshInfo -> RenderInfo
 toRenderInfo m = renderInfo
     where
+    mesh = meshInfoMesh m
+    material = meshMaterial mesh
     program = meshInfoProgram m
     vao = meshInfoVertexArray m
     dm = resolveDrawMethod . meshGeometry . meshInfoMesh $ m
-    uniforms = [] -- TODO
+    uniformInfos = programInfoUniforms program
+    uniforms = Map.elems $ Map.mapMaybeWithKey toUniformEntry (materialUniforms material)
+    toUniformEntry uniformName uniform = do
+        uniformInfo <- Map.lookup uniformName uniformInfos
+        return (uniformInfo, uniform)
     texture = Nothing -- TODO
     renderInfo = RenderInfo program dm vao uniforms texture
 

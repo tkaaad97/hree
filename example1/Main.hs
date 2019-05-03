@@ -32,7 +32,7 @@ main = do
         , BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
         ]
 
-    material = Material.basicMaterial
+    material = Material.flatColorMaterial (V4 0 1 0 1.0)
 
     --proj = orthographic 0 1 0 1 (-10) 10
     proj = perspective 90 1.0 0.1 10.0

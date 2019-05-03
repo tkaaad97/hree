@@ -9,6 +9,7 @@ module Graphics.Hree.Program
     , FragmentShaderSpec(..)
     , ProgramSpec(..)
     , basicProgramSpec
+    , flatColorProgramSpec
     , testProgramSpec
     , mkProgram
     ) where
@@ -34,11 +35,13 @@ import System.IO.Error (userError)
 
 data VertexShaderSpec =
     BasicVertexShader |
+    FlatColorVertexShader |
     TestVertexShader
     deriving (Show, Eq, Ord)
 
 data FragmentShaderSpec =
     BasicFragmentShader |
+    FlatColorFragmentShader |
     TestFragmentShader
     deriving (Show, Eq, Ord)
 
@@ -49,6 +52,9 @@ data ProgramSpec = ProgramSpec
 
 basicProgramSpec :: ProgramSpec
 basicProgramSpec = ProgramSpec BasicVertexShader BasicFragmentShader
+
+flatColorProgramSpec :: ProgramSpec
+flatColorProgramSpec = ProgramSpec FlatColorVertexShader FlatColorFragmentShader
 
 testProgramSpec :: ProgramSpec
 testProgramSpec = ProgramSpec TestVertexShader TestFragmentShader
@@ -87,12 +93,16 @@ mkProgram (ProgramSpec vspec fspec) = do
 mkVertexShader :: VertexShaderSpec -> IO (GLW.Shader 'GLW.GL_VERTEX_SHADER)
 mkVertexShader BasicVertexShader =
     mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) $(embedFile "shader/basic-vertex.glsl")
+mkVertexShader FlatColorVertexShader =
+    mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) $(embedFile "shader/flat-color-vertex.glsl")
 mkVertexShader TestVertexShader =
     mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) $(embedFile "shader/test-vertex.glsl")
 
 mkFragmentShader :: FragmentShaderSpec -> IO (GLW.Shader 'GLW.GL_FRAGMENT_SHADER)
 mkFragmentShader BasicFragmentShader =
     mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/basic-fragment.glsl")
+mkFragmentShader FlatColorFragmentShader =
+    mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/flat-color-fragment.glsl")
 mkFragmentShader TestFragmentShader =
     mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/test-fragment.glsl")
 
