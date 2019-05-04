@@ -8,6 +8,7 @@ module Graphics.Hree.Scene
     , addMesh
     , deleteScene
     , geometryFromVertexVector
+    , addSampler
     , addTexture
     , newScene
     , removeMesh
@@ -246,7 +247,7 @@ addTextureInternal renameOnConflict scene name settings source =
     initializeTexture texture = do
         GLW.glTextureStorage2D texture levels internalFormat width height
         when (pixels /= Foreign.nullPtr) $ GLW.glTextureSubImage2D texture 0 0 0 swidth sheight format dataType pixels
-        when (levels > 0 && generateMipmap) $ GLW.glGenerateTextureMipmap texture
+        when (levels > 1 && generateMipmap) $ GLW.glGenerateTextureMipmap texture
         return texture
 
     addTextureFunc name' texture state =
@@ -329,8 +330,8 @@ mkDefaultTextureIfNotExists scene = do
     maybe (mkDefaultTexture scene) return maybeDefaultTexture
 
 mkDefaultTexture :: Scene -> IO Texture
-mkDefaultTexture scene = Foreign.withArray [0, 0, 0, 0] $ \p -> do
-    let settings = TextureSettings 0 GL.GL_RGBA8 1 1 False
+mkDefaultTexture scene = Foreign.withArray [0, 0, 0, 1] $ \p -> do
+    let settings = TextureSettings 1 GL.GL_RGBA8 1 1 False
         source = TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
     (_, texture) <- addTexture scene defaultTextureName settings source
     (_, sampler) <- addSampler scene defaultSamplerName

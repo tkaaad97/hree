@@ -56,8 +56,7 @@ bindTextures :: [Texture] -> IO ()
 bindTextures textures = mapM_ bindTexture $ zip [0..(length textures - 1)] textures
     where
     bindTexture (index, Texture (texture, sampler)) = do
-        GL.glActiveTexture (GL.GL_TEXTURE0 + fromIntegral index)
-        GLW.glBindTexture TextureTarget.glTexture2D texture
+        GLW.glBindTextureUnit (fromIntegral index) texture
         GLW.glBindSampler (fromIntegral index) sampler
 
 renderMany :: Foldable t => [(ByteString, Uniform)] -> t RenderInfo -> IO ()

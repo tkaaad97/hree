@@ -11,6 +11,7 @@ module Graphics.Hree.Material
 import Data.ByteString (ByteString)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (maybeToList)
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
@@ -23,11 +24,11 @@ data Material = Material
     , materialProgramSpecifier :: !ProgramSpec
     } deriving (Show)
 
-basicMaterial :: Material
-basicMaterial = Material u t p
+basicMaterial :: Maybe Texture -> Material
+basicMaterial a = Material u t p
     where
     u = Map.empty
-    t = []
+    t = maybeToList a
     p = basicProgramSpec
 
 flatColorMaterial :: V4 GL.GLfloat -> Material

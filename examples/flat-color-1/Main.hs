@@ -1,6 +1,7 @@
 module Main where
 
 import qualified Data.Vector.Storable as Vector
+import Example
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
@@ -12,7 +13,6 @@ import Graphics.Hree.Mesh (Mesh(..))
 import Graphics.Hree.Scene
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
-import Sample
 
 main :: IO ()
 main = do

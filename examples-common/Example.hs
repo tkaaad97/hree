@@ -1,5 +1,6 @@
-module Sample
-    ( setCameraMouseControl
+module Example
+    ( mkColoredImage
+    , setCameraMouseControl
     , shutdown
     , resizeWindow
     , withWindow
@@ -7,11 +8,14 @@ module Sample
 
 import Control.Monad (forever, unless, when)
 import Control.Monad.IO.Class (liftIO)
+import Data.Vector.Storable (Vector)
+import qualified Data.Vector.Storable as Vector
+import Data.Word (Word8)
 import qualified GLW
 import Graphics.Hree.Camera
 import Graphics.Hree.CameraControl.SphericalControl
 import qualified Graphics.UI.GLFW as GLFW
-import Linear (V2(..))
+import Linear (V2(..), V4(..))
 import System.Exit (ExitCode(..), exitSuccess)
 
 withWindow :: Int -> Int -> String -> (GLFW.Window -> IO a) -> (a -> GLFW.Window -> IO ()) -> IO ()
@@ -94,3 +98,14 @@ setCameraMouseControl w camera = do
                 then max 0 (min (fromIntegral height) (realToFrac y)) / fromIntegral height
                 else 0
         in V2 x' y'
+
+mkColoredImage :: Int -> Vector (V4 Word8)
+mkColoredImage size = Vector.generate (size * size) gen
+    where
+    gen i =
+        let (y, x) = divMod i size
+            r = fromIntegral $ 255 * x `div` size
+            g = fromIntegral $ 255 * y `div` size
+            b = 0
+            a = 255
+        in V4 r g b a
