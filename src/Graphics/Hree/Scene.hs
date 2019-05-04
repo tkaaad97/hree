@@ -35,9 +35,10 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import Data.Word (Word8)
 import Foreign (Ptr, Storable)
-import qualified Foreign (castPtr, copyArray, nullPtr, with)
+import qualified Foreign (castPtr, copyArray, nullPtr, with, withArray)
 import qualified GLW
 import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit)
+import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Groups.PrimitiveType as PrimitiveType
 import qualified GLW.Internal.Groups as GLW (PixelFormat(..))
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
@@ -71,6 +72,8 @@ data SceneState = SceneState
     , ssBufferRefCounter :: !(IntMap Int)
     , ssTextures         :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
     , ssSamplers         :: !(Map ByteString GLW.Sampler)
+    , ssUniforms         :: !(Map ByteString Uniform)
+    , ssDefaultTexture   :: !(Maybe (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler))
     , ssPrograms         :: !(Map ProgramSpec ProgramInfo)
     }
 
@@ -131,9 +134,12 @@ addMesh scene mesh = do
             programs = if programAdded
                         then Map.insert pspec program (ssPrograms state)
                         else ssPrograms state
-            textures = ssTextures state
-            samplers = ssSamplers state
-            newState = SceneState meshCounter meshes bufferRefCounter textures samplers programs
+            newState = state
+                { ssMeshCounter = meshCounter
+                , ssMeshes = meshes
+                , ssBufferRefCounter = bufferRefCounter
+                , ssPrograms = programs
+                }
         in (newState, meshId)
 
     geo = meshGeometry mesh
@@ -200,10 +206,14 @@ geometryFromVertexVector bindingIndex storage usage scene = do
 
 addTexture :: Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D)
 addTexture scene name settings source =
+    maybe (throwIO . userError $ "addTextureInternal returned Nothing unexpectedly") return =<< addTextureInternal True scene name settings source
+
+addTextureInternal :: Bool -> Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (Maybe (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D))
+addTextureInternal renameOnConflict scene name settings source =
     bracketOnError
         (GLW.createObject Proxy)
         GLW.deleteObject
-        addTextureAction
+        (addTextureAction renameOnConflict)
 
     where
     levels = textureLevels settings
@@ -219,11 +229,15 @@ addTexture scene name settings source =
 
     tryCount = 10
 
-    addTextureAction texture = do
+    addTextureAction True texture = do
         r <- atomicModifyIORef' (unScene scene) (addTextureFunc name texture)
         name' <- maybe (tryAddTexture name texture tryCount) return r
         initializeTexture texture
-        return (name', texture)
+        return $ Just (name', texture)
+
+    addTextureAction False texture = do
+        r <- atomicModifyIORef' (unScene scene) (addTextureFunc name texture)
+        maybe (return Nothing) (\_ -> initializeTexture texture >> return (Just (name, texture))) r
 
     initializeTexture texture = do
         GLW.glTextureStorage2D texture levels internalFormat width height
@@ -247,6 +261,44 @@ addTexture scene name settings source =
             r <- atomicModifyIORef' (unScene scene) (addTextureFunc name' texture)
             maybe (tryAddTexture prefix texture (count - 1)) return r
 
+addSampler :: Scene -> ByteString -> IO (ByteString, GLW.Sampler)
+addSampler scene name =
+    maybe (throwIO . userError $ "addSamplerInternal returned Nothing unexpectedly") return =<< addSamplerInternal True scene name
+
+addSamplerInternal :: Bool -> Scene -> ByteString -> IO (Maybe (ByteString, GLW.Sampler))
+addSamplerInternal renameOnConflict scene name =
+    bracketOnError
+        (GLW.createObject Proxy)
+        GLW.deleteObject
+        (addSamplerAction renameOnConflict)
+
+    where
+    tryCount = 10
+    addSamplerAction True sampler = do
+        r <- atomicModifyIORef' (unScene scene) (addSamplerFunc name sampler)
+        name' <- maybe (tryAddSampler name sampler tryCount) return r
+        return $ Just (name', sampler)
+
+    addSamplerAction False sampler = do
+        r <- atomicModifyIORef' (unScene scene) (addSamplerFunc name sampler)
+        maybe (return Nothing) (\name' -> return (Just (name', sampler))) r
+
+    addSamplerFunc name' sampler state =
+        let (maybeHit, samplers') = Map.insertLookupWithKey (\_ _ a -> a) name' sampler (ssSamplers state)
+        in maybe
+            (state { ssSamplers = samplers' }, Just name')
+            (const (state, Nothing))
+            maybeHit
+
+    randomLen = 8
+
+    tryAddSampler prefix sampler count
+        | count == 0 = throwIO . userError $ "failed to addSampler"
+        | otherwise = do
+            name' <- genRandomName prefix randomLen
+            r <- atomicModifyIORef' (unScene scene) (addSamplerFunc name' sampler)
+            maybe (tryAddSampler prefix sampler (count - 1)) return r
+
 --setBackground
 
 mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)
@@ -259,12 +311,33 @@ mkProgramAndInsert :: Scene -> ProgramSpec -> IO ProgramInfo
 mkProgramAndInsert scene pspec = do
     program <- mkProgram pspec
     atomicModifyIORef' (unScene scene) (insertProgram program)
+    _ <- mkDefaultTextureIfNotExists scene
     return program
     where
     insertProgram program state =
         let programs = Map.insert pspec program (ssPrograms state)
             newState = state { ssPrograms = programs }
         in (newState, ())
+
+mkDefaultTextureIfNotExists :: Scene -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler)
+mkDefaultTextureIfNotExists scene = do
+    maybeDefaultTexture <- ssDefaultTexture <$> (readIORef . unScene $ scene)
+    maybe (mkDefaultTexture scene) return maybeDefaultTexture
+
+mkDefaultTexture :: Scene -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler)
+mkDefaultTexture scene = Foreign.withArray [0, 0, 0, 0] $ \p -> do
+    let settings = TextureSettings 0 GL.GL_RGBA8 1 1 False
+        source = TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
+    (_, texture) <- addTexture scene defaultTextureName settings source
+    (_, sampler) <- addSampler scene defaultSamplerName
+    atomicModifyIORef' (unScene scene) (setDefaultTexture (texture, sampler))
+    return (texture, sampler)
+
+    where
+    defaultTextureName = "default_texture"
+    defaultSamplerName = "default_sampler"
+    setDefaultTexture a s =
+        (s { ssDefaultTexture = Just a }, ())
 
 newScene :: IO Scene
 newScene = Scene <$> newIORef initialSceneState
@@ -276,8 +349,10 @@ initialSceneState =
         buffers = IntMap.empty
         textures = Map.empty
         samplers = Map.empty
+        uniforms = Map.empty
+        defaultTexture = Nothing
         programs = Map.empty
-    in SceneState counter meshes buffers textures samplers programs
+    in SceneState counter meshes buffers textures samplers uniforms defaultTexture programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
