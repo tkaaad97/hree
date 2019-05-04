@@ -30,12 +30,12 @@ main = do
 
     x = 1
     vs = Vector.fromList
-        [ BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0 0) (V4 0 0 0 1)
-        , BasicVertex (V3 x x 0) (V3 0 0 0) (V2 1 1) (V4 0 0 0 1)
-        , BasicVertex (V3 0 x 0) (V3 0 0 0) (V2 0 1) (V4 0 0 0 1)
-        , BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0 0) (V4 0 0 0 1)
-        , BasicVertex (V3 x x 0) (V3 0 0 0) (V2 1 1) (V4 0 0 0 1)
-        , BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 1 0) (V4 0 0 0 1)
+        [ BasicVertex (V3 x x 0) (V3 0 0 0) (V2 1 1) (V4 0 0 0 255)
+        , BasicVertex (V3 0 x 0) (V3 0 0 0) (V2 0.0 1) (V4 0 0 0 255)
+        , BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 1 0.0) (V4 0 0 0 255)
+        , BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0.0 0.0) (V4 0 0 0 255)
+        , BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 1 0.0) (V4 0 0 0 255)
+        , BasicVertex (V3 0 x 0) (V3 0 0 0) (V2 0.0 1) (V4 0 0 0 255)
         ]
 
     proj = perspective 90 1.0 0.1 10.0
@@ -65,7 +65,7 @@ main = do
 
     mkTexture :: Scene -> IO Texture
     mkTexture scene = do
-        let size = 1024
+        let size = 256
             settings = Texture.TextureSettings 1 GL.GL_RGBA8 (fromIntegral size) (fromIntegral size) False
             image = mkColoredImage size
         Vector.unsafeWith image $ \p -> do

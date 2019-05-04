@@ -12,7 +12,6 @@ module Graphics.Hree.CameraControl.SphericalControl
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef, writeIORef)
 import Data.Maybe (maybe)
-import Debug.Trace (traceShow, traceShowId)
 import Graphics.Hree.Camera
 import Linear (Additive((^+^), (^-^)), Quaternion(..), V2(..), V3(..), (*^))
 import qualified Linear

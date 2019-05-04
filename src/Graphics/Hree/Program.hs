@@ -24,6 +24,7 @@ import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(..))
 import Foreign (Ptr)
 import qualified Foreign (alloca, allocaArray, peek, peekArray, with)
@@ -118,19 +119,19 @@ mkShader _ source =
         return shader
 
 getActiveAttribs :: GLW.Program -> IO [AttribInfo]
-getActiveAttribs = getActivePorts AttribInfo (GLW.AttribLocation . fromIntegral) GL.GL_ACTIVE_ATTRIBUTES GLW.glGetActiveAttrib
+getActiveAttribs = getActivePorts AttribInfo GLW.glGetAttribLocation GL.GL_ACTIVE_ATTRIBUTES GLW.glGetActiveAttrib
 
 getActiveUniforms :: GLW.Program -> IO [UniformInfo]
-getActiveUniforms = getActivePorts UniformInfo GLW.UniformLocation GL.GL_ACTIVE_UNIFORMS GLW.glGetActiveUniform
+getActiveUniforms = getActivePorts UniformInfo GLW.glGetUniformLocation GL.GL_ACTIVE_UNIFORMS GLW.glGetActiveUniform
 
 getActivePorts ::
     (ByteString -> location -> GL.GLuint -> GL.GLuint -> a)
-    -> (GL.GLint -> location)
+    -> (GLW.Program -> Ptr GL.GLchar -> IO (Maybe location))
     -> GL.GLenum
     -> (GLW.Program -> GL.GLuint -> GL.GLsizei -> Ptr GL.GLsizei -> Ptr GL.GLint -> Ptr GL.GLenum -> Ptr GL.GLchar -> IO ())
     -> GLW.Program
     -> IO [a]
-getActivePorts construct toLocation pname f program = do
+getActivePorts construct getLocation pname f program = do
     len  <- Foreign.alloca $ \p -> GLW.glGetProgramiv program pname p >> Foreign.peek p
     mapM g [0..(len - 1)]
 
@@ -146,7 +147,8 @@ getActivePorts construct toLocation pname f program = do
             size <- Foreign.peek sp
             dataType <- Foreign.peek tp
             name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral length)
-            return $ construct name (toLocation i) (fromIntegral size) dataType
+            l <- fromMaybe (error "getLocation failed") <$> getLocation program np
+            return $ construct name l (fromIntegral size) dataType
 
 throwIfProgramErrorStatus
     :: GLW.Program

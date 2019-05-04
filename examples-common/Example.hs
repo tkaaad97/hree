@@ -106,6 +106,6 @@ mkColoredImage size = Vector.generate (size * size) gen
         let (y, x) = divMod i size
             r = fromIntegral $ 255 * x `div` size
             g = fromIntegral $ 255 * y `div` size
-            b = 0
+            b = 64
             a = 255
         in V4 r g b a

@@ -11,6 +11,5 @@ uniform sampler2D texture;
 void main()
 {
     vec4 textureColor = texture2D(texture, fragmentUv);
-    // outColor = vec4(mix(fragmentColor.xyz, textureColor.xyz, textureColor.w), fragmentColor.w);
-    outColor = textureColor;
+    outColor = vec4(mix(fragmentColor.xyz, textureColor.xyz, textureColor.w), fragmentColor.w);
 }

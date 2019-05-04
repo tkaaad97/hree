@@ -8,7 +8,6 @@ import Control.Exception (throwIO)
 import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString
-import Data.Coerce (coerce)
 import Data.Foldable (foldrM)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -19,11 +18,10 @@ import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Storable as V
 import qualified Foreign (Storable(..), alloca, allocaArray, castPtr)
 import qualified GLW
-import qualified GLW.Groups.TextureTarget as TextureTarget
+import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
-import Unsafe.Coerce (unsafeCoerce)
 
 render :: [(ByteString, Uniform)] -> RenderInfo -> Maybe GLW.Program -> IO (Maybe GLW.Program)
 render commons a cur = do
@@ -72,7 +70,7 @@ mkBuffer (BufferSource vec usage) = do
         size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
-    return (unsafeCoerce buffer)
+    return buffer
 
 mkVertexArray :: Map ByteString AttribBinding -> IntMap (GLW.Buffer, BindBufferSetting) -> Maybe GLW.Buffer -> ProgramInfo -> IO GLW.VertexArray
 mkVertexArray attribBindings buffers indexBuffer programInfo = do
@@ -80,7 +78,7 @@ mkVertexArray attribBindings buffers indexBuffer programInfo = do
     vao <- GLW.createObject (Proxy :: Proxy GLW.VertexArray)
     mapM_ (setAttrib vao) (Map.toList attribBindings)
     mapM_ (setBindingBuffer vao) . IntMap.toList $ buffers
-    setIndexBuffer vao (unsafeCoerce indexBuffer)
+    setIndexBuffer vao indexBuffer
     GLW.glUseProgram GLW.zero
     return vao
 
@@ -98,7 +96,7 @@ mkVertexArray attribBindings buffers indexBuffer programInfo = do
             maybeLocation
 
     setBindingBuffer vao (i, (b, BindBufferSetting offset stride)) =
-        GLW.glVertexArrayVertexBuffer vao (GLW.BindingIndex . fromIntegral $ i) (unsafeCoerce b) (fromIntegral offset) (fromIntegral stride)
+        GLW.glVertexArrayVertexBuffer vao (GLW.BindingIndex . fromIntegral $ i) b (fromIntegral offset) (fromIntegral stride)
 
     setIndexBuffer vao (Just b) =
         GLW.glVertexArrayElementBuffer vao b
