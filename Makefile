@@ -3,8 +3,9 @@
 lib: src shader package.yaml
 	docker-compose run --rm app stack build
 
-ex1: src shader example1 package.yaml
-	docker-compose run --rm app stack run hree-exapmle1
+run: src shader examples package.yaml
+	@if [ -z ${EXAMPLE} ]; then echo "usage: make run EXAMPLE=flat-color-1" >&2; exit 1; fi
+	docker-compose run --rm app stack run ${EXAMPLE}
 
 clean:
 	docker-compose run --rm app stack clean

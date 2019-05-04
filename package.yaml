@@ -37,9 +37,9 @@ library:
   source-dirs: src
 
 executables:
-  hree-example1:
-    main:                Main.hs
-    source-dirs:         example1
+  flat-color-1:
+    main:                FlatColor1.hs
+    source-dirs:         examples
     ghc-options:
     - -threaded
     - -rtsopts
