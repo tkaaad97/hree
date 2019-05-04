@@ -17,11 +17,6 @@ import Graphics.Hree.GL.Types
 import Graphics.Hree.Program
 import Linear (V4)
 
-data Texture = Texture
-    { textureSource  :: !(GLW.Texture 'GLW.GL_TEXTURE_2D)
-    , textureSampler :: !GLW.Sampler
-    } deriving (Show, Eq)
-
 data Material = Material
     { materialUniforms         :: !(Map ByteString Uniform)
     , materialTextures         :: ![Texture]

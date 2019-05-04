@@ -28,7 +28,7 @@ import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import qualified Data.List as List (nub)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (isNothing, mapMaybe)
+import Data.Maybe (isNothing, mapMaybe, maybeToList)
 import Data.Proxy (Proxy(..))
 import qualified Data.Traversable as Traversable (mapM)
 import Data.Vector.Storable (Vector)
@@ -72,8 +72,7 @@ data SceneState = SceneState
     , ssBufferRefCounter :: !(IntMap Int)
     , ssTextures         :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
     , ssSamplers         :: !(Map ByteString GLW.Sampler)
-    , ssUniforms         :: !(Map ByteString Uniform)
-    , ssDefaultTexture   :: !(Maybe (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler))
+    , ssDefaultTexture   :: !(Maybe Texture)
     , ssPrograms         :: !(Map ProgramSpec ProgramInfo)
     }
 
@@ -82,14 +81,16 @@ renderScene scene camera = do
     projectionViewMatrix <- getCameraMatrix camera
     GLW.glClearColor 1 1 1 1
     GLW.glClear GLW.glColorBufferBit
-    meshes <- fmap ssMeshes . readIORef . unScene $ scene
-    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] meshes
+    state <- readIORef . unScene $ scene
+    let meshes = ssMeshes state
+        defaultTexture = ssDefaultTexture state
+    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] defaultTexture meshes
 
-renderMeshes :: [(ByteString, Uniform)] -> IntMap MeshInfo ->  IO ()
-renderMeshes uniforms = renderMany uniforms . fmap toRenderInfo
+renderMeshes :: [(ByteString, Uniform)] -> Maybe Texture -> IntMap MeshInfo ->  IO ()
+renderMeshes uniforms defaultTexture = renderMany uniforms . fmap (toRenderInfo defaultTexture)
 
-toRenderInfo :: MeshInfo -> RenderInfo
-toRenderInfo m = renderInfo
+toRenderInfo :: Maybe Texture -> MeshInfo -> RenderInfo
+toRenderInfo defaultTexture m = renderInfo
     where
     mesh = meshInfoMesh m
     material = meshMaterial mesh
@@ -101,8 +102,11 @@ toRenderInfo m = renderInfo
     toUniformEntry uniformName uniform = do
         uniformInfo <- Map.lookup uniformName uniformInfos
         return (uniformInfo, uniform)
-    texture = Nothing -- TODO
-    renderInfo = RenderInfo program dm vao uniforms texture
+    mtextures = materialTextures material
+    textures = if null mtextures
+        then maybeToList defaultTexture
+        else mtextures
+    renderInfo = RenderInfo program dm vao uniforms textures
 
 resolveDrawMethod :: Geometry -> DrawMethod
 resolveDrawMethod geo | isNothing (geometryIndexBuffer geo) =
@@ -319,19 +323,19 @@ mkProgramAndInsert scene pspec = do
             newState = state { ssPrograms = programs }
         in (newState, ())
 
-mkDefaultTextureIfNotExists :: Scene -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler)
+mkDefaultTextureIfNotExists :: Scene -> IO Texture
 mkDefaultTextureIfNotExists scene = do
     maybeDefaultTexture <- ssDefaultTexture <$> (readIORef . unScene $ scene)
     maybe (mkDefaultTexture scene) return maybeDefaultTexture
 
-mkDefaultTexture :: Scene -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler)
+mkDefaultTexture :: Scene -> IO Texture
 mkDefaultTexture scene = Foreign.withArray [0, 0, 0, 0] $ \p -> do
     let settings = TextureSettings 0 GL.GL_RGBA8 1 1 False
         source = TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
     (_, texture) <- addTexture scene defaultTextureName settings source
     (_, sampler) <- addSampler scene defaultSamplerName
-    atomicModifyIORef' (unScene scene) (setDefaultTexture (texture, sampler))
-    return (texture, sampler)
+    atomicModifyIORef' (unScene scene) (setDefaultTexture (Texture (texture, sampler)))
+    return $ Texture (texture, sampler)
 
     where
     defaultTextureName = "default_texture"
@@ -345,14 +349,13 @@ newScene = Scene <$> newIORef initialSceneState
 initialSceneState :: SceneState
 initialSceneState =
     let counter = 1
-        meshes = IntMap.empty
-        buffers = IntMap.empty
-        textures = Map.empty
-        samplers = Map.empty
-        uniforms = Map.empty
+        meshes = mempty
+        buffers = mempty
+        textures = mempty
+        samplers = mempty
         defaultTexture = Nothing
-        programs = Map.empty
-    in SceneState counter meshes buffers textures samplers uniforms defaultTexture programs
+        programs = mempty
+    in SceneState counter meshes buffers textures samplers defaultTexture programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do

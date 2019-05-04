@@ -15,6 +15,7 @@ module Graphics.Hree.GL.Types
     , RenderInfo(..)
     , Uniform(..)
     , UniformInfo(..)
+    , Texture(..)
     ) where
 
 import Data.ByteString (ByteString)
@@ -64,7 +65,7 @@ data RenderInfo = RenderInfo
     , riDrawMethod  :: !DrawMethod
     , riVertexArray :: !GLW.VertexArray
     , riUniforms    :: ![(UniformInfo, Uniform)]
-    , riTexture     :: !(Maybe (GLW.Texture 'GLW.GL_TEXTURE_2D))
+    , riTextures    :: ![Texture]
     }
 
 data DrawMethod =
@@ -84,4 +85,8 @@ data BindBufferSetting = BindBufferSetting
 data AttribBinding = AttribBinding
     { attribBindingIndex        :: !GLW.BindingIndex
     , attribBindingAttribFormat :: !AttribFormat
+    } deriving (Show, Eq)
+
+newtype Texture = Texture
+    { unTexture :: (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler)
     } deriving (Show, Eq)

@@ -19,6 +19,7 @@ import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Storable as V
 import qualified Foreign (Storable(..), alloca, allocaArray, castPtr)
 import qualified GLW
+import qualified GLW.Groups.TextureTarget as TextureTarget
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
@@ -29,6 +30,7 @@ render commons a cur = do
     setCurrentProgram cur program
     GLW.glBindVertexArray (riVertexArray a)
     bindUniforms uniforms
+    bindTextures textures
     drawWith method
     return . Just $ program
     where
@@ -36,12 +38,27 @@ render commons a cur = do
     uniformInfos = programInfoUniforms . riProgram $ a
     method = riDrawMethod a
     uniforms = riUniforms a
+    textures = riTextures a
     setCurrentProgram (Just p0) p1 | p0 == p1 = return ()
     setCurrentProgram _ p = do
         bindUniforms . mapMaybe toUniformPair $ commons
         GLW.glUseProgram p
     toUniformPair (k, u) =
         (,) <$> Map.lookup k uniformInfos <*> Just u
+
+bindUniforms :: [(UniformInfo, Uniform)] -> IO ()
+bindUniforms = mapM_ bindUniform
+    where
+    bindUniform (ui, Uniform a) =
+        GLW.uniform (uiUniformLocation ui) a
+
+bindTextures :: [Texture] -> IO ()
+bindTextures textures = mapM_ bindTexture $ zip [0..(length textures - 1)] textures
+    where
+    bindTexture (index, Texture (texture, sampler)) = do
+        GL.glActiveTexture (GL.GL_TEXTURE0 + fromIntegral index)
+        GLW.glBindTexture TextureTarget.glTexture2D texture
+        GLW.glBindSampler (fromIntegral index) sampler
 
 renderMany :: Foldable t => [(ByteString, Uniform)] -> t RenderInfo -> IO ()
 renderMany common = void . foldrM (render common) Nothing
@@ -101,9 +118,3 @@ setVertexArrayAttribFormatAndBinding vao attribLocation (AttribBinding binding f
     formatSize = fromIntegral fsize
     formatNormalized = fromIntegral . fromEnum $ fnormalized
     formatRelativeOffset = fromIntegral foffset
-
-bindUniforms :: [(UniformInfo, Uniform)] -> IO ()
-bindUniforms = mapM_ bindUniform
-    where
-    bindUniform (ui, Uniform a) =
-        GLW.uniform (uiUniformLocation ui) a
