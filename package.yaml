@@ -27,6 +27,7 @@ dependencies:
 - gl
 - gl-wrapper
 - hashable
+- hashtables
 - linear
 - mwc-random
 - text
