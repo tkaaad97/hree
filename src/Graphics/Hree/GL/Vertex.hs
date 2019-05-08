@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Graphics.Hree.GL.Vertex
     ( BasicVertex(..)
+    , PositionAndNormal(..)
     , Vertex(..)
     , VertexField(..)
     , VertexSpec(..)
@@ -85,3 +86,33 @@ instance Vertex BasicVertex where
             , colorField
             ]
         bbs = BindBufferSetting 0 (sizeOf (undefined :: BasicVertex))
+
+data PositionAndNormal = PositionAndNormal
+    { pnPosition :: !Vec3
+    , pnNormal   :: !Vec3
+    } deriving (Show, Eq)
+
+instance Storable PositionAndNormal where
+    sizeOf _ = 24
+
+    alignment _ = 4
+
+    peek ptr = do
+        p <- peek $ castPtr ptr `plusPtr` positionOffset
+        n <- peek $ castPtr ptr `plusPtr` normalOffset
+        return $ PositionAndNormal p n
+
+    poke ptr (PositionAndNormal p n) = do
+        poke (castPtr ptr `plusPtr` positionOffset) p
+        poke (castPtr ptr `plusPtr` normalOffset) n
+
+instance Vertex PositionAndNormal where
+    vertexSpec _ = VertexSpec bbs fields
+
+        where
+        positionField = VertexField "position" (AttribFormat 3 GL.GL_FLOAT False positionOffset)
+        normalField = VertexField "normal" (AttribFormat 3 GL.GL_FLOAT False normalOffset)
+        fields = [ positionField
+            , normalField
+            ]
+        bbs = BindBufferSetting 0 (sizeOf (undefined :: PositionAndNormal))
