@@ -1,7 +1,7 @@
 module Graphics.Hree.Geometry
     ( Geometry(..)
     , addAttribBindings
-    , empty
+    , newGeometry
     ) where
 
 import Data.ByteString (ByteString)
@@ -21,8 +21,8 @@ data Geometry = Geometry
     , geometryCount          :: !Int
     } deriving (Show)
 
-empty :: Geometry
-empty = Geometry Map.empty IntMap.empty Nothing 0
+newGeometry :: Int -> Geometry
+newGeometry = Geometry Map.empty IntMap.empty Nothing
 
 addAttribBindings :: Geometry -> Int -> Map ByteString AttribBinding -> (GLW.Buffer, BindBufferSetting) -> Geometry
 addAttribBindings geo bindingIndex xs b = geo'

@@ -6,15 +6,16 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import qualified GLW
 import qualified Graphics.GL as GL
-import Graphics.Hree.Geometry (Geometry)
+import Graphics.Hree.Geometry (Geometry, newGeometry)
 import Graphics.Hree.GL.Vertex (PositionAndNormal(..), Vertex)
-import Graphics.Hree.Scene (Scene, geometryFromVertexVector)
+import Graphics.Hree.Scene (Scene, addVerticesToGeometry)
 import Linear (V3(..))
 
-createBoxGeometry :: GLW.BindingIndex -> Int -> Int -> Int -> Scene -> IO (Geometry, Vector PositionAndNormal)
-createBoxGeometry bindingIndex width height depth scene = do
-    geo <- geometryFromVertexVector bindingIndex vs GL.GL_STATIC_READ scene
-    return (geo, vs)
+createBoxGeometry :: Int -> Int -> Int -> Scene -> IO (Geometry, Vector PositionAndNormal)
+createBoxGeometry width height depth scene = do
+    let geo = newGeometry . Vector.length $ vs
+    geo' <- addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
+    return (geo', vs)
     where
     x = fromIntegral width
     y = fromIntegral height

@@ -14,6 +14,7 @@ import GLContext
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
+import qualified Graphics.Hree.Geometry as Hree
 import qualified Graphics.Hree.GL.Vertex as Hree
 import qualified Graphics.Hree.Material as Hree
 import qualified Graphics.Hree.Mesh as Hree (Mesh(..))
@@ -30,7 +31,7 @@ spec = do
     describe "addMesh" $ do
         it "change scene state" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material
             meshId <- Hree.addMesh scene mesh
             meshId `shouldBe` 1
@@ -41,7 +42,7 @@ spec = do
 
         specify "use same geometry twice"  . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material
             meshId1 <- Hree.addMesh scene mesh
             meshId1 `shouldBe` 1
@@ -55,7 +56,7 @@ spec = do
     describe "removeMesh" $ do
         it "remove mesh and delete buffer" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material
             meshId <- Hree.addMesh scene mesh
             bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter
@@ -66,7 +67,7 @@ spec = do
 
         specify "buffer will be released when all reference removed" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material
             meshId1 <- Hree.addMesh scene mesh
             meshId2 <- Hree.addMesh scene mesh
@@ -98,8 +99,8 @@ spec = do
     describe "deleteScene" $ do
         it "delete meshes" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry1 <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
-            geometry2 <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+            geometry1 <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
+            geometry2 <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
             let mesh1 = Hree.Mesh geometry1 material
                 mesh2 = Hree.Mesh geometry2 material
             meshId1 <- Hree.addMesh scene mesh1
@@ -116,7 +117,7 @@ spec = do
 
         it "delete unreferenced orphan buffers" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry <- Hree.geometryFromVertexVector (GLW.BindingIndex 0) vs GL.GL_STREAM_DRAW scene
+            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material
             bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter
             bufferRefCounter `shouldBe` IntMap.fromList [(1, 0)]

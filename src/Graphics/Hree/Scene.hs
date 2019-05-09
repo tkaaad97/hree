@@ -7,9 +7,9 @@ module Graphics.Hree.Scene
     , SceneState(..)
     , addMesh
     , deleteScene
-    , geometryFromVertexVector
     , addSampler
     , addTexture
+    , addVerticesToGeometry
     , newScene
     , removeMesh
     , renderScene
@@ -196,18 +196,20 @@ addBuffer scene bufferSource = do
         let bufferRefCounter = IntMap.insert bufferId 0 (ssBufferRefCounter state)
         in (state { ssBufferRefCounter = bufferRefCounter }, ())
 
-geometryFromVertexVector :: forall a. (Storable a, Vertex a) => GLW.BindingIndex -> Vector a -> GL.GLenum -> Scene -> IO Geometry
-geometryFromVertexVector bindingIndex storage usage scene = do
+addVerticesToGeometry :: forall a. (Storable a, Vertex a) => Geometry -> Vector a -> GL.GLenum -> Scene -> IO Geometry
+addVerticesToGeometry geometry storage usage scene = do
     buffer <- addBuffer scene (BufferSource storage usage)
-    let buffers = IntMap.singleton (fromIntegral . GLW.unBindingIndex $ bindingIndex) (buffer, bbs)
-    return (Geometry attribBindings buffers Nothing num)
+    let buffers' = IntMap.insert bindingIndex (buffer, bbs) buffers
+    return (Geometry attribBindings' buffers' indexBuffer count)
     where
+    Geometry attribBindings buffers indexBuffer count = geometry
+    bindingIndex = maybe 0 (+ 1) . fmap fst . IntMap.lookupMax $ buffers
     VertexSpec bbs fields = vertexSpec (Proxy :: Proxy a)
     keys = map vertexFieldAttribName fields
     bindings = map toAttribBinding fields
-    toAttribBinding (VertexField name format) = AttribBinding bindingIndex format
-    attribBindings = Map.fromList $ zip keys bindings
-    num = Vector.length storage
+    toAttribBinding (VertexField name format) = AttribBinding (GLW.BindingIndex . fromIntegral $ bindingIndex) format
+    newAttribBindings = Map.fromList $ zip keys bindings
+    attribBindings' = Map.union attribBindings newAttribBindings
 
 addTexture :: Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D)
 addTexture scene name settings source =
