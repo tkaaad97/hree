@@ -27,6 +27,7 @@ withWindow width height title constructor f = do
         GLFW.windowHint $ GLFW.WindowHint'ContextVersionMinor 5
         GLFW.windowHint $ GLFW.WindowHint'OpenGLForwardCompat True
         GLFW.windowHint $ GLFW.WindowHint'OpenGLProfile GLFW.OpenGLProfile'Core
+        GLFW.windowHint $ GLFW.WindowHint'DepthBits (Just 32)
         m <- GLFW.createWindow width height title Nothing Nothing
         case m of
           (Just win) -> do

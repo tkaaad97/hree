@@ -45,6 +45,7 @@ main = do
 
     init w = do
         GL.glEnable GL.GL_CULL_FACE
+        GL.glEnable GL.GL_DEPTH_TEST
         scene <- newScene
         (geometry, _) <- createBoxGeometry 0.5 0.5 0.5 scene
         geometry' <- addVerticesToGeometry geometry vs GL.GL_STATIC_READ scene

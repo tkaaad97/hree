@@ -17,6 +17,7 @@ module Graphics.Hree.Scene
 
 import Control.Exception (bracketOnError, throwIO)
 import Control.Monad (when)
+import Data.Bits ((.|.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (index, length)
 import qualified Data.ByteString.Char8 as ByteString (pack)
@@ -38,7 +39,8 @@ import Data.Word (Word8)
 import Foreign (Ptr, Storable)
 import qualified Foreign (castPtr, copyArray, nullPtr, with, withArray)
 import qualified GLW
-import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit)
+import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit,
+                                                    glDepthBufferBit)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Groups.PrimitiveType as PrimitiveType
 import qualified GLW.Internal.Groups as GLW (PixelFormat(..))
@@ -81,7 +83,7 @@ renderScene :: Scene -> Camera -> IO ()
 renderScene scene camera = do
     projectionViewMatrix <- getCameraMatrix camera
     GLW.glClearColor 1 1 1 1
-    GLW.glClear GLW.glColorBufferBit
+    GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
     state <- readIORef . unScene $ scene
     let meshes = ssMeshes state
         defaultTexture = ssDefaultTexture state
