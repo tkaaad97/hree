@@ -1,7 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 module Graphics.Hree.GL.Vertex
     ( BasicVertex(..)
     , PositionAndNormal(..)
+    , Uv(..)
     , Vertex(..)
     , VertexField(..)
     , VertexSpec(..)
@@ -116,3 +118,15 @@ instance Vertex PositionAndNormal where
             , normalField
             ]
         bbs = BindBufferSetting 0 (sizeOf (undefined :: PositionAndNormal))
+
+newtype Uv = Uv
+    { unUv :: Vec2
+    } deriving (Show, Eq, Storable)
+
+instance Vertex Uv where
+    vertexSpec _ = VertexSpec bbs fields
+
+        where
+        uvField = VertexField "uv" (AttribFormat 2 GL.GL_FLOAT False 0)
+        fields = [ uvField ]
+        bbs = BindBufferSetting 0 (sizeOf (undefined :: Uv))
