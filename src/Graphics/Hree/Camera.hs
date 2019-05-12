@@ -1,12 +1,14 @@
 module Graphics.Hree.Camera
     ( Camera
     , LookAt(..)
+    , Projection(..)
     , lookAt
     , newCamera
     , orthographic
     , perspective
     , getCameraLookAt
     , getCameraMatrix
+    , getCameraProjection
     , updateProjection
     , updateLookAt
     ) where
@@ -90,3 +92,6 @@ updateLookAt (Camera cameraRef) l =
 
 getCameraLookAt :: Camera -> IO LookAt
 getCameraLookAt (Camera cameraRef) = cameraLookAt <$> readIORef cameraRef
+
+getCameraProjection :: Camera -> IO Projection
+getCameraProjection (Camera cameraRef) = cameraProjection <$> readIORef cameraRef

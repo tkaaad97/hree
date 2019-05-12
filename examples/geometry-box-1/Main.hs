@@ -28,6 +28,7 @@ main = do
     where
     width  = 640
     height = 480
+    aspect = fromIntegral width / fromIntegral height
 
     uvs =
         [ Uv $ V2 0 0
@@ -39,7 +40,7 @@ main = do
         ]
     vs = Vector.fromList . concat . replicate 6 $ uvs
 
-    proj = perspective 90 1.0 0.1 10.0
+    proj = perspective 90 aspect 0.1 10.0
 
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
@@ -55,6 +56,8 @@ main = do
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
+
+        GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
         return (scene, camera)
 
     onDisplay (s, c) w = do
@@ -66,6 +69,17 @@ main = do
         render = do
             renderScene s c
             GLFW.swapBuffers w
+
+    resizeWindow' camera win w h = do
+        GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
+        projection <- getCameraProjection camera
+        let aspect = fromIntegral w / fromIntegral h
+            projection' = updateProjectionAspectRatio projection aspect
+        updateProjection camera projection'
+
+    updateProjectionAspectRatio p @ Perspective {} aspect =
+        p { perspectiveAspect = aspect }
+    updateProjectionAspectRatio p _ = p
 
     mkTexture :: Scene -> IO Texture
     mkTexture scene = do
