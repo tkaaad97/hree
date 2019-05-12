@@ -70,14 +70,22 @@ addComponent e a store = do
         let currentSize = componentStoreSize s
             reservedSize = MV.length $ componentStoreVec s
         when (reservedSize <= currentSize) $
-            extendComponentStore store (currentSize + margin)
+            extendComponentStore store =<< decideSize currentSize
         atomicModifyIORef' ref (genIdentifier currentSize)
         where
-        margin = 100
         ref = unComponentStore store
         genIdentifier i s =
             let s' = s { componentStoreSize = i + 1 }
             in (s', (i, s))
+
+    decideSize :: Int -> IO Int
+    decideSize current = do
+        let limit = maxBound :: Int
+        when (current >= fromIntegral limit)
+            (throwIO . userError $ "max bound")
+        return $ if current > limit `div` 2
+            then limit
+            else current * 2
 
 removeComponent :: (Storable a) => Entity -> ComponentStore a -> IO Bool
 removeComponent e store = do
