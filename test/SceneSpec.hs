@@ -34,7 +34,7 @@ spec = do
             geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material
             meshId <- Hree.addMesh scene mesh
-            meshId `shouldBe` 1
+            meshId `shouldBe` Hree.MeshId 1
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 2
             bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter
@@ -45,9 +45,9 @@ spec = do
             geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material
             meshId1 <- Hree.addMesh scene mesh
-            meshId1 `shouldBe` 1
+            meshId1 `shouldBe` Hree.MeshId 1
             meshId2 <- Hree.addMesh scene mesh
-            meshId2 `shouldBe` 2
+            meshId2 `shouldBe` Hree.MeshId 2
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 3
             bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter

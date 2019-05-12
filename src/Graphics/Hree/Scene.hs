@@ -1,8 +1,10 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 module Graphics.Hree.Scene
-    ( MeshInfo(..)
+    ( MeshId(..)
+    , MeshInfo(..)
     , Scene(..)
     , SceneState(..)
     , addMesh
@@ -10,6 +12,7 @@ module Graphics.Hree.Scene
     , addSampler
     , addTexture
     , addVerticesToGeometry
+    , maxMeshCount
     , newScene
     , removeMesh
     , renderScene
@@ -24,6 +27,7 @@ import qualified Data.ByteString.Char8 as ByteString (pack)
 import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
 import Data.Foldable (foldr')
+import Data.Hashable (Hashable)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
@@ -59,8 +63,12 @@ import qualified System.Random.MWC as Random (asGenIO, uniformR,
                                               withSystemRandom)
 import Unsafe.Coerce (unsafeCoerce)
 
+newtype MeshId = MeshId
+    { unMeshId :: Int
+    } deriving (Show, Eq, Ord, Hashable)
+
 data MeshInfo = MeshInfo
-    { mishInfoId          :: !Int
+    { mishInfoId          :: !MeshId
     , meshInfoMesh        :: !Mesh
     , meshInfoBuffers     :: ![GLW.Buffer]
     , meshInfoProgram     :: !ProgramInfo
@@ -119,7 +127,10 @@ resolveDrawMethod geo =
     let count = fromIntegral . geometryCount $ geo
     in DrawElements PrimitiveType.glTriangles count GL.GL_UNSIGNED_INT Foreign.nullPtr
 
-addMesh :: Scene -> Mesh -> IO Int
+maxMeshCount :: Int
+maxMeshCount = 1000000
+
+addMesh :: Scene -> Mesh -> IO MeshId
 addMesh scene mesh = do
     (program, programAdded) <- mkProgramIfNotExists scene pspec
     GLW.glUseProgram (programInfoProgram program)
@@ -129,13 +140,14 @@ addMesh scene mesh = do
     where
     insertsWith f kvs m = foldr' (uncurry $ IntMap.insertWith f) m kvs
     addMeshFunc program programAdded vao state =
-        let meshId = ssMeshCounter state
-            meshCounter = meshId + 1
+        let meshIdVal = ssMeshCounter state
+            meshId = MeshId meshIdVal
+            meshCounter = meshIdVal + 1
             bos = map fst . IntMap.elems $ buffers
             bos' = maybe bos (: bos) maybeIndexBuffer
             nubBufferIds = List.nub . map (fromIntegral . GLW.unBuffer) $ bos'
             minfo = MeshInfo meshId mesh bos' program vao
-            meshes = IntMap.insert meshId minfo (ssMeshes state)
+            meshes = IntMap.insert meshIdVal minfo (ssMeshes state)
             bufferRefCounter =
                 insertsWith (+) (nubBufferIds `zip` repeat 1) (ssBufferRefCounter state)
             programs = if programAdded
@@ -154,7 +166,7 @@ addMesh scene mesh = do
     maybeIndexBuffer = geometryIndexBuffer geo
     pspec = resolveProgramSpec mesh
 
-removeMesh :: Scene -> Int -> IO ()
+removeMesh :: Scene -> MeshId -> IO ()
 removeMesh scene meshId = do
     (vao, deletedBuffers) <- atomicModifyIORef' state (removeMeshFunc meshId)
     maybe (return ()) GLW.deleteObject vao
@@ -162,9 +174,9 @@ removeMesh scene meshId = do
     where
     state = unScene scene
 
-removeMeshFunc :: Int -> SceneState -> (SceneState, (Maybe GLW.VertexArray, [GLW.Buffer]))
+removeMeshFunc :: MeshId -> SceneState -> (SceneState, (Maybe GLW.VertexArray, [GLW.Buffer]))
 removeMeshFunc meshId state =
-    let (result, meshes) = IntMap.updateLookupWithKey (const $ const Nothing) meshId (ssMeshes state)
+    let (result, meshes) = IntMap.updateLookupWithKey (const $ const Nothing) (unMeshId meshId) (ssMeshes state)
         vao = fmap meshInfoVertexArray result
         bos = maybe [] meshInfoBuffers result
         (bufferRefCounter, deletedBuffers) = decrementAndLookupDeletion bos (ssBufferRefCounter state)
@@ -371,7 +383,7 @@ deleteScene scene = do
 
     where
     deleteSceneFunc state =
-        let meshIds = IntMap.keys . ssMeshes $ state
+        let meshIds = map MeshId . IntMap.keys . ssMeshes $ state
             (state', xs) = foldr' removeMeshFunc' (state, []) meshIds
             vaos = mapMaybe fst xs
             buffers = map (GLW.Buffer . fromIntegral) . IntMap.keys . ssBufferRefCounter $ state'
