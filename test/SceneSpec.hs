@@ -24,7 +24,7 @@ import Linear (V2(..), V3(..), V4(..))
 import Test.Hspec
 
 getSceneProp :: Hree.Scene -> (Hree.SceneState -> a) -> IO a
-getSceneProp scene property = property <$> readIORef (Hree.unScene scene)
+getSceneProp scene property = property <$> readIORef (Hree.sceneState scene)
 
 spec :: Spec
 spec = do

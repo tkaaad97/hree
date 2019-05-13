@@ -12,14 +12,13 @@ module Graphics.Hree.Scene
     , addSampler
     , addTexture
     , addVerticesToGeometry
-    , maxMeshCount
     , newScene
     , removeMesh
     , renderScene
     ) where
 
 import Control.Exception (bracketOnError, throwIO)
-import Control.Monad (when)
+import Control.Monad (void, when)
 import Data.Bits ((.|.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (index, length)
@@ -34,7 +33,7 @@ import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import qualified Data.List as List (nub)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (isNothing, mapMaybe, maybeToList)
+import Data.Maybe (fromMaybe, isNothing, mapMaybe, maybeToList)
 import Data.Proxy (Proxy(..))
 import qualified Data.Traversable as Traversable (mapM)
 import Data.Vector.Storable (Vector)
@@ -51,14 +50,17 @@ import qualified GLW.Internal.Groups as GLW (PixelFormat(..))
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
+import qualified Graphics.Hree.Component as Component
 import Graphics.Hree.Geometry
 import Graphics.Hree.GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
 import Graphics.Hree.Material
+import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
 import Graphics.Hree.Texture
+import qualified Linear
 import qualified System.Random.MWC as Random (asGenIO, uniformR,
                                               withSystemRandom)
 import Unsafe.Coerce (unsafeCoerce)
@@ -68,14 +70,18 @@ newtype MeshId = MeshId
     } deriving (Show, Eq, Ord, Hashable)
 
 data MeshInfo = MeshInfo
-    { mishInfoId          :: !MeshId
+    { meshInfoId          :: !MeshId
     , meshInfoMesh        :: !Mesh
     , meshInfoBuffers     :: ![GLW.Buffer]
     , meshInfoProgram     :: !ProgramInfo
     , meshInfoVertexArray :: !GLW.VertexArray
     } deriving (Show)
 
-newtype Scene = Scene { unScene :: IORef SceneState }
+data Scene = Scene
+    { sceneState                    :: !(IORef SceneState)
+    , sceneMeshTransformStore       :: !(Component.ComponentStore Transform)
+    , sceneMeshTransformMatrixStore :: !(Component.ComponentStore Mat4)
+    }
 
 data SceneState = SceneState
     { ssMeshCounter      :: !Int
@@ -92,24 +98,41 @@ renderScene scene camera = do
     projectionViewMatrix <- getCameraMatrix camera
     GLW.glClearColor 1 1 1 1
     GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
-    state <- readIORef . unScene $ scene
+    state <- readIORef . sceneState $ scene
     let meshes = ssMeshes state
         defaultTexture = ssDefaultTexture state
-    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] defaultTexture meshes
+        transformStore = sceneMeshTransformStore scene
+        matrixStore = sceneMeshTransformMatrixStore scene
+    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] defaultTexture transformStore matrixStore meshes
 
-renderMeshes :: [(ByteString, Uniform)] -> Maybe Texture -> IntMap MeshInfo ->  IO ()
-renderMeshes uniforms defaultTexture = renderMany uniforms . fmap (toRenderInfo defaultTexture)
+renderMeshes :: [(ByteString, Uniform)] -> Maybe Texture -> Component.ComponentStore Transform -> Component.ComponentStore Mat4 -> IntMap MeshInfo ->  IO ()
+renderMeshes uniforms defaultTexture transformStore matrixStore meshes = do
+    rs <- mapM (toRenderInfo defaultTexture transformStore matrixStore) meshes
+    renderMany uniforms rs
 
-toRenderInfo :: Maybe Texture -> MeshInfo -> RenderInfo
-toRenderInfo defaultTexture m = renderInfo
+toRenderInfo :: Maybe Texture -> Component.ComponentStore Transform -> Component.ComponentStore Mat4 -> MeshInfo -> IO RenderInfo
+toRenderInfo defaultTexture transformStore matrixStore m = do
+    transform <- fromMaybe zeroTransform <$> Component.readComponent entity transformStore
+    matrix <- if transformUpdated transform
+                then do
+                    let matrix = transformMatrix transform
+                    Component.writeComponent entity matrix matrixStore
+                    return matrix
+                else fromMaybe Linear.identity <$> Component.readComponent entity matrixStore
+    let maybeUniform = toUniformEntry "modelMatrix" (Uniform matrix)
+        uniforms = Map.elems $ Map.mapMaybeWithKey toUniformEntry (materialUniforms material)
+        uniforms' = maybe uniforms (: uniforms) maybeUniform
+        renderInfo = RenderInfo program dm vao uniforms' textures
+    return renderInfo
     where
+    meshId = meshInfoId m
+    entity = meshIdToEntity meshId
     mesh = meshInfoMesh m
     material = meshMaterial mesh
     program = meshInfoProgram m
     vao = meshInfoVertexArray m
     dm = resolveDrawMethod . meshGeometry . meshInfoMesh $ m
     uniformInfos = programInfoUniforms program
-    uniforms = Map.elems $ Map.mapMaybeWithKey toUniformEntry (materialUniforms material)
     toUniformEntry uniformName uniform = do
         uniformInfo <- Map.lookup uniformName uniformInfos
         return (uniformInfo, uniform)
@@ -117,7 +140,6 @@ toRenderInfo defaultTexture m = renderInfo
     textures = if null mtextures
         then maybeToList defaultTexture
         else mtextures
-    renderInfo = RenderInfo program dm vao uniforms textures
 
 resolveDrawMethod :: Geometry -> DrawMethod
 resolveDrawMethod geo | isNothing (geometryIndexBuffer geo) =
@@ -127,15 +149,21 @@ resolveDrawMethod geo =
     let count = fromIntegral . geometryCount $ geo
     in DrawElements PrimitiveType.glTriangles count GL.GL_UNSIGNED_INT Foreign.nullPtr
 
-maxMeshCount :: Int
-maxMeshCount = 1000000
+meshIdToEntity :: MeshId -> Component.Entity
+meshIdToEntity = Component.Entity . unMeshId
 
 addMesh :: Scene -> Mesh -> IO MeshId
 addMesh scene mesh = do
     (program, programAdded) <- mkProgramIfNotExists scene pspec
     GLW.glUseProgram (programInfoProgram program)
     vao <- mkVertexArray (geometryAttribBindings geo) buffers maybeIndexBuffer program
-    atomicModifyIORef' (unScene scene) (addMeshFunc program programAdded vao)
+    meshId <- atomicModifyIORef' (sceneState scene) (addMeshFunc program programAdded vao)
+    let transformStore = sceneMeshTransformStore scene
+        matrixStore = sceneMeshTransformMatrixStore scene
+        entity = meshIdToEntity meshId
+    Component.addComponent entity zeroTransform transformStore
+    Component.addComponent entity Linear.identity matrixStore
+    return meshId
 
     where
     insertsWith f kvs m = foldr' (uncurry $ IntMap.insertWith f) m kvs
@@ -171,8 +199,13 @@ removeMesh scene meshId = do
     (vao, deletedBuffers) <- atomicModifyIORef' state (removeMeshFunc meshId)
     maybe (return ()) GLW.deleteObject vao
     GLW.deleteObjects deletedBuffers
+    let transformStore = sceneMeshTransformStore scene
+        matrixStore = sceneMeshTransformMatrixStore scene
+        entity = meshIdToEntity meshId
+    void $ Component.removeComponent entity transformStore
+    void $ Component.removeComponent entity matrixStore
     where
-    state = unScene scene
+    state = sceneState scene
 
 removeMeshFunc :: MeshId -> SceneState -> (SceneState, (Maybe GLW.VertexArray, [GLW.Buffer]))
 removeMeshFunc meshId state =
@@ -203,7 +236,7 @@ addBuffer :: Scene -> BufferSource -> IO GLW.Buffer
 addBuffer scene bufferSource = do
     buffer <- mkBuffer bufferSource
     let bufferId = fromIntegral . GLW.unBuffer $ buffer
-    atomicModifyIORef' (unScene scene) (addBufferFunc bufferId)
+    atomicModifyIORef' (sceneState scene) (addBufferFunc bufferId)
     return buffer
     where
     addBufferFunc bufferId state =
@@ -251,13 +284,13 @@ addTextureInternal renameOnConflict scene name settings source =
     tryCount = 10
 
     addTextureAction True texture = do
-        r <- atomicModifyIORef' (unScene scene) (addTextureFunc name texture)
+        r <- atomicModifyIORef' (sceneState scene) (addTextureFunc name texture)
         name' <- maybe (tryAddTexture name texture tryCount) return r
         initializeTexture texture
         return $ Just (name', texture)
 
     addTextureAction False texture = do
-        r <- atomicModifyIORef' (unScene scene) (addTextureFunc name texture)
+        r <- atomicModifyIORef' (sceneState scene) (addTextureFunc name texture)
         maybe (return Nothing) (\_ -> initializeTexture texture >> return (Just (name, texture))) r
 
     initializeTexture texture = do
@@ -279,7 +312,7 @@ addTextureInternal renameOnConflict scene name settings source =
         | count == 0 = throwIO . userError $ "failed to addTexture"
         | otherwise = do
             name' <- genRandomName prefix randomLen
-            r <- atomicModifyIORef' (unScene scene) (addTextureFunc name' texture)
+            r <- atomicModifyIORef' (sceneState scene) (addTextureFunc name' texture)
             maybe (tryAddTexture prefix texture (count - 1)) return r
 
 addSampler :: Scene -> ByteString -> IO (ByteString, GLW.Sampler)
@@ -296,12 +329,12 @@ addSamplerInternal renameOnConflict scene name =
     where
     tryCount = 10
     addSamplerAction True sampler = do
-        r <- atomicModifyIORef' (unScene scene) (addSamplerFunc name sampler)
+        r <- atomicModifyIORef' (sceneState scene) (addSamplerFunc name sampler)
         name' <- maybe (tryAddSampler name sampler tryCount) return r
         return $ Just (name', sampler)
 
     addSamplerAction False sampler = do
-        r <- atomicModifyIORef' (unScene scene) (addSamplerFunc name sampler)
+        r <- atomicModifyIORef' (sceneState scene) (addSamplerFunc name sampler)
         maybe (return Nothing) (\name' -> return (Just (name', sampler))) r
 
     addSamplerFunc name' sampler state =
@@ -317,21 +350,21 @@ addSamplerInternal renameOnConflict scene name =
         | count == 0 = throwIO . userError $ "failed to addSampler"
         | otherwise = do
             name' <- genRandomName prefix randomLen
-            r <- atomicModifyIORef' (unScene scene) (addSamplerFunc name' sampler)
+            r <- atomicModifyIORef' (sceneState scene) (addSamplerFunc name' sampler)
             maybe (tryAddSampler prefix sampler (count - 1)) return r
 
 --setBackground
 
 mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)
 mkProgramIfNotExists scene pspec = do
-    programs <- fmap ssPrograms . readIORef . unScene $ scene
+    programs <- fmap ssPrograms . readIORef . sceneState $ scene
     let maybeProgram = Map.lookup pspec programs
     maybe (flip (,) True <$> mkProgramAndInsert scene pspec) (return . flip (,) False) maybeProgram
 
 mkProgramAndInsert :: Scene -> ProgramSpec -> IO ProgramInfo
 mkProgramAndInsert scene pspec = do
     program <- mkProgram pspec
-    atomicModifyIORef' (unScene scene) (insertProgram program)
+    atomicModifyIORef' (sceneState scene) (insertProgram program)
     _ <- mkDefaultTextureIfNotExists scene
     return program
     where
@@ -342,7 +375,7 @@ mkProgramAndInsert scene pspec = do
 
 mkDefaultTextureIfNotExists :: Scene -> IO Texture
 mkDefaultTextureIfNotExists scene = do
-    maybeDefaultTexture <- ssDefaultTexture <$> (readIORef . unScene $ scene)
+    maybeDefaultTexture <- ssDefaultTexture <$> (readIORef . sceneState $ scene)
     maybe (mkDefaultTexture scene) return maybeDefaultTexture
 
 mkDefaultTexture :: Scene -> IO Texture
@@ -351,7 +384,7 @@ mkDefaultTexture scene = Foreign.withArray [0, 0, 0, 1] $ \p -> do
         source = TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
     (_, texture) <- addTexture scene defaultTextureName settings source
     (_, sampler) <- addSampler scene defaultSamplerName
-    atomicModifyIORef' (unScene scene) (setDefaultTexture (Texture (texture, sampler)))
+    atomicModifyIORef' (sceneState scene) (setDefaultTexture (Texture (texture, sampler)))
     return $ Texture (texture, sampler)
 
     where
@@ -361,7 +394,14 @@ mkDefaultTexture scene = Foreign.withArray [0, 0, 0, 1] $ \p -> do
         (s { ssDefaultTexture = Just a }, ())
 
 newScene :: IO Scene
-newScene = Scene <$> newIORef initialSceneState
+newScene = do
+    ref <- newIORef initialSceneState
+    transforms <- Component.newComponentStore defaultPreserveSize Proxy
+    matrices <- Component.newComponentStore defaultPreserveSize Proxy
+    return $ Scene ref transforms matrices
+
+defaultPreserveSize :: Int
+defaultPreserveSize = 10
 
 initialSceneState :: SceneState
 initialSceneState =
@@ -376,7 +416,7 @@ initialSceneState =
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
-    (vaos, buffers, textures) <- atomicModifyIORef' (unScene scene) deleteSceneFunc
+    (vaos, buffers, textures) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
     GLW.deleteObjects vaos
     GLW.deleteObjects buffers
     GLW.deleteObjects textures
