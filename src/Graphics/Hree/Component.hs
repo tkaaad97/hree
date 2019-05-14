@@ -9,6 +9,7 @@ module Graphics.Hree.Component
     , removeComponent
     , readComponent
     , writeComponent
+    , modifyComponent
     ) where
 
 import Control.Exception (throwIO)
@@ -133,6 +134,14 @@ writeComponentAt :: (Storable a) => Int -> a -> ComponentStore a -> IO ()
 writeComponentAt i a store = do
     vec <- componentStoreVec <$> readIORef (unComponentStore store)
     MV.unsafeWrite vec i a
+
+modifyComponent :: (Storable a) => Entity -> (a -> a) -> ComponentStore a -> IO Bool
+modifyComponent e f store = do
+    s <- readIORef (unComponentStore store)
+    maybeIndex <- HT.lookup (componentStoreEntityMap s) e
+    maybe (return False)
+        (\i -> MV.unsafeModify (componentStoreVec s) f i >> return True)
+        maybeIndex
 
 extendComponentStore :: (Storable a) => ComponentStore a -> Int -> IO ()
 extendComponentStore (ComponentStore ref) newSize = do

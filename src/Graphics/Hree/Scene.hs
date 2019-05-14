@@ -15,6 +15,9 @@ module Graphics.Hree.Scene
     , newScene
     , removeMesh
     , renderScene
+    , translateMesh
+    , rotateMesh
+    , applyTransformToMesh
     ) where
 
 import Control.Exception (bracketOnError, throwIO)
@@ -60,6 +63,7 @@ import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
 import Graphics.Hree.Texture
+import Linear ((^+^))
 import qualified Linear
 import qualified System.Random.MWC as Random (asGenIO, uniformR,
                                               withSystemRandom)
@@ -231,6 +235,29 @@ removeMeshFunc meshId state =
             ds = map fst . filter ((== Just 1) . snd) $ (ks `zip` xs)
             ds' = map (GLW.Buffer . fromIntegral) ds
         in (m', ds')
+
+translateMesh :: MeshId -> Vec3 -> Scene -> IO ()
+translateMesh meshId v = applyTransformToMesh meshId f
+    where
+    f transform = transform
+        { transformTranslation = transformTranslation transform ^+^ v
+        , transformUpdated = True
+        }
+
+rotateMesh :: MeshId -> Vec3 -> Float -> Scene -> IO ()
+rotateMesh meshId axis angle = applyTransformToMesh meshId f
+    where
+    f transform = transform
+        { transformQuaternion = transformQuaternion transform * Linear.axisAngle axis angle
+        , transformUpdated = True
+        }
+
+applyTransformToMesh :: MeshId -> (Transform -> Transform) -> Scene -> IO ()
+applyTransformToMesh meshId f scene =
+    void $ Component.modifyComponent entity f transformStore
+    where
+    entity = meshIdToEntity meshId
+    transformStore = sceneMeshTransformStore scene
 
 addBuffer :: Scene -> BufferSource -> IO GLW.Buffer
 addBuffer scene bufferSource = do
