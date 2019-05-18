@@ -17,6 +17,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (IORef)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Vector.Mutable as BV
 import qualified Data.Vector.Storable.Mutable as SV
 import qualified GLW
 import qualified Graphics.Hree.Component as Component
@@ -56,13 +57,13 @@ data MeshInfo = MeshInfo
 
 data Scene = Scene
     { sceneState                    :: !(IORef SceneState)
+    , sceneMeshStore                :: !(Component.ComponentStore BV.MVector MeshInfo)
     , sceneMeshTransformStore       :: !(Component.ComponentStore SV.MVector Transform)
     , sceneMeshTransformMatrixStore :: !(Component.ComponentStore SV.MVector Mat4)
     }
 
 data SceneState = SceneState
     { ssMeshCounter    :: !Int
-    , ssMeshes         :: !(IntMap MeshInfo)
     , ssBuffers        :: ![GLW.Buffer]
     , ssTextures       :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
     , ssSamplers       :: !(Map ByteString GLW.Sampler)

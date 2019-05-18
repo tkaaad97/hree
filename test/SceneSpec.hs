@@ -15,6 +15,7 @@ import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
+import qualified Graphics.Hree.Component as Component
 import qualified Graphics.Hree.Geometry as Hree
 import qualified Graphics.Hree.GL.Vertex as Hree
 import qualified Graphics.Hree.Material as Hree
@@ -94,13 +95,13 @@ spec = do
                 mesh2 = Hree.Mesh geometry2 material
             meshId1 <- Hree.addMesh scene mesh1
             meshId2 <- Hree.addMesh scene mesh2
-            meshes <- getSceneProp scene Hree.ssMeshes
-            IntMap.size meshes `shouldBe` 2
+            meshSize <- Component.componentSize $ Hree.sceneMeshStore scene
+            meshSize `shouldBe` 2
             buffers <- getSceneProp scene Hree.ssBuffers
             buffers `shouldBe` [GLW.Buffer 2, GLW.Buffer 1]
             Hree.deleteScene scene
-            meshesAfter <- getSceneProp scene Hree.ssMeshes
-            IntMap.size meshesAfter `shouldBe` 0
+            meshSizeAfter <- Component.componentSize $ Hree.sceneMeshStore scene
+            meshSizeAfter `shouldBe` 0
             buffers <- getSceneProp scene Hree.ssBuffers
             buffers `shouldBe` []
 

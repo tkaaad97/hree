@@ -11,6 +11,9 @@ module Graphics.Hree.Component
     , readComponent
     , writeComponent
     , modifyComponent
+    , getComponentSlice
+    , cleanComponentStore
+    , extendComponentStore
     ) where
 
 import Control.Exception (throwIO)
@@ -18,7 +21,7 @@ import Control.Monad (when)
 import Control.Monad.ST (RealWorld)
 import Data.Hashable (Hashable(..))
 import qualified Data.HashTable.IO as HT
-import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef, writeIORef)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Generic.Mutable as MV
 import Foreign (Storable(..))
@@ -143,6 +146,18 @@ modifyComponent e f store = do
     maybe (return False)
         (\i -> MV.unsafeModify (componentStoreVec s) f i >> return True)
         maybeIndex
+
+getComponentSlice :: (MV.MVector v a, MV.MVector v Entity) => ComponentStore v a -> IO (v RealWorld a)
+getComponentSlice store = do
+    s <- readIORef (unComponentStore store)
+    return $ MV.slice 0 (componentStoreSize s) (componentStoreVec s)
+
+cleanComponentStore :: (MV.MVector v a, MV.MVector v Entity) => ComponentStore v a -> Int -> IO ()
+cleanComponentStore store preserve = do
+    v <- MV.new preserve
+    ev <- MV.new preserve
+    em <- HT.newSized preserve
+    writeIORef (unComponentStore store) (ComponentStoreState 0 v ev em)
 
 extendComponentStore :: (MV.MVector v a, MV.MVector v Entity) => ComponentStore v a -> Int -> IO ()
 extendComponentStore (ComponentStore ref) newSize = do

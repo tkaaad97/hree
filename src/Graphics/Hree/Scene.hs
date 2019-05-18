@@ -37,9 +37,10 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, isNothing, maybeToList)
 import Data.Proxy (Proxy(..))
 import qualified Data.Traversable as Traversable (mapM)
-import Data.Vector.Storable (Vector)
-import qualified Data.Vector.Storable as Vector
-import qualified Data.Vector.Storable.Mutable as MV
+import qualified Data.Vector as BV
+import qualified Data.Vector.Mutable as MBV
+import qualified Data.Vector.Storable as SV
+import qualified Data.Vector.Storable.Mutable as MSV
 import Data.Word (Word8)
 import Foreign (Ptr, Storable)
 import qualified Foreign (castPtr, copyArray, nullPtr, with, withArray)
@@ -72,18 +73,19 @@ renderScene scene camera = do
     GLW.glClearColor 1 1 1 1
     GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
     state <- readIORef . sceneState $ scene
-    let meshes = ssMeshes state
-        defaultTexture = ssDefaultTexture state
+    let defaultTexture = ssDefaultTexture state
+        meshStore = sceneMeshStore scene
         transformStore = sceneMeshTransformStore scene
         matrixStore = sceneMeshTransformMatrixStore scene
-    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] defaultTexture transformStore matrixStore meshes
+    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] defaultTexture meshStore transformStore matrixStore
 
-renderMeshes :: [(ByteString, Uniform)] -> Maybe Texture -> Component.ComponentStore MV.MVector Transform -> Component.ComponentStore MV.MVector Mat4 -> IntMap MeshInfo ->  IO ()
-renderMeshes uniforms defaultTexture transformStore matrixStore meshes = do
-    rs <- mapM (toRenderInfo defaultTexture transformStore matrixStore) meshes
+renderMeshes :: [(ByteString, Uniform)] -> Maybe Texture -> Component.ComponentStore BV.MVector MeshInfo -> Component.ComponentStore SV.MVector Transform -> Component.ComponentStore SV.MVector Mat4 ->  IO ()
+renderMeshes uniforms defaultTexture meshStore transformStore matrixStore = do
+    meshes <- Component.getComponentSlice meshStore
+    rs <- BV.mapM (toRenderInfo defaultTexture transformStore matrixStore) =<< BV.freeze meshes
     renderMany uniforms rs
 
-toRenderInfo :: Maybe Texture -> Component.ComponentStore MV.MVector Transform -> Component.ComponentStore MV.MVector Mat4 -> MeshInfo -> IO RenderInfo
+toRenderInfo :: Maybe Texture -> Component.ComponentStore SV.MVector Transform -> Component.ComponentStore SV.MVector Mat4 -> MeshInfo -> IO RenderInfo
 toRenderInfo defaultTexture transformStore matrixStore m = do
     transform <- fromMaybe zeroTransform <$> Component.readComponent entity transformStore
     matrix <- if transformUpdated transform
@@ -130,12 +132,12 @@ addMesh scene mesh = do
     (program, programAdded) <- mkProgramIfNotExists scene pspec
     GLW.glUseProgram (programInfoProgram program)
     vao <- mkVertexArray (geometryAttribBindings geo) buffers maybeIndexBuffer program
-    meshId <- atomicModifyIORef' (sceneState scene) (addMeshFunc program programAdded vao)
-    let transformStore = sceneMeshTransformStore scene
-        matrixStore = sceneMeshTransformMatrixStore scene
+    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc program programAdded vao)
+    let meshId = meshInfoId minfo
         entity = meshIdToEntity meshId
-    Component.addComponent entity zeroTransform transformStore
-    Component.addComponent entity Linear.identity matrixStore
+    Component.addComponent entity minfo (sceneMeshStore scene)
+    Component.addComponent entity zeroTransform (sceneMeshTransformStore scene)
+    Component.addComponent entity Linear.identity (sceneMeshTransformMatrixStore scene)
     return meshId
 
     where
@@ -148,16 +150,14 @@ addMesh scene mesh = do
             bos' = maybe bos (: bos) maybeIndexBuffer
             nubBufferIds = List.nub . map (fromIntegral . GLW.unBuffer) $ bos'
             minfo = MeshInfo meshId mesh bos' program vao
-            meshes = IntMap.insert meshIdVal minfo (ssMeshes state)
             programs = if programAdded
                         then Map.insert pspec program (ssPrograms state)
                         else ssPrograms state
             newState = state
                 { ssMeshCounter = meshCounter
-                , ssMeshes = meshes
                 , ssPrograms = programs
                 }
-        in (newState, meshId)
+        in (newState, minfo)
 
     geo = meshGeometry mesh
     buffers = geometryBuffers geo
@@ -166,27 +166,14 @@ addMesh scene mesh = do
 
 removeMesh :: Scene -> MeshId -> IO ()
 removeMesh scene meshId = do
-    vao <- atomicModifyIORef' state (removeMeshFunc meshId)
+    vao <- fmap meshInfoVertexArray <$> Component.readComponent entity (sceneMeshStore scene)
     maybe (return ()) GLW.deleteObject vao
-    let transformStore = sceneMeshTransformStore scene
-        matrixStore = sceneMeshTransformMatrixStore scene
-        entity = meshIdToEntity meshId
-    void $ Component.removeComponent entity transformStore
-    void $ Component.removeComponent entity matrixStore
+    void $ Component.removeComponent entity (sceneMeshStore scene)
+    void $ Component.removeComponent entity (sceneMeshTransformStore scene)
+    void $ Component.removeComponent entity (sceneMeshTransformMatrixStore scene)
     where
     state = sceneState scene
-
-removeMeshFunc :: MeshId -> SceneState -> (SceneState, Maybe GLW.VertexArray)
-removeMeshFunc meshId state =
-    let (result, meshes) = IntMap.updateLookupWithKey (const $ const Nothing) (unMeshId meshId) (ssMeshes state)
-        vao = fmap meshInfoVertexArray result
-        newState = state { ssMeshes = meshes }
-    in (newState, vao)
-    where
-
-    updateLookupWith' f k (xs, m) =
-        let (x, m') = IntMap.updateLookupWithKey f k m
-        in (x : xs, m')
+    entity = meshIdToEntity meshId
 
 translateMesh :: MeshId -> Vec3 -> Scene -> IO ()
 translateMesh meshId v = applyTransformToMesh meshId f
@@ -358,9 +345,10 @@ mkDefaultTexture scene = Foreign.withArray [0, 0, 0, 1] $ \p -> do
 newScene :: IO Scene
 newScene = do
     ref <- newIORef initialSceneState
+    meshes <- Component.newComponentStore defaultPreserveSize Proxy
     transforms <- Component.newComponentStore defaultPreserveSize Proxy
     matrices <- Component.newComponentStore defaultPreserveSize Proxy
-    return $ Scene ref transforms matrices
+    return $ Scene ref meshes transforms matrices
 
 defaultPreserveSize :: Int
 defaultPreserveSize = 10
@@ -368,38 +356,38 @@ defaultPreserveSize = 10
 initialSceneState :: SceneState
 initialSceneState =
     let counter = 1
-        meshes = mempty
         buffers = mempty
         textures = mempty
         samplers = mempty
         defaultTexture = Nothing
         programs = mempty
-    in SceneState counter meshes buffers textures samplers defaultTexture programs
+    in SceneState counter buffers textures samplers defaultTexture programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
-    (vaos, buffers, textures) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
-    GLW.deleteObjects vaos
+    (buffers, textures) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
+    meshes <- Component.getComponentSlice (sceneMeshStore scene)
+    vaos <- BV.map meshInfoVertexArray <$> BV.freeze meshes
+    BV.mapM_ GLW.deleteObject vaos
     GLW.deleteObjects buffers
     GLW.deleteObjects textures
+    Component.cleanComponentStore meshStore defaultPreserveSize
+    Component.cleanComponentStore transformStore defaultPreserveSize
+    Component.cleanComponentStore matrixStore defaultPreserveSize
 
     where
+    meshStore = sceneMeshStore scene
+    transformStore = sceneMeshTransformStore scene
+    matrixStore = sceneMeshTransformStore scene
     deleteSceneFunc state =
-        let meshIds = map MeshId . IntMap.keys . ssMeshes $ state
-            (state', xs) = foldr' removeMeshFunc' (state, []) meshIds
-            vaos = catMaybes xs
-            buffers = ssBuffers state'
-            textures = Map.elems . ssTextures $ state'
-        in (initialSceneState, (vaos, buffers, textures))
-
-    removeMeshFunc' i (s, xs) =
-        let (s', x) = removeMeshFunc i s
-        in (s, x : xs)
+        let buffers = ssBuffers state
+            textures = Map.elems . ssTextures $ state
+        in (initialSceneState, (buffers, textures))
 
 genRandomName :: ByteString -> Int -> IO ByteString
 genRandomName prefix len = do
-        v <- Vector.generateM len (const randomCharacter)
-        a <- Vector.unsafeWith v $ \source ->
+        v <- SV.generateM len (const randomCharacter)
+        a <- SV.unsafeWith v $ \source ->
             ByteString.create len $ \dest -> Foreign.copyArray dest source len
         return (prefix `mappend` a)
     where
