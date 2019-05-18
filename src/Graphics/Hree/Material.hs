@@ -16,13 +16,8 @@ import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Program
+import Graphics.Hree.Types
 import Linear (V4)
-
-data Material = Material
-    { materialUniforms         :: !(Map ByteString Uniform)
-    , materialTextures         :: ![Texture]
-    , materialProgramSpecifier :: !ProgramSpec
-    } deriving (Show)
 
 basicMaterial :: Maybe Texture -> Material
 basicMaterial a = Material u t p

@@ -6,11 +6,7 @@ module Graphics.Hree.Mesh
 import Graphics.Hree.Geometry
 import Graphics.Hree.Material
 import Graphics.Hree.Program
-
-data Mesh = Mesh
-    { meshGeometry :: Geometry
-    , meshMaterial :: Material
-    } deriving (Show)
+import Graphics.Hree.Types
 
 resolveProgramSpec :: Mesh -> ProgramSpec
 resolveProgramSpec = materialProgramSpecifier . meshMaterial

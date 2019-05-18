@@ -63,39 +63,11 @@ import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
 import Graphics.Hree.Texture
+import Graphics.Hree.Types
 import Linear ((^+^))
 import qualified Linear
 import qualified System.Random.MWC as Random (asGenIO, uniformR,
                                               withSystemRandom)
-import Unsafe.Coerce (unsafeCoerce)
-
-newtype MeshId = MeshId
-    { unMeshId :: Int
-    } deriving (Show, Eq, Ord, Hashable)
-
-data MeshInfo = MeshInfo
-    { meshInfoId          :: !MeshId
-    , meshInfoMesh        :: !Mesh
-    , meshInfoBuffers     :: ![GLW.Buffer]
-    , meshInfoProgram     :: !ProgramInfo
-    , meshInfoVertexArray :: !GLW.VertexArray
-    } deriving (Show)
-
-data Scene = Scene
-    { sceneState                    :: !(IORef SceneState)
-    , sceneMeshTransformStore       :: !(Component.ComponentStore Transform)
-    , sceneMeshTransformMatrixStore :: !(Component.ComponentStore Mat4)
-    }
-
-data SceneState = SceneState
-    { ssMeshCounter      :: !Int
-    , ssMeshes           :: !(IntMap MeshInfo)
-    , ssBufferRefCounter :: !(IntMap Int)
-    , ssTextures         :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
-    , ssSamplers         :: !(Map ByteString GLW.Sampler)
-    , ssDefaultTexture   :: !(Maybe Texture)
-    , ssPrograms         :: !(Map ProgramSpec ProgramInfo)
-    }
 
 renderScene :: Scene -> Camera -> IO ()
 renderScene scene camera = do

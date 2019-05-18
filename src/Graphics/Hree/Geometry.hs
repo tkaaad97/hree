@@ -13,13 +13,7 @@ import Data.Proxy (Proxy(..))
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
-
-data Geometry = Geometry
-    { geometryAttribBindings :: !(Map ByteString AttribBinding)
-    , geometryBuffers        :: !(IntMap (GLW.Buffer, BindBufferSetting))
-    , geometryIndexBuffer    :: !(Maybe GLW.Buffer)
-    , geometryCount          :: !Int
-    } deriving (Show)
+import Graphics.Hree.Types
 
 newGeometry :: Int -> Geometry
 newGeometry = Geometry Map.empty IntMap.empty Nothing
