@@ -60,11 +60,11 @@ data Scene = Scene
     }
 
 data SceneState = SceneState
-    { ssMeshCounter      :: !Int
-    , ssMeshes           :: !(IntMap MeshInfo)
-    , ssBufferRefCounter :: !(IntMap Int)
-    , ssTextures         :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
-    , ssSamplers         :: !(Map ByteString GLW.Sampler)
-    , ssDefaultTexture   :: !(Maybe Texture)
-    , ssPrograms         :: !(Map ProgramSpec ProgramInfo)
+    { ssMeshCounter    :: !Int
+    , ssMeshes         :: !(IntMap MeshInfo)
+    , ssBuffers        :: ![GLW.Buffer]
+    , ssTextures       :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
+    , ssSamplers       :: !(Map ByteString GLW.Sampler)
+    , ssDefaultTexture :: !(Maybe Texture)
+    , ssPrograms       :: !(Map ProgramSpec ProgramInfo)
     }

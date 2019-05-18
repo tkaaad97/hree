@@ -13,6 +13,7 @@ import qualified Foreign (castPtr, withArray)
 import GLContext
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
+import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree.Geometry as Hree
 import qualified Graphics.Hree.GL.Vertex as Hree
@@ -37,8 +38,8 @@ spec = do
             meshId `shouldBe` Hree.MeshId 1
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 2
-            bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter
-            bufferRefCounter `shouldBe` IntMap.fromList [(1, 1)]
+            buffers <- getSceneProp scene Hree.ssBuffers
+            buffers `shouldBe` [GLW.Buffer 1]
 
         specify "use same geometry twice"  . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
@@ -50,32 +51,20 @@ spec = do
             meshId2 `shouldBe` Hree.MeshId 2
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 3
-            bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter
-            bufferRefCounter `shouldBe` IntMap.fromList [(1, 2)]
+            buffers <- getSceneProp scene Hree.ssBuffers
+            buffers `shouldBe` [GLW.Buffer 1]
 
     describe "removeMesh" $ do
-        it "remove mesh and delete buffer" . runOnOSMesaContext width height $ do
+        it "remove mesh" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
             geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material
             meshId <- Hree.addMesh scene mesh
-            bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter
-            bufferRefCounter `shouldBe` IntMap.fromList [(1, 1)]
+            buffers <- getSceneProp scene Hree.ssBuffers
+            buffers `shouldBe` [GLW.Buffer 1]
             Hree.removeMesh scene meshId
-            bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter
-            bufferRefCounter `shouldBe` IntMap.fromList []
-
-        specify "buffer will be released when all reference removed" . runOnOSMesaContext width height $ do
-            scene <- Hree.newScene
-            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
-            let mesh = Hree.Mesh geometry material
-            meshId1 <- Hree.addMesh scene mesh
-            meshId2 <- Hree.addMesh scene mesh
-            (`shouldBe` IntMap.fromList [(1, 2)]) =<< getSceneProp scene Hree.ssBufferRefCounter
-            Hree.removeMesh scene meshId1
-            (`shouldBe` IntMap.fromList [(1, 1)]) =<< getSceneProp scene Hree.ssBufferRefCounter
-            Hree.removeMesh scene meshId2
-            (`shouldBe` IntMap.fromList []) =<< getSceneProp scene Hree.ssBufferRefCounter
+            buffers <- getSceneProp scene Hree.ssBuffers
+            buffers `shouldBe` [GLW.Buffer 1]
 
     describe "addTexture" $ do
         it "change scene state" . runOnOSMesaContext width height . Foreign.withArray [0, 0, 0, 0] $ \p -> do
@@ -107,23 +96,13 @@ spec = do
             meshId2 <- Hree.addMesh scene mesh2
             meshes <- getSceneProp scene Hree.ssMeshes
             IntMap.size meshes `shouldBe` 2
-            bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter
-            bufferRefCounter `shouldBe` IntMap.fromList [(1, 1), (2, 1)]
+            buffers <- getSceneProp scene Hree.ssBuffers
+            buffers `shouldBe` [GLW.Buffer 2, GLW.Buffer 1]
             Hree.deleteScene scene
             meshesAfter <- getSceneProp scene Hree.ssMeshes
             IntMap.size meshesAfter `shouldBe` 0
-            bufferRefCounterAfter <- getSceneProp scene Hree.ssBufferRefCounter
-            bufferRefCounterAfter `shouldBe` IntMap.empty
-
-        it "delete unreferenced orphan buffers" . runOnOSMesaContext width height $ do
-            scene <- Hree.newScene
-            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
-            let mesh = Hree.Mesh geometry material
-            bufferRefCounter <- getSceneProp scene Hree.ssBufferRefCounter
-            bufferRefCounter `shouldBe` IntMap.fromList [(1, 0)]
-            Hree.deleteScene scene
-            bufferRefCounterAfter <- getSceneProp scene Hree.ssBufferRefCounter
-            bufferRefCounterAfter `shouldBe` IntMap.empty
+            buffers <- getSceneProp scene Hree.ssBuffers
+            buffers `shouldBe` []
 
         it "delete textures" . runOnOSMesaContext width height . Foreign.withArray [0, 0, 0, 0] $ \p -> do
             scene <- Hree.newScene

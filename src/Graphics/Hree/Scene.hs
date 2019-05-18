@@ -34,7 +34,7 @@ import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import qualified Data.List as List (nub)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe, isNothing, mapMaybe, maybeToList)
+import Data.Maybe (catMaybes, fromMaybe, isNothing, maybeToList)
 import Data.Proxy (Proxy(..))
 import qualified Data.Traversable as Traversable (mapM)
 import Data.Vector.Storable (Vector)
@@ -148,15 +148,12 @@ addMesh scene mesh = do
             nubBufferIds = List.nub . map (fromIntegral . GLW.unBuffer) $ bos'
             minfo = MeshInfo meshId mesh bos' program vao
             meshes = IntMap.insert meshIdVal minfo (ssMeshes state)
-            bufferRefCounter =
-                insertsWith (+) (nubBufferIds `zip` repeat 1) (ssBufferRefCounter state)
             programs = if programAdded
                         then Map.insert pspec program (ssPrograms state)
                         else ssPrograms state
             newState = state
                 { ssMeshCounter = meshCounter
                 , ssMeshes = meshes
-                , ssBufferRefCounter = bufferRefCounter
                 , ssPrograms = programs
                 }
         in (newState, meshId)
@@ -168,9 +165,8 @@ addMesh scene mesh = do
 
 removeMesh :: Scene -> MeshId -> IO ()
 removeMesh scene meshId = do
-    (vao, deletedBuffers) <- atomicModifyIORef' state (removeMeshFunc meshId)
+    vao <- atomicModifyIORef' state (removeMeshFunc meshId)
     maybe (return ()) GLW.deleteObject vao
-    GLW.deleteObjects deletedBuffers
     let transformStore = sceneMeshTransformStore scene
         matrixStore = sceneMeshTransformMatrixStore scene
         entity = meshIdToEntity meshId
@@ -179,30 +175,17 @@ removeMesh scene meshId = do
     where
     state = sceneState scene
 
-removeMeshFunc :: MeshId -> SceneState -> (SceneState, (Maybe GLW.VertexArray, [GLW.Buffer]))
+removeMeshFunc :: MeshId -> SceneState -> (SceneState, Maybe GLW.VertexArray)
 removeMeshFunc meshId state =
     let (result, meshes) = IntMap.updateLookupWithKey (const $ const Nothing) (unMeshId meshId) (ssMeshes state)
         vao = fmap meshInfoVertexArray result
-        bos = maybe [] meshInfoBuffers result
-        (bufferRefCounter, deletedBuffers) = decrementAndLookupDeletion bos (ssBufferRefCounter state)
-        newState = state { ssMeshes = meshes, ssBufferRefCounter = bufferRefCounter }
-    in (newState, (vao, deletedBuffers))
+        newState = state { ssMeshes = meshes }
+    in (newState, vao)
     where
 
     updateLookupWith' f k (xs, m) =
         let (x, m') = IntMap.updateLookupWithKey f k m
         in (x : xs, m')
-
-    decrementAndLookupDeletion [] m = (m, [])
-    decrementAndLookupDeletion bs m =
-        let ks = List.nub . map (fromIntegral . GLW.unBuffer) $ bs
-            decrementOrDelete a
-                | a <= 1 = Nothing
-                | otherwise = Just (a - 1)
-            (xs, m') = foldr' (updateLookupWith' (const decrementOrDelete)) ([], m) ks
-            ds = map fst . filter ((== Just 1) . snd) $ (ks `zip` xs)
-            ds' = map (GLW.Buffer . fromIntegral) ds
-        in (m', ds')
 
 translateMesh :: MeshId -> Vec3 -> Scene -> IO ()
 translateMesh meshId v = applyTransformToMesh meshId f
@@ -230,13 +213,11 @@ applyTransformToMesh meshId f scene =
 addBuffer :: Scene -> BufferSource -> IO GLW.Buffer
 addBuffer scene bufferSource = do
     buffer <- mkBuffer bufferSource
-    let bufferId = fromIntegral . GLW.unBuffer $ buffer
-    atomicModifyIORef' (sceneState scene) (addBufferFunc bufferId)
-    return buffer
+    atomicModifyIORef' (sceneState scene) (addBufferFunc buffer)
     where
-    addBufferFunc bufferId state =
-        let bufferRefCounter = IntMap.insert bufferId 0 (ssBufferRefCounter state)
-        in (state { ssBufferRefCounter = bufferRefCounter }, ())
+    addBufferFunc buffer state =
+        let buffers = buffer : ssBuffers state
+        in (state { ssBuffers = buffers }, buffer)
 
 addTexture :: Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D)
 addTexture scene name settings source =
@@ -405,8 +386,8 @@ deleteScene scene = do
     deleteSceneFunc state =
         let meshIds = map MeshId . IntMap.keys . ssMeshes $ state
             (state', xs) = foldr' removeMeshFunc' (state, []) meshIds
-            vaos = mapMaybe fst xs
-            buffers = map (GLW.Buffer . fromIntegral) . IntMap.keys . ssBufferRefCounter $ state'
+            vaos = catMaybes xs
+            buffers = ssBuffers state'
             textures = Map.elems . ssTextures $ state'
         in (initialSceneState, (vaos, buffers, textures))
 
