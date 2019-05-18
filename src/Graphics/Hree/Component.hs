@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Graphics.Hree.Component
     ( ComponentStore(..)
@@ -14,32 +15,32 @@ module Graphics.Hree.Component
 
 import Control.Exception (throwIO)
 import Control.Monad (when)
+import Control.Monad.ST (RealWorld)
 import Data.Hashable (Hashable(..))
 import qualified Data.HashTable.IO as HT
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.Proxy (Proxy(..))
-import qualified Data.Vector.Storable as V
-import qualified Data.Vector.Storable.Mutable as MV
-import Foreign (Storable)
+import qualified Data.Vector.Generic.Mutable as MV
+import Foreign (Storable(..))
 
 newtype Entity = Entity
     { unEntity :: Int
     } deriving (Show, Eq, Hashable, Storable)
 
-newtype ComponentStore a = ComponentStore
-    { unComponentStore :: IORef (ComponentStoreState a)
+newtype ComponentStore v a = ComponentStore
+    { unComponentStore :: IORef (ComponentStoreState v a)
     }
 
 type HashTable k v = HT.BasicHashTable k v
 
-data ComponentStoreState a = ComponentStoreState
+data ComponentStoreState v a = ComponentStoreState
     { componentStoreSize      :: !Int
-    , componentStoreVec       :: !(MV.IOVector a)
-    , componentStoreEntityVec :: !(MV.IOVector Entity)
+    , componentStoreVec       :: !(v RealWorld a)
+    , componentStoreEntityVec :: !(v RealWorld Entity)
     , componentStoreEntityMap :: !(HashTable Entity Int)
     }
 
-newComponentStore :: (Storable a) => Int -> Proxy a -> IO (ComponentStore a)
+newComponentStore :: (MV.MVector v a, MV.MVector v Entity) => Int -> Proxy (v RealWorld a) -> IO (ComponentStore v a)
 newComponentStore preserve _ = do
     v <- MV.new preserve
     ev <- MV.new preserve
@@ -47,11 +48,11 @@ newComponentStore preserve _ = do
     ref <- newIORef (ComponentStoreState 0 v ev em)
     return (ComponentStore ref)
 
-componentSize :: ComponentStore a -> IO Int
+componentSize :: ComponentStore v a -> IO Int
 componentSize =
     fmap componentStoreSize . readIORef . unComponentStore
 
-addComponent :: (Storable a) => Entity -> a -> ComponentStore a -> IO ()
+addComponent :: (MV.MVector v a, MV.MVector v Entity) => Entity -> a -> ComponentStore v a -> IO ()
 addComponent e a store = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
@@ -88,7 +89,7 @@ addComponent e a store = do
             then limit
             else current * 2
 
-removeComponent :: (Storable a) => Entity -> ComponentStore a -> IO Bool
+removeComponent :: (MV.MVector v a, MV.MVector v Entity) => Entity -> ComponentStore v a -> IO Bool
 removeComponent e store = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
@@ -113,7 +114,7 @@ removeComponent e store = do
         HT.delete emap e
         return True
 
-readComponent :: (Storable a) => Entity -> ComponentStore a -> IO (Maybe a)
+readComponent :: (MV.MVector v a, MV.MVector v Entity) => Entity -> ComponentStore v a -> IO (Maybe a)
 readComponent e store = do
     s <- readIORef (unComponentStore store)
     let vec = componentStoreVec s
@@ -122,7 +123,7 @@ readComponent e store = do
     maybe (return Nothing)
         (fmap Just . MV.unsafeRead vec) maybeIndex
 
-writeComponent :: (Storable a) => Entity -> a -> ComponentStore a -> IO Bool
+writeComponent :: (MV.MVector v a, MV.MVector v Entity) => Entity -> a -> ComponentStore v a -> IO Bool
 writeComponent e a store = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
@@ -130,12 +131,12 @@ writeComponent e a store = do
         (\i -> MV.unsafeWrite (componentStoreVec s) i a >> return True)
         maybeIndex
 
-writeComponentAt :: (Storable a) => Int -> a -> ComponentStore a -> IO ()
+writeComponentAt :: (MV.MVector v a, MV.MVector v Entity) => Int -> a -> ComponentStore v a -> IO ()
 writeComponentAt i a store = do
     vec <- componentStoreVec <$> readIORef (unComponentStore store)
     MV.unsafeWrite vec i a
 
-modifyComponent :: (Storable a) => Entity -> (a -> a) -> ComponentStore a -> IO Bool
+modifyComponent :: (MV.MVector v a, MV.MVector v Entity) => Entity -> (a -> a) -> ComponentStore v a -> IO Bool
 modifyComponent e f store = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
@@ -143,7 +144,7 @@ modifyComponent e f store = do
         (\i -> MV.unsafeModify (componentStoreVec s) f i >> return True)
         maybeIndex
 
-extendComponentStore :: (Storable a) => ComponentStore a -> Int -> IO ()
+extendComponentStore :: (MV.MVector v a, MV.MVector v Entity) => ComponentStore v a -> Int -> IO ()
 extendComponentStore (ComponentStore ref) newSize = do
     s <- readIORef ref
     let currentVec = componentStoreVec s

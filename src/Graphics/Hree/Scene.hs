@@ -39,6 +39,7 @@ import Data.Proxy (Proxy(..))
 import qualified Data.Traversable as Traversable (mapM)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
+import qualified Data.Vector.Storable.Mutable as MV
 import Data.Word (Word8)
 import Foreign (Ptr, Storable)
 import qualified Foreign (castPtr, copyArray, nullPtr, with, withArray)
@@ -77,12 +78,12 @@ renderScene scene camera = do
         matrixStore = sceneMeshTransformMatrixStore scene
     renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] defaultTexture transformStore matrixStore meshes
 
-renderMeshes :: [(ByteString, Uniform)] -> Maybe Texture -> Component.ComponentStore Transform -> Component.ComponentStore Mat4 -> IntMap MeshInfo ->  IO ()
+renderMeshes :: [(ByteString, Uniform)] -> Maybe Texture -> Component.ComponentStore MV.MVector Transform -> Component.ComponentStore MV.MVector Mat4 -> IntMap MeshInfo ->  IO ()
 renderMeshes uniforms defaultTexture transformStore matrixStore meshes = do
     rs <- mapM (toRenderInfo defaultTexture transformStore matrixStore) meshes
     renderMany uniforms rs
 
-toRenderInfo :: Maybe Texture -> Component.ComponentStore Transform -> Component.ComponentStore Mat4 -> MeshInfo -> IO RenderInfo
+toRenderInfo :: Maybe Texture -> Component.ComponentStore MV.MVector Transform -> Component.ComponentStore MV.MVector Mat4 -> MeshInfo -> IO RenderInfo
 toRenderInfo defaultTexture transformStore matrixStore m = do
     transform <- fromMaybe zeroTransform <$> Component.readComponent entity transformStore
     matrix <- if transformUpdated transform

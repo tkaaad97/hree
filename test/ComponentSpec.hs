@@ -15,7 +15,7 @@ spec = do
     describe "newComponentStore" $ do
         it "preserve store vectors" $ do
             let preserve = 10
-            store <- newComponentStore preserve (Proxy :: Proxy (V3 Double))
+            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double)))
             state <- readIORef (unComponentStore store)
             componentStoreSize state `shouldBe` 0
             MV.length (componentStoreVec state) `shouldBe` preserve
@@ -28,7 +28,7 @@ spec = do
                 component1 = V3 1 2 3
                 entity2 = Entity 2
                 component2 = V3 4 5 6
-            store <- newComponentStore preserve (Proxy :: Proxy (V3 Double))
+            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double)))
             addComponent entity1 component1 store
             addComponent entity2 component2 store
             c1 <- readComponent entity1 store
@@ -44,7 +44,7 @@ spec = do
                 component1 = V3 1 2 3
                 entity2 = Entity 2
                 component2 = V3 4 5 6
-            store <- newComponentStore preserve (Proxy :: Proxy (V3 Double))
+            store <- newComponentStore preserve (Proxy :: (Proxy (MV.IOVector (V3 Double))))
 
             addComponent entity1 component1 store
             c1 <- readComponent entity1 store
@@ -63,7 +63,7 @@ spec = do
             let preserve = 10
                 entity1 = Entity 1
                 component1 = V3 1 2 3
-            store <- newComponentStore preserve (Proxy :: Proxy (V3 Double))
+            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double)))
             addComponent entity1 component1 store
             c1 <- readComponent entity1 store
             c1 `shouldBe` Just component1
@@ -80,7 +80,7 @@ spec = do
                 component2 = V3 4 5 6
                 entity3 = Entity 3
                 component3 = V3 7 8 9
-            store <- newComponentStore preserve (Proxy :: Proxy (V3 Double))
+            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double)))
 
             addComponent entity1 component1 store
             addComponent entity2 component2 store

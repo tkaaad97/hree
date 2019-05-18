@@ -17,6 +17,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (IORef)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Vector.Storable.Mutable as SV
 import qualified GLW
 import qualified Graphics.Hree.Component as Component
 import Graphics.Hree.GL.Types
@@ -55,8 +56,8 @@ data MeshInfo = MeshInfo
 
 data Scene = Scene
     { sceneState                    :: !(IORef SceneState)
-    , sceneMeshTransformStore       :: !(Component.ComponentStore Transform)
-    , sceneMeshTransformMatrixStore :: !(Component.ComponentStore Mat4)
+    , sceneMeshTransformStore       :: !(Component.ComponentStore SV.MVector Transform)
+    , sceneMeshTransformMatrixStore :: !(Component.ComponentStore SV.MVector Mat4)
     }
 
 data SceneState = SceneState
