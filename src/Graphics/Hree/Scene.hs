@@ -1,17 +1,15 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Graphics.Hree.Scene
     ( MeshId(..)
     , MeshInfo(..)
     , Scene(..)
     , SceneState(..)
+    , addBuffer
     , addMesh
     , deleteScene
     , addSampler
     , addTexture
-    , addVerticesToGeometry
     , newScene
     , removeMesh
     , renderScene
@@ -54,11 +52,9 @@ import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import qualified Graphics.Hree.Component as Component
-import Graphics.Hree.Geometry
 import Graphics.Hree.GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
-import Graphics.Hree.Material
 import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
@@ -241,21 +237,6 @@ addBuffer scene bufferSource = do
     addBufferFunc bufferId state =
         let bufferRefCounter = IntMap.insert bufferId 0 (ssBufferRefCounter state)
         in (state { ssBufferRefCounter = bufferRefCounter }, ())
-
-addVerticesToGeometry :: forall a. (Storable a, Vertex a) => Geometry -> Vector a -> GL.GLenum -> Scene -> IO Geometry
-addVerticesToGeometry geometry storage usage scene = do
-    buffer <- addBuffer scene (BufferSource storage usage)
-    let buffers' = IntMap.insert bindingIndex (buffer, bbs) buffers
-    return (Geometry attribBindings' buffers' indexBuffer count)
-    where
-    Geometry attribBindings buffers indexBuffer count = geometry
-    bindingIndex = maybe 0 (+ 1) . fmap fst . IntMap.lookupMax $ buffers
-    VertexSpec bbs fields = vertexSpec (Proxy :: Proxy a)
-    keys = map vertexFieldAttribName fields
-    bindings = map toAttribBinding fields
-    toAttribBinding (VertexField name format) = AttribBinding (GLW.BindingIndex . fromIntegral $ bindingIndex) format
-    newAttribBindings = Map.fromList $ zip keys bindings
-    attribBindings' = Map.union attribBindings newAttribBindings
 
 addTexture :: Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D)
 addTexture scene name settings source =

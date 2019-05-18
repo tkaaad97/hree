@@ -6,9 +6,9 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import qualified GLW
 import qualified Graphics.GL as GL
-import Graphics.Hree.Geometry (Geometry, newGeometry)
+import Graphics.Hree.Geometry (Geometry, addVerticesToGeometry, newGeometry)
 import Graphics.Hree.GL.Vertex (PositionAndNormal(..), Vertex)
-import Graphics.Hree.Scene (Scene, addVerticesToGeometry)
+import Graphics.Hree.Types (Scene)
 import Linear (V3(..))
 
 createBoxGeometry :: Float -> Float -> Float -> Scene -> IO (Geometry, Vector PositionAndNormal)

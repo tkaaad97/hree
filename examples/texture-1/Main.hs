@@ -44,7 +44,7 @@ main = do
 
     init w = do
         scene <- newScene
-        geometry <- addVerticesToGeometry (Geometry.newGeometry 6) vs GL.GL_STREAM_DRAW scene
+        geometry <- Geometry.addVerticesToGeometry (Geometry.newGeometry 6) vs GL.GL_STREAM_DRAW scene
         texture <- mkTexture scene
         let material = Material.basicMaterial (Just texture)
             mesh = Mesh geometry material

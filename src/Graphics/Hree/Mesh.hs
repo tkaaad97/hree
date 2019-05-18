@@ -3,8 +3,6 @@ module Graphics.Hree.Mesh
     , resolveProgramSpec
     ) where
 
-import Graphics.Hree.Geometry
-import Graphics.Hree.Material
 import Graphics.Hree.Program
 import Graphics.Hree.Types
 

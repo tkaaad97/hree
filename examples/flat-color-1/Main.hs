@@ -41,7 +41,7 @@ main = do
 
     init w = do
         scene <- newScene
-        geometry <- addVerticesToGeometry (Geometry.newGeometry 6) vs GL.GL_STREAM_DRAW scene
+        geometry <- Geometry.addVerticesToGeometry (Geometry.newGeometry 6) vs GL.GL_STREAM_DRAW scene
         let mesh = Mesh geometry material
         addMesh scene mesh
         camera <- newCamera proj la
