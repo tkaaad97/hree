@@ -29,7 +29,6 @@ data Geometry = Geometry
     { geometryAttribBindings :: !(Map ByteString AttribBinding)
     , geometryBuffers        :: !(IntMap (GLW.Buffer, BindBufferSetting))
     , geometryIndexBuffer    :: !(Maybe GLW.Buffer)
-    , geometryCount          :: !Int
     } deriving (Show)
 
 data Material = Material
@@ -43,8 +42,9 @@ newtype MeshId = MeshId
     } deriving (Show, Eq, Ord, Hashable)
 
 data Mesh = Mesh
-    { meshGeometry :: Geometry
-    , meshMaterial :: Material
+    { meshGeometry    :: !Geometry
+    , meshMaterial    :: !Material
+    , meshVertexCount :: !Int
     } deriving (Show)
 
 data MeshInfo = MeshInfo

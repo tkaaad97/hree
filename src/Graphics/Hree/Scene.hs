@@ -16,6 +16,7 @@ module Graphics.Hree.Scene
     , translateMesh
     , rotateMesh
     , applyTransformToMesh
+    , updateMeshVertexCount
     ) where
 
 import Control.Exception (bracketOnError, throwIO)
@@ -106,7 +107,7 @@ toRenderInfo defaultTexture transformStore matrixStore m = do
     material = meshMaterial mesh
     program = meshInfoProgram m
     vao = meshInfoVertexArray m
-    dm = resolveDrawMethod . meshGeometry . meshInfoMesh $ m
+    dm = resolveDrawMethod . meshInfoMesh $ m
     uniformInfos = programInfoUniforms program
     toUniformEntry uniformName uniform = do
         uniformInfo <- Map.lookup uniformName uniformInfos
@@ -116,12 +117,12 @@ toRenderInfo defaultTexture transformStore matrixStore m = do
         then maybeToList defaultTexture
         else mtextures
 
-resolveDrawMethod :: Geometry -> DrawMethod
-resolveDrawMethod geo | isNothing (geometryIndexBuffer geo) =
-    let count = fromIntegral . geometryCount $ geo
+resolveDrawMethod :: Mesh -> DrawMethod
+resolveDrawMethod mesh | isNothing (geometryIndexBuffer . meshGeometry $ mesh) =
+    let count = fromIntegral . meshVertexCount $ mesh
     in DrawArrays PrimitiveType.glTriangles 0 count
-resolveDrawMethod geo =
-    let count = fromIntegral . geometryCount $ geo
+resolveDrawMethod mesh =
+    let count = fromIntegral . meshVertexCount $ mesh
     in DrawElements PrimitiveType.glTriangles count GL.GL_UNSIGNED_INT Foreign.nullPtr
 
 meshIdToEntity :: MeshId -> Component.Entity
@@ -175,28 +176,36 @@ removeMesh scene meshId = do
     state = sceneState scene
     entity = meshIdToEntity meshId
 
-translateMesh :: MeshId -> Vec3 -> Scene -> IO ()
-translateMesh meshId v = applyTransformToMesh meshId f
+translateMesh :: Scene -> MeshId -> Vec3 -> IO ()
+translateMesh scene meshId v = applyTransformToMesh scene meshId f
     where
     f transform = transform
         { transformTranslation = transformTranslation transform ^+^ v
         , transformUpdated = True
         }
 
-rotateMesh :: MeshId -> Vec3 -> Float -> Scene -> IO ()
-rotateMesh meshId axis angle = applyTransformToMesh meshId f
+rotateMesh :: Scene -> MeshId -> Vec3 -> Float -> IO ()
+rotateMesh scene meshId axis angle = applyTransformToMesh scene meshId f
     where
     f transform = transform
         { transformQuaternion = transformQuaternion transform * Linear.axisAngle axis angle
         , transformUpdated = True
         }
 
-applyTransformToMesh :: MeshId -> (Transform -> Transform) -> Scene -> IO ()
-applyTransformToMesh meshId f scene =
+applyTransformToMesh :: Scene -> MeshId -> (Transform -> Transform) -> IO ()
+applyTransformToMesh scene meshId f =
     void $ Component.modifyComponent entity f transformStore
     where
     entity = meshIdToEntity meshId
     transformStore = sceneMeshTransformStore scene
+
+updateMeshVertexCount :: Scene -> MeshId -> Int -> IO ()
+updateMeshVertexCount scene meshId c =
+    void $ Component.modifyComponent entity f meshStore
+    where
+    f m = m { meshInfoMesh = (meshInfoMesh m) { meshVertexCount = c } }
+    entity = meshIdToEntity meshId
+    meshStore = sceneMeshStore scene
 
 addBuffer :: Scene -> BufferSource -> IO GLW.Buffer
 addBuffer scene bufferSource = do

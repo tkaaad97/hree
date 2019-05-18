@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import qualified Data.Vector.Storable as Vector
 import Example
 import qualified GLW
 import qualified Graphics.GL as GL
@@ -31,9 +32,9 @@ main = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
         scene <- newScene
-        (geometry, _) <- createBoxGeometry 0.5 0.5 0.5 scene
+        (geometry, vs) <- createBoxGeometry 0.5 0.5 0.5 scene
         let material = Material.flatColorMaterial (V4 0.2 0.4 0.6 1)
-            mesh = Mesh geometry material
+            mesh = Mesh geometry material (Vector.length vs)
         meshId <- addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
@@ -46,7 +47,7 @@ main = do
     onDisplay (s, c, m) w = do
         render
         GLFW.pollEvents
-        rotateMesh m (V3 0 0 1) deltaAngle s
+        rotateMesh s m (V3 0 0 1) deltaAngle
         onDisplay (s, c, m) w
 
         where

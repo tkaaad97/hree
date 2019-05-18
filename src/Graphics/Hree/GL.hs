@@ -2,6 +2,7 @@ module Graphics.Hree.GL
     ( mkBuffer
     , mkVertexArray
     , renderMany
+    , updateBuffer
     ) where
 
 import Control.Exception (throwIO)
@@ -71,6 +72,12 @@ mkBuffer (BufferSource vec usage) = do
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
     return buffer
+
+updateBuffer :: GLW.Buffer -> BufferSource -> IO ()
+updateBuffer buffer (BufferSource vec usage) = do
+    let n = V.length vec
+        size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
+    V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
 
 mkVertexArray :: Map ByteString AttribBinding -> IntMap (GLW.Buffer, BindBufferSetting) -> Maybe GLW.Buffer -> ProgramInfo -> IO GLW.VertexArray
 mkVertexArray attribBindings buffers indexBuffer programInfo = do

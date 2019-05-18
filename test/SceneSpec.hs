@@ -33,8 +33,8 @@ spec = do
     describe "addMesh" $ do
         it "change scene state" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
-            let mesh = Hree.Mesh geometry material
+            geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
+            let mesh = Hree.Mesh geometry material (Vector.length vs)
             meshId <- Hree.addMesh scene mesh
             meshId `shouldBe` Hree.MeshId 1
             counter <- getSceneProp scene Hree.ssMeshCounter
@@ -44,8 +44,8 @@ spec = do
 
         specify "use same geometry twice"  . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
-            let mesh = Hree.Mesh geometry material
+            geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
+            let mesh = Hree.Mesh geometry material (Vector.length vs)
             meshId1 <- Hree.addMesh scene mesh
             meshId1 `shouldBe` Hree.MeshId 1
             meshId2 <- Hree.addMesh scene mesh
@@ -58,8 +58,8 @@ spec = do
     describe "removeMesh" $ do
         it "remove mesh" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
-            let mesh = Hree.Mesh geometry material
+            geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
+            let mesh = Hree.Mesh geometry material (Vector.length vs)
             meshId <- Hree.addMesh scene mesh
             buffers <- getSceneProp scene Hree.ssBuffers
             buffers `shouldBe` [GLW.Buffer 1]
@@ -89,10 +89,10 @@ spec = do
     describe "deleteScene" $ do
         it "delete meshes" . runOnOSMesaContext width height $ do
             scene <- Hree.newScene
-            geometry1 <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
-            geometry2 <- Hree.addVerticesToGeometry (Hree.newGeometry . Vector.length $ vs) vs GL.GL_STREAM_DRAW scene
-            let mesh1 = Hree.Mesh geometry1 material
-                mesh2 = Hree.Mesh geometry2 material
+            geometry1 <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
+            geometry2 <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
+            let mesh1 = Hree.Mesh geometry1 material (Vector.length vs)
+                mesh2 = Hree.Mesh geometry2 material (Vector.length vs)
             meshId1 <- Hree.addMesh scene mesh1
             meshId2 <- Hree.addMesh scene mesh2
             meshSize <- Component.componentSize $ Hree.sceneMeshStore scene

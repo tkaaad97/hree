@@ -22,7 +22,7 @@ import Graphics.Hree.GL.Vertex
 import Graphics.Hree.Scene (addBuffer)
 import Graphics.Hree.Types
 
-newGeometry :: Int -> Geometry
+newGeometry :: Geometry
 newGeometry = Geometry Map.empty IntMap.empty Nothing
 
 addAttribBindings :: Geometry -> Int -> Map ByteString AttribBinding -> (GLW.Buffer, BindBufferSetting) -> Geometry
@@ -36,9 +36,9 @@ addVerticesToGeometry :: forall a. (Storable a, Vertex a) => Geometry -> Vector 
 addVerticesToGeometry geometry storage usage scene = do
     buffer <- addBuffer scene (BufferSource storage usage)
     let buffers' = IntMap.insert bindingIndex (buffer, bbs) buffers
-    return (Geometry attribBindings' buffers' indexBuffer count)
+    return (Geometry attribBindings' buffers' indexBuffer)
     where
-    Geometry attribBindings buffers indexBuffer count = geometry
+    Geometry attribBindings buffers indexBuffer = geometry
     bindingIndex = maybe 0 (+ 1) . fmap fst . IntMap.lookupMax $ buffers
     VertexSpec bbs fields = vertexSpec (Proxy :: Proxy a)
     keys = map vertexFieldAttribName fields

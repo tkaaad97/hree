@@ -13,7 +13,7 @@ import Linear (V3(..))
 
 createBoxGeometry :: Float -> Float -> Float -> Scene -> IO (Geometry, Vector PositionAndNormal)
 createBoxGeometry width height depth scene = do
-    let geo = newGeometry . Vector.length $ vs
+    let geo = newGeometry
     geo' <- addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
     return (geo', vs)
     where
