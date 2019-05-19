@@ -6,7 +6,7 @@ module Graphics.Hree.GL
     ) where
 
 import Control.Exception (throwIO)
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString
 import Data.Foldable (foldrM)
@@ -63,7 +63,9 @@ renderMany common = void . foldrM (render common) Nothing
 
 drawWith :: DrawMethod -> IO ()
 drawWith (DrawArrays mode index num) = GLW.glDrawArrays mode index num
-drawWith (DrawElements mode num dataType indicesOffset) = GLW.glDrawElements mode num dataType indicesOffset
+drawWith (DrawElements mode num dataType indices) = GLW.glDrawElements mode num dataType indices
+drawWith (DrawArraysInstanced mode index num inum) = GLW.glDrawArraysInstanced mode index num inum
+drawWith (DrawElementsInstanced mode num dataType indices inum) = GLW.glDrawElementsInstanced mode num dataType indices inum
 
 mkBuffer :: BufferSource -> IO GLW.Buffer
 mkBuffer (BufferSource vec usage) = do
@@ -102,8 +104,11 @@ mkVertexArray attribBindings buffers indexBuffer programInfo = do
             (\location -> setVertexArrayAttribFormatAndBinding vao location a)
             maybeLocation
 
-    setBindingBuffer vao (i, (b, BindBufferSetting offset stride)) =
-        GLW.glVertexArrayVertexBuffer vao (GLW.BindingIndex . fromIntegral $ i) b (fromIntegral offset) (fromIntegral stride)
+    setBindingBuffer vao (i, (b, BindBufferSetting offset stride divisor)) = do
+        let bi = GLW.BindingIndex . fromIntegral $ i
+        GLW.glVertexArrayVertexBuffer vao bi b (fromIntegral offset) (fromIntegral stride)
+        when (divisor /= 0) $
+            GLW.glVertexArrayBindingDivisor vao bi (fromIntegral divisor)
 
     setIndexBuffer vao (Just b) =
         GLW.glVertexArrayElementBuffer vao b

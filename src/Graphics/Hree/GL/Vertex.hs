@@ -87,7 +87,7 @@ instance Vertex BasicVertex where
             , uvField
             , colorField
             ]
-        bbs = BindBufferSetting 0 (sizeOf (undefined :: BasicVertex))
+        bbs = BindBufferSetting 0 (sizeOf (undefined :: BasicVertex)) 0
 
 data PositionAndNormal = PositionAndNormal
     { pnPosition :: !Vec3
@@ -117,7 +117,7 @@ instance Vertex PositionAndNormal where
         fields = [ positionField
             , normalField
             ]
-        bbs = BindBufferSetting 0 (sizeOf (undefined :: PositionAndNormal))
+        bbs = BindBufferSetting 0 (sizeOf (undefined :: PositionAndNormal)) 0
 
 newtype Uv = Uv
     { unUv :: Vec2
@@ -129,4 +129,4 @@ instance Vertex Uv where
         where
         uvField = VertexField "uv" (AttribFormat 2 GL.GL_FLOAT False 0)
         fields = [ uvField ]
-        bbs = BindBufferSetting 0 (sizeOf (undefined :: Uv))
+        bbs = BindBufferSetting 0 (sizeOf (undefined :: Uv)) 0

@@ -70,7 +70,9 @@ data RenderInfo = RenderInfo
 
 data DrawMethod =
     DrawArrays !GLW.PrimitiveType !GL.GLint !GL.GLsizei |
-    DrawElements !GLW.PrimitiveType !GL.GLsizei !GL.GLenum !(Ptr ())
+    DrawElements !GLW.PrimitiveType !GL.GLsizei !GL.GLenum !(Ptr ()) |
+    DrawArraysInstanced !GLW.PrimitiveType !GL.GLint !GL.GLsizei !GL.GLsizei |
+    DrawElementsInstanced !GLW.PrimitiveType !GL.GLsizei !GL.GLenum !(Ptr ()) !GL.GLsizei
     deriving (Show, Eq)
 
 data BufferSource = forall a. Storable a => BufferSource !(Vector a) !GL.GLenum
@@ -78,8 +80,9 @@ data BufferSource = forall a. Storable a => BufferSource !(Vector a) !GL.GLenum
 type BindingIndex = Int
 
 data BindBufferSetting = BindBufferSetting
-    { bindBufferSettingOffset :: !Int
-    , bindBufferSettingStride :: !Int
+    { bindBufferSettingOffset  :: !Int
+    , bindBufferSettingStride  :: !Int
+    , bindBufferSettingDivisor :: !Int
     } deriving (Show, Eq)
 
 data AttribBinding = AttribBinding

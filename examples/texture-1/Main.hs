@@ -47,7 +47,7 @@ main = do
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry vs GL.GL_STREAM_DRAW scene
         texture <- mkTexture scene
         let material = Material.basicMaterial (Just texture)
-            mesh = Mesh geometry material 6
+            mesh = Mesh geometry material 6 Nothing
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

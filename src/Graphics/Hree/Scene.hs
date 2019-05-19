@@ -16,7 +16,7 @@ module Graphics.Hree.Scene
     , translateMesh
     , rotateMesh
     , applyTransformToMesh
-    , updateMeshVertexCount
+    , updateMeshIndicesCount
     ) where
 
 import Control.Exception (bracketOnError, throwIO)
@@ -118,12 +118,21 @@ toRenderInfo defaultTexture transformStore matrixStore m = do
         else mtextures
 
 resolveDrawMethod :: Mesh -> DrawMethod
-resolveDrawMethod mesh | isNothing (geometryIndexBuffer . meshGeometry $ mesh) =
-    let count = fromIntegral . meshVertexCount $ mesh
-    in DrawArrays PrimitiveType.glTriangles 0 count
 resolveDrawMethod mesh =
-    let count = fromIntegral . meshVertexCount $ mesh
-    in DrawElements PrimitiveType.glTriangles count GL.GL_UNSIGNED_INT Foreign.nullPtr
+    let indicesCount = fromIntegral . meshIndicesCount $ mesh
+        indexBuffer = geometryIndexBuffer . meshGeometry $ mesh
+        instanceCount = fromIntegral <$> meshInstanceCount mesh
+    in resolve indicesCount indexBuffer instanceCount
+
+    where
+    resolve indicesCount Nothing Nothing =
+        DrawArrays PrimitiveType.glTriangles 0 indicesCount
+    resolve indicesCount (Just _) Nothing =
+        DrawElements PrimitiveType.glTriangles indicesCount GL.GL_UNSIGNED_INT Foreign.nullPtr
+    resolve indicesCount Nothing (Just instanceCount) =
+        DrawArraysInstanced PrimitiveType.glTriangles 0 indicesCount instanceCount
+    resolve indicesCount (Just _) (Just instanceCount) =
+        DrawElementsInstanced PrimitiveType.glTriangles indicesCount GL.GL_UNSIGNED_INT Foreign.nullPtr instanceCount
 
 meshIdToEntity :: MeshId -> Component.Entity
 meshIdToEntity = Component.Entity . unMeshId
@@ -199,11 +208,19 @@ applyTransformToMesh scene meshId f =
     entity = meshIdToEntity meshId
     transformStore = sceneMeshTransformStore scene
 
-updateMeshVertexCount :: Scene -> MeshId -> Int -> IO ()
-updateMeshVertexCount scene meshId c =
+updateMeshIndicesCount :: Scene -> MeshId -> Int -> IO ()
+updateMeshIndicesCount scene meshId c =
     void $ Component.modifyComponent entity f meshStore
     where
-    f m = m { meshInfoMesh = (meshInfoMesh m) { meshVertexCount = c } }
+    f m = m { meshInfoMesh = (meshInfoMesh m) { meshIndicesCount = c } }
+    entity = meshIdToEntity meshId
+    meshStore = sceneMeshStore scene
+
+updateMeshInstanceCount :: Scene -> MeshId -> Maybe Int -> IO ()
+updateMeshInstanceCount scene meshId c =
+    void $ Component.modifyComponent entity f meshStore
+    where
+    f m = m { meshInfoMesh = (meshInfoMesh m) { meshInstanceCount = c } }
     entity = meshIdToEntity meshId
     meshStore = sceneMeshStore scene
 

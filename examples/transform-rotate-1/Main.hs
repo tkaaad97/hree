@@ -34,7 +34,7 @@ main = do
         scene <- newScene
         (geometry, vs) <- createBoxGeometry 0.5 0.5 0.5 scene
         let material = Material.flatColorMaterial (V4 0.2 0.4 0.6 1)
-            mesh = Mesh geometry material (Vector.length vs)
+            mesh = Mesh geometry material (Vector.length vs) Nothing
         meshId <- addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

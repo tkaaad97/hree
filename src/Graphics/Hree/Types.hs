@@ -42,9 +42,10 @@ newtype MeshId = MeshId
     } deriving (Show, Eq, Ord, Hashable)
 
 data Mesh = Mesh
-    { meshGeometry    :: !Geometry
-    , meshMaterial    :: !Material
-    , meshVertexCount :: !Int
+    { meshGeometry      :: !Geometry
+    , meshMaterial      :: !Material
+    , meshIndicesCount  :: !Int
+    , meshInstanceCount :: !(Maybe Int)
     } deriving (Show)
 
 data MeshInfo = MeshInfo

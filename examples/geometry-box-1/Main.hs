@@ -52,7 +52,7 @@ main = do
         geometry' <- Geometry.addVerticesToGeometry geometry vs GL.GL_STATIC_READ scene
         texture <- mkTexture scene
         let material = Material.basicMaterial (Just texture)
-            mesh = Mesh geometry' material (Vector.length vs)
+            mesh = Mesh geometry' material (Vector.length vs) Nothing
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
