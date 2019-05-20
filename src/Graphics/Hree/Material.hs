@@ -33,6 +33,13 @@ flatColorMaterial color = Material u t p
     t = []
     p = flatColorProgramSpec
 
+spriteMaterial :: Texture -> Material
+spriteMaterial a = Material u t p
+    where
+    u = Map.empty
+    t = [a]
+    p = spriteProgramSpec
+
 testMaterial :: Material
 testMaterial = Material u t p
     where
