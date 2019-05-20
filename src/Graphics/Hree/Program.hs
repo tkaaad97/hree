@@ -10,6 +10,7 @@ module Graphics.Hree.Program
     , ProgramSpec(..)
     , basicProgramSpec
     , flatColorProgramSpec
+    , spriteProgramSpec
     , testProgramSpec
     , mkProgram
     ) where

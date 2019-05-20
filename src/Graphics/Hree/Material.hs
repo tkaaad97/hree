@@ -5,6 +5,7 @@ module Graphics.Hree.Material
     , Texture(..)
     , basicMaterial
     , flatColorMaterial
+    , spriteMaterial
     , testMaterial
     ) where
 

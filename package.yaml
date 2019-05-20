@@ -93,6 +93,18 @@ executables:
     - hree
     - GLFW-b
 
+  sprite-instanced-1:
+    main:                Main.hs
+    source-dirs:         examples/sprite-instanced-1
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - examples-common
+    - hree
+    - GLFW-b
+
 tests:
   hree-test:
     main:                Spec.hs
