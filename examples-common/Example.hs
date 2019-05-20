@@ -1,5 +1,6 @@
 module Example
     ( mkColoredImage
+    , mkCircleImage
     , setCameraMouseControl
     , shutdown
     , resizeWindow
@@ -110,3 +111,14 @@ mkColoredImage size = Vector.generate (size * size) gen
             b = 64
             a = 255
         in V4 r g b a
+
+mkCircleImage :: Int -> V4 Word8 -> Vector (V4 Word8)
+mkCircleImage size color = Vector.generate (size * size) gen
+    where
+    empty = V4 0 0 0 0
+    half = size `div` 2
+    r2 = half * half
+    gen i =
+        let (y, x) = divMod i size
+            q = (x - half) * (x - half) + (y - half) * (y - half)
+        in if q <= r2 then color else empty
