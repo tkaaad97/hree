@@ -14,8 +14,7 @@ module Graphics.Hree.Camera
     ) where
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
-import Linear (M44, V3(..), V4(..), (!*!), (^-^))
-import qualified Linear
+import Linear (M44, V3, (!*!))
 import qualified Linear (identity, lookAt, normalize, ortho, perspective)
 
 newtype Camera = Camera
@@ -73,32 +72,11 @@ getCameraMatrix (Camera cameraRef) =
     f a @ (CameraState _ _ m False) = (a, m)
 
 projectionMatrix :: Projection -> M44 Float
+projectionMatrix (Perspective fov aspect near far) = Linear.perspective fov aspect near far
 projectionMatrix (Orthographic left right bottom top near far) = Linear.ortho left right bottom top near far
-projectionMatrix (Perspective fov aspect near far) =
-    let tanHalfFovy = tan $ fov * 0.5
-        x = 1 / (aspect * tanHalfFovy)
-        y = 1 / tanHalfFovy
-        z = far / (near - far)
-        w = near * far / (near - far)
-    in V4
-        (V4 x 0 0 0)
-        (V4 0 y 0 0)
-        (V4 0 0 z w)
-        (V4 0 0 (-1) 0)
 
 lookAtMatrix :: LookAt -> M44 Float
-lookAtMatrix (LookAt eye center up) =
-    let za @ (V3 zax zay zaz) = Linear.normalize $ eye ^-^ center
-        xa @ (V3 xax xay xaz) = Linear.normalize $ Linear.cross up za
-        ya @ (V3 yax yay yaz) = Linear.cross za xa
-        xd = - Linear.dot xa eye
-        yd = - Linear.dot ya eye
-        zd = - Linear.dot za eye
-    in V4
-        (V4 xax xay xaz xd)
-        (V4 yax yay yaz yd)
-        (V4 zax zay zaz zd)
-        (V4 0 0 0 1)
+lookAtMatrix (LookAt eye center up) = Linear.lookAt eye center up
 
 updateProjection :: Camera -> Projection -> IO ()
 updateProjection (Camera cameraRef) p =
