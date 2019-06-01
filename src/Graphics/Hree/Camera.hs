@@ -73,6 +73,7 @@ getCameraMatrix (Camera cameraRef) =
     f a @ (CameraState _ _ m False) = (a, m)
 
 projectionMatrix :: Projection -> M44 Float
+projectionMatrix (Orthographic left right bottom top near far) = Linear.ortho left right bottom top near far
 projectionMatrix (Perspective fov aspect near far) =
     let tanHalfFovy = tan $ fov * 0.5
         x = 1 / (aspect * tanHalfFovy)
@@ -84,18 +85,6 @@ projectionMatrix (Perspective fov aspect near far) =
         (V4 0 y 0 0)
         (V4 0 0 z w)
         (V4 0 0 (-1) 0)
-projectionMatrix (Orthographic left right bottom top near far) =
-    let x = 1 / (right - left)
-        y = 1 / (top - bottom)
-        z = 1 / (far - near)
-        a = - (right + left) * x
-        b = - (top + bottom) * y
-        c = - (far + near) * z
-    in V4
-        (V4 (2 * x) 0 0 a)
-        (V4 0 (2 * y) 0 b)
-        (V4 0 0 z c)
-        (V4 0 0 0 1)
 
 lookAtMatrix :: LookAt -> M44 Float
 lookAtMatrix (LookAt eye center up) =
