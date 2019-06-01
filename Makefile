@@ -1,4 +1,7 @@
-.PHONY: lib clean ex1 test
+.PHONY: lib clean test
+
+ghci:
+	docker-compose run --rm app stack ghci
 
 lib: src shader package.yaml
 	docker-compose run --rm app stack build
