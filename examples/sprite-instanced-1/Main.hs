@@ -34,49 +34,25 @@ main = do
     delta :: Float
     delta = 0.2
 
-    positions = Vector.fromList . map (\x -> V3 (fromIntegral x * delta) 0 0) $ [0..100]
-
-    offsets = Vector.fromList
-        [ V3 0 0 0
-        , V3 delta 0 0
-        , V3 0 delta 0
-        , V3 delta delta 0
-        , V3 0 delta 0
-        , V3 delta 0 0
-        ]
-
-    uvs = Vector.fromList
-        [ Uv $ V2 0 0
-        , Uv $ V2 1 0
-        , Uv $ V2 0 1
-        , Uv $ V2 1 1
-        , Uv $ V2 0 1
-        , Uv $ V2 1 0
-        ]
+    spriteVertices = Vector.fromList
+        $  map (\x -> SpriteVertex (V3 (fromIntegral x * delta) 0 0) (V3 delta delta 0) 0 (V2 0 0) (V2 1 1)) [0..9]
+        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) delta 0) (V3 (delta * 2) delta 0) 0 (V2 0 0) (V2 1 1)) [0..4]
+        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) (delta * 2) 0) (V3 (delta * 2) delta 0) (pi * 0.2) (V2 0 0) (V2 1 1)) [0..4]
 
     proj = perspective 90 aspect 0.1 10.0
 
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
-    offsetBbs = BindBufferSetting 0 12 0
-    uvBbs = BindBufferSetting 0 8 0
-    positionBbs = BindBufferSetting 0 12 1
-
     init w = do
         GL.glEnable GL.GL_BLEND
         GL.glBlendFunc GL.GL_SRC_ALPHA GL.GL_ONE_MINUS_SRC_ALPHA
         scene <- newScene
-        offsetBuffer <- addBuffer scene (BufferSource offsets GL.GL_STATIC_READ)
-        uvBuffer <- addBuffer scene (BufferSource uvs GL.GL_STATIC_READ)
-        positionBuffer <- addBuffer scene (BufferSource positions GL.GL_STATIC_READ)
 
-        let geo0 = Geometry.newGeometry
-            geo1 = Geometry.addAttribBindings geo0 0 (Map.singleton "positionOffset" (AttribBinding (GLW.BindingIndex 0) (AttribFormat 3 GL.GL_FLOAT False 0))) (offsetBuffer, offsetBbs)
-            geo2 = Geometry.addAttribBindings geo1 1 (Map.singleton "uv" (AttribBinding (GLW.BindingIndex 1) (AttribFormat 2 GL.GL_FLOAT False 0))) (uvBuffer, uvBbs)
-            geo3 = Geometry.addAttribBindings geo2 2 (Map.singleton "position" (AttribBinding (GLW.BindingIndex 2) (AttribFormat 3 GL.GL_FLOAT False 0))) (positionBuffer, positionBbs)
+        (geo, offsets) <- Geometry.newSpriteGeometry scene
+        geo' <- Geometry.addVerticesToGeometry geo spriteVertices GL.GL_STATIC_READ scene
         texture <- mkTexture scene
         let material = Material.spriteMaterial texture
-            mesh = Mesh geo3 material (Vector.length offsets) (Just . Vector.length $ positions)
+            mesh = Mesh geo' material (Vector.length offsets) (Just . Vector.length $ spriteVertices)
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

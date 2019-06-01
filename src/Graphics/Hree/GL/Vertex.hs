@@ -3,6 +3,8 @@
 module Graphics.Hree.GL.Vertex
     ( BasicVertex(..)
     , PositionAndNormal(..)
+    , SpriteOffset(..)
+    , SpriteVertex(..)
     , Uv(..)
     , Vertex(..)
     , VertexField(..)
@@ -130,3 +132,80 @@ instance Vertex Uv where
         uvField = VertexField "uv" (AttribFormat 2 GL.GL_FLOAT False 0)
         fields = [ uvField ]
         bbs = BindBufferSetting 0 (sizeOf (undefined :: Uv)) 0
+
+data SpriteOffset = SpriteOffset
+    { soPositionOffset :: !Vec3
+    , soUvOffset       :: !Vec2
+    } deriving (Show, Eq)
+
+instance Storable SpriteOffset where
+    sizeOf _ = 20
+
+    alignment _ = 4
+
+    peek ptr = do
+        p <- peek $ castPtr ptr `plusPtr` 0
+        u <- peek $ castPtr ptr `plusPtr` 12
+        return $ SpriteOffset p u
+
+    poke ptr (SpriteOffset p u) = do
+        poke (castPtr ptr `plusPtr` 0) p
+        poke (castPtr ptr `plusPtr` 12) u
+
+instance Vertex SpriteOffset where
+    vertexSpec _ = VertexSpec bbs fields
+
+        where
+        positionOffsetField = VertexField "positionOffset" (AttribFormat 3 GL.GL_FLOAT False 0)
+        uvOffsetField = VertexField "uvOffset" (AttribFormat 2 GL.GL_FLOAT False 12)
+        fields =
+            [ positionOffsetField
+            , uvOffsetField
+            ]
+        bbs = BindBufferSetting 0 (sizeOf (undefined :: SpriteOffset)) 0
+
+data SpriteVertex = SpriteVertex
+    { svPosition :: !Vec3
+    , svSize     :: !Vec3
+    , svAngle    :: !Float
+    , svUv       :: !Vec2
+    , svUvSize   :: !Vec2
+    } deriving (Show, Eq)
+
+instance Storable SpriteVertex where
+    sizeOf _ = 44
+
+    alignment _ = 4
+
+    peek ptr = do
+        p <- peek $ castPtr ptr `plusPtr` 0
+        s <- peek $ castPtr ptr `plusPtr` 12
+        a <- peek $ castPtr ptr `plusPtr` 24
+        u <- peek $ castPtr ptr `plusPtr` 28
+        us <- peek $ castPtr ptr `plusPtr` 36
+        return $ SpriteVertex p s a u us
+
+    poke ptr (SpriteVertex p s a u us) = do
+        poke (castPtr ptr `plusPtr` 0) p
+        poke (castPtr ptr `plusPtr` 12) s
+        poke (castPtr ptr `plusPtr` 24) a
+        poke (castPtr ptr `plusPtr` 28) u
+        poke (castPtr ptr `plusPtr` 36) us
+
+instance Vertex SpriteVertex where
+    vertexSpec _ = VertexSpec bbs fields
+
+        where
+        positionField = VertexField "position" (AttribFormat 3 GL.GL_FLOAT False 0)
+        sizeField = VertexField "size" (AttribFormat 3 GL.GL_FLOAT False 12)
+        angleField = VertexField "angle" (AttribFormat 1 GL.GL_FLOAT False 24)
+        uvField = VertexField "uv" (AttribFormat 2 GL.GL_FLOAT False 28)
+        uvSizeField = VertexField "uvSize" (AttribFormat 2 GL.GL_FLOAT False 36)
+        fields =
+            [ positionField
+            , sizeField
+            , angleField
+            , uvField
+            , uvSizeField
+            ]
+        bbs = BindBufferSetting 0 (sizeOf (undefined :: SpriteVertex)) 1

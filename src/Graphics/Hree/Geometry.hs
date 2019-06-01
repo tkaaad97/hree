@@ -4,6 +4,7 @@ module Graphics.Hree.Geometry
     , addAttribBindings
     , addVerticesToGeometry
     , newGeometry
+    , newSpriteGeometry
     ) where
 
 import Data.ByteString (ByteString)
@@ -21,6 +22,7 @@ import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
 import Graphics.Hree.Scene (addBuffer)
 import Graphics.Hree.Types
+import Linear (V2(..), V3(..))
 
 newGeometry :: Geometry
 newGeometry = Geometry Map.empty IntMap.empty Nothing
@@ -46,3 +48,17 @@ addVerticesToGeometry geometry storage usage scene = do
     toAttribBinding (VertexField name format) = AttribBinding (GLW.BindingIndex . fromIntegral $ bindingIndex) format
     newAttribBindings = Map.fromList $ zip keys bindings
     attribBindings' = Map.union attribBindings newAttribBindings
+
+newSpriteGeometry :: Scene -> IO (Geometry, Vector SpriteOffset)
+newSpriteGeometry scene = do
+    geo <- addVerticesToGeometry newGeometry offsets GL.GL_STATIC_READ scene
+    return (geo, offsets)
+    where
+    offsets = Vector.fromList
+        [ SpriteOffset (V3 0 0 0) (V2 0 0)
+        , SpriteOffset (V3 1 0 0) (V2 1 0)
+        , SpriteOffset (V3 0 1 0) (V2 0 1)
+        , SpriteOffset (V3 1 1 0) (V2 1 1)
+        , SpriteOffset (V3 0 1 0) (V2 0 1)
+        , SpriteOffset (V3 1 0 0) (V2 1 0)
+        ]
