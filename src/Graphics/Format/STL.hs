@@ -6,9 +6,12 @@ module Graphics.Format.STL
 import Data.Binary (Binary(..))
 import Data.ByteString (ByteString)
 import Data.Vector (Vector)
-import Data.Vector as Vector
+import qualified Data.Vector as Vector
+import qualified Data.Vector.Storable as SV
 import Data.Word (Word16, Word32, Word8)
+import qualified Graphics.GL as GL
 import Graphics.Hree.Geometry
+import Graphics.Hree.GL.Vertex (PositionAndNormal(..))
 import Graphics.Hree.Types (Scene)
 import Linear (V3)
 
@@ -56,3 +59,22 @@ instance Binary STL where
         num <- get
         triangles <- Vector.replicateM (fromIntegral num) get
         return (STL header num triangles)
+
+createGeometryFromSTL :: STL -> Scene -> IO (Geometry, SV.Vector PositionAndNormal)
+createGeometryFromSTL stl scene = do
+    let len = fromIntegral (stlTriangleNum stl) * 3
+        vs = SV.generate len f
+        geo = newGeometry
+    geo' <- addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
+    return (geo', vs)
+    where
+    f i =
+        let (d, m) = divMod i 3
+            triangles = stlTriangles stl
+            triangle = triangles Vector.! d
+            position = case m of
+                    0 -> triangleVertex1 triangle
+                    1 -> triangleVertex2 triangle
+                    2 -> triangleVertex3 triangle
+            normal = triangleNormal triangle
+        in PositionAndNormal position normal
