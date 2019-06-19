@@ -106,6 +106,18 @@ executables:
     - hree
     - GLFW-b
 
+  format-stl-1:
+    main:                Main.hs
+    source-dirs:         examples/format-stl-1
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - examples-common
+    - hree
+    - GLFW-b
+
 tests:
   hree-test:
     main:                Spec.hs

@@ -1,10 +1,17 @@
-{-# LANGUAGE StrictData #-}
 module Graphics.Format.STL
-    (
+    ( Triangle(..)
+    , STL(..)
+    , createGeometryFromSTL
+    , loadGeometryFromSTLFile
     ) where
 
-import Data.Binary (Binary(..))
-import Data.ByteString (ByteString)
+import Data.Binary (Binary(..), Get(..))
+import qualified Data.Binary as Binary (decode)
+import qualified Data.Binary.Get as Binary (getFloatle, getWord16le,
+                                            getWord32le)
+import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as ByteString (readFile)
+import Data.Int (Int32)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Storable as SV
@@ -13,14 +20,14 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.Geometry
 import Graphics.Hree.GL.Vertex (PositionAndNormal(..))
 import Graphics.Hree.Types (Scene)
-import Linear (V3)
+import Linear (V3(..))
 
 data Triangle = Triangle
-    { triangleNormal  :: V3 Float
-    , triangleVertex1 :: V3 Float
-    , triangleVertex2 :: V3 Float
-    , triangleVertex3 :: V3 Float
-    , triangleExtra   :: Word16
+    { triangleNormal  :: !(V3 Float)
+    , triangleVertex1 :: !(V3 Float)
+    , triangleVertex2 :: !(V3 Float)
+    , triangleVertex3 :: !(V3 Float)
+    , triangleExtra   :: !Word16
     } deriving (Show, Eq)
 
 instance Binary Triangle where
@@ -32,17 +39,25 @@ instance Binary Triangle where
         put ex
 
     get = do
-        normal <- get
-        v1 <- get
-        v2 <- get
-        v3 <- get
-        ex <- get
-        return (Triangle normal v1 v2 v3 ex)
+        n0 <- Binary.getFloatle
+        n1 <- Binary.getFloatle
+        n2 <- Binary.getFloatle
+        v10 <- Binary.getFloatle
+        v11 <- Binary.getFloatle
+        v12 <- Binary.getFloatle
+        v20 <- Binary.getFloatle
+        v21 <- Binary.getFloatle
+        v22 <- Binary.getFloatle
+        v30 <- Binary.getFloatle
+        v31 <- Binary.getFloatle
+        v32 <- Binary.getFloatle
+        ex <- Binary.getWord16le
+        return (Triangle (V3 n0 n1 n2) (V3 v10 v11 v12) (V3 v20 v21 v22) (V3 v30 v31 v32) ex)
 
 data STL = STL
-    { stlHeader      :: Vector Word8
-    , stlTriangleNum :: Word32
-    , stlTriangles   :: Vector Triangle
+    { stlHeader      :: !(Vector Word8)
+    , stlTriangleNum :: !Word32
+    , stlTriangles   :: !(Vector Triangle)
     } deriving (Show, Eq)
 
 stlHeaderLength :: Int
@@ -56,7 +71,7 @@ instance Binary STL where
 
     get = do
         header <- Vector.replicateM stlHeaderLength get
-        num <- get
+        num <- Binary.getWord32le
         triangles <- Vector.replicateM (fromIntegral num) get
         return (STL header num triangles)
 
@@ -78,3 +93,9 @@ createGeometryFromSTL stl scene = do
                     2 -> triangleVertex3 triangle
             normal = triangleNormal triangle
         in PositionAndNormal position normal
+
+loadGeometryFromSTLFile :: FilePath -> Scene -> IO (Geometry, SV.Vector PositionAndNormal)
+loadGeometryFromSTLFile path scene = do
+    bs <- ByteString.readFile path
+    let stl = Binary.decode bs
+    createGeometryFromSTL stl scene
