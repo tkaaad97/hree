@@ -44,7 +44,8 @@ main = do
         scene <- newScene
         (geometry, vs) <- STL.loadGeometryFromSTLFile path scene
         let material = Material.basicMaterial Nothing
-            mesh = Mesh geometry material (Vector.length vs) Nothing
+            material' = Material.setDirectionalLight material (V3 0.5 (-1) (-0.5))
+            mesh = Mesh geometry material' (Vector.length vs) Nothing
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

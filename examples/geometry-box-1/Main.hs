@@ -52,7 +52,8 @@ main = do
         geometry' <- Geometry.addVerticesToGeometry geometry vs GL.GL_STATIC_READ scene
         texture <- mkTexture scene
         let material = Material.basicMaterial (Just texture)
-            mesh = Mesh geometry' material (Vector.length ps) Nothing
+            material' = Material.setDirectionalLight material (V3 0.5 (-1) (-1))
+            mesh = Mesh geometry' material' (Vector.length ps) Nothing
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

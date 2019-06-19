@@ -7,9 +7,11 @@ in vec4 fragmentColor;
 out vec4 outColor;
 
 uniform sampler2D texture;
+uniform vec3 directionalLight = vec3(0.0, 0.0, 0.0);
 
 void main()
 {
+    float diffuse = clamp(dot(fragmentNormal, -normalize(directionalLight)), 0.1, 1.0);
     vec4 textureColor = texture2D(texture, fragmentUv);
-    outColor = vec4(mix(fragmentColor.xyz, textureColor.xyz, textureColor.w), fragmentColor.w);
+    outColor = vec4(diffuse * mix(fragmentColor.xyz, textureColor.xyz, textureColor.w), fragmentColor.w);
 }

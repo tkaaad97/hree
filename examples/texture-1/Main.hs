@@ -30,12 +30,12 @@ main = do
 
     x = 1
     vs = Vector.fromList
-        [ BasicVertex (V3 x x 0) (V3 0 0 0) (V2 1 1) (V4 0 0 0 255)
-        , BasicVertex (V3 0 x 0) (V3 0 0 0) (V2 0.0 1) (V4 0 0 0 255)
-        , BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 1 0.0) (V4 0 0 0 255)
-        , BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0.0 0.0) (V4 0 0 0 255)
-        , BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 1 0.0) (V4 0 0 0 255)
-        , BasicVertex (V3 0 x 0) (V3 0 0 0) (V2 0.0 1) (V4 0 0 0 255)
+        [ BasicVertex (V3 x x 0) (V3 0 0 1) (V2 1 1) (V4 0 0 0 255)
+        , BasicVertex (V3 0 x 0) (V3 0 0 1) (V2 0.0 1) (V4 0 0 0 255)
+        , BasicVertex (V3 x 0 0) (V3 0 0 1) (V2 1 0.0) (V4 0 0 0 255)
+        , BasicVertex (V3 0 0 0) (V3 0 0 1) (V2 0.0 0.0) (V4 0 0 0 255)
+        , BasicVertex (V3 x 0 0) (V3 0 0 1) (V2 1 0.0) (V4 0 0 0 255)
+        , BasicVertex (V3 0 x 0) (V3 0 0 1) (V2 0.0 1) (V4 0 0 0 255)
         ]
 
     proj = perspective 90 1.0 0.1 10.0
@@ -47,7 +47,8 @@ main = do
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry vs GL.GL_STREAM_DRAW scene
         texture <- mkTexture scene
         let material = Material.basicMaterial (Just texture)
-            mesh = Mesh geometry material 6 Nothing
+            material' = Material.setDirectionalLight material (V3 0 0 (-1))
+            mesh = Mesh geometry material' 6 Nothing
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

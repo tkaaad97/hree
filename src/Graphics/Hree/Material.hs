@@ -7,6 +7,7 @@ module Graphics.Hree.Material
     , flatColorMaterial
     , spriteMaterial
     , testMaterial
+    , setDirectionalLight
     ) where
 
 import Data.ByteString (ByteString)
@@ -18,7 +19,7 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Program
 import Graphics.Hree.Types
-import Linear (V4)
+import Linear (V3, V4)
 
 basicMaterial :: Maybe Texture -> Material
 basicMaterial a = Material u t p
@@ -47,3 +48,10 @@ testMaterial = Material u t p
     u = Map.empty
     t = []
     p = testProgramSpec
+
+setDirectionalLight :: Material -> V3 Float -> Material
+setDirectionalLight m dl = m { materialUniforms = us' }
+    where
+    u = Uniform dl
+    us = materialUniforms m
+    us' = Map.insert "directionalLight" u us
