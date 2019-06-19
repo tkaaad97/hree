@@ -36,7 +36,7 @@ main = do
 
     proj = perspective 90 aspect 0.1 10.0
 
-    la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
+    la = lookAt (V3 0 (-1) 5) (V3 0 0 0) (V3 0 1 0)
 
     init path w = do
         GL.glEnable GL.GL_CULL_FACE

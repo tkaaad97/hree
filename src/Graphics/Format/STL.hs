@@ -18,9 +18,9 @@ import qualified Data.Vector.Storable as SV
 import Data.Word (Word16, Word32, Word8)
 import qualified Graphics.GL as GL
 import Graphics.Hree.Geometry
-import Graphics.Hree.GL.Vertex (PositionAndNormal(..))
+import Graphics.Hree.GL.Vertex (BasicVertex(..))
 import Graphics.Hree.Types (Scene)
-import Linear (V3(..))
+import Linear (V2(..), V3(..), V4(..))
 
 data Triangle = Triangle
     { triangleNormal  :: !(V3 Float)
@@ -75,7 +75,7 @@ instance Binary STL where
         triangles <- Vector.replicateM (fromIntegral num) get
         return (STL header num triangles)
 
-createGeometryFromSTL :: STL -> Scene -> IO (Geometry, SV.Vector PositionAndNormal)
+createGeometryFromSTL :: STL -> Scene -> IO (Geometry, SV.Vector BasicVertex)
 createGeometryFromSTL stl scene = do
     let len = fromIntegral (stlTriangleNum stl) * 3
         vs = SV.generate len f
@@ -92,9 +92,9 @@ createGeometryFromSTL stl scene = do
                     1 -> triangleVertex2 triangle
                     2 -> triangleVertex3 triangle
             normal = triangleNormal triangle
-        in PositionAndNormal position normal
+        in BasicVertex position normal (V2 0 0) (V4 255 255 255 255)
 
-loadGeometryFromSTLFile :: FilePath -> Scene -> IO (Geometry, SV.Vector PositionAndNormal)
+loadGeometryFromSTLFile :: FilePath -> Scene -> IO (Geometry, SV.Vector BasicVertex)
 loadGeometryFromSTLFile path scene = do
     bs <- ByteString.readFile path
     let stl = Binary.decode bs

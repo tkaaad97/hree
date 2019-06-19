@@ -83,7 +83,7 @@ instance Vertex BasicVertex where
         positionField = VertexField "position" (AttribFormat 3 GL.GL_FLOAT False positionOffset)
         normalField = VertexField "normal" (AttribFormat 3 GL.GL_FLOAT False normalOffset)
         uvField = VertexField "uv" (AttribFormat 2 GL.GL_FLOAT False uvOffset)
-        colorField = VertexField "color" (AttribFormat 4 GL.GL_UNSIGNED_BYTE False colorOffset)
+        colorField = VertexField "color" (AttribFormat 4 GL.GL_UNSIGNED_BYTE True colorOffset)
         fields = [ positionField
             , normalField
             , uvField
