@@ -9,6 +9,8 @@ import Data.Binary (Binary(..), Get(..))
 import qualified Data.Binary as Binary (decode)
 import qualified Data.Binary.Get as Binary (getFloatle, getWord16le,
                                             getWord32le)
+import qualified Data.Binary.Put as Binary (putFloatle, putWord16le,
+                                            putWord32le)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString (readFile)
 import Data.Int (Int32)
@@ -31,12 +33,20 @@ data Triangle = Triangle
     } deriving (Show, Eq)
 
 instance Binary Triangle where
-    put (Triangle normal v1 v2 v3 ex) = do
-        put normal
-        put v1
-        put v2
-        put v3
-        put ex
+    put (Triangle (V3 n0 n1 n2) (V3 v10 v11 v12) (V3 v20 v21 v22) (V3 v30 v31 v32) ex) = do
+        Binary.putFloatle n0
+        Binary.putFloatle n1
+        Binary.putFloatle n2
+        Binary.putFloatle v10
+        Binary.putFloatle v11
+        Binary.putFloatle v12
+        Binary.putFloatle v20
+        Binary.putFloatle v21
+        Binary.putFloatle v22
+        Binary.putFloatle v30
+        Binary.putFloatle v31
+        Binary.putFloatle v32
+        Binary.putWord16le ex
 
     get = do
         n0 <- Binary.getFloatle
@@ -66,7 +76,7 @@ stlHeaderLength = 80
 instance Binary STL where
     put (STL header num triangles) = do
         Vector.mapM_ put header
-        put num
+        Binary.putWord32le num
         Vector.mapM_ put triangles
 
     get = do
