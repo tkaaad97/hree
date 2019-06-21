@@ -23,6 +23,7 @@ dependencies:
 - JuicyPixels
 - binary
 - bytestring
+- cereal
 - containers
 - file-embed
 - gl
