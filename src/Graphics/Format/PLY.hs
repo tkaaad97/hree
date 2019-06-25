@@ -4,10 +4,21 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 module Graphics.Format.PLY
-    ( parsePLYHeader
+    ( createGeometryFromPLY
+    , loadGeometryFromPLYFile
+    , loadPLYFile
     ) where
 
+import Control.Exception (throwIO)
 import Control.Monad (when)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.State.Strict (StateT(..), evalStateT)
+import qualified Control.Monad.Trans.State.Strict as State (get, put)
+import qualified Data.Attoparsec.ByteString.Char8 as Attoparsec (IResult(..),
+                                                                 Parser,
+                                                                 decimal,
+                                                                 double, parse,
+                                                                 rational)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS (breakSubstring, drop, empty, isPrefixOf,
                                         length, readFile, stripPrefix)
@@ -20,15 +31,36 @@ import qualified Data.List as List (filter, span)
 import Data.Maybe (fromMaybe, maybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Serialize as Serialize
+import Data.Vector (Vector)
+import qualified Data.Vector as Vector (concatMap, findIndex, foldM', foldl',
+                                        fromList, length, map, mapM, replicateM,
+                                        zip, (!))
+import qualified Data.Vector.Storable as SV (Vector, generate, generateM)
 import Data.Word
 import Foreign (sizeOf)
+import qualified Graphics.GL as GL
+import Graphics.Hree.Geometry (addVerticesToGeometry, newGeometry,
+                               setIndexBuffer)
 import Graphics.Hree.GL.Vertex (BasicVertex(..))
+import Graphics.Hree.Scene (addIndexBufferUInt)
+import Graphics.Hree.Types (Geometry, Scene)
 import Linear (V2(..), V3(..), V4(..))
 import Text.Read (readEither)
 
+type Parser = StateT ByteString (Either String)
+
+data PLY = PLY
+    { plyHeader  :: !PLYHeader
+    , plyBuffers :: !(Vector Buffer)
+    } deriving (Show, Eq)
+
 data PLYHeader = PLYHeader
     { phFormat         :: !PLYFormat
-    , phElementHeaders :: ![ElementHeader]
+    , phElementHeaders :: !(Vector ElementHeader)
+    } deriving (Show, Eq)
+
+newtype Buffer = Buffer
+    { unBuffer :: Vector (Vector Value)
     } deriving (Show, Eq)
 
 data PLYFormat =
@@ -40,7 +72,7 @@ data PLYFormat =
 data ElementHeader = ElementHeader
     { ehName       :: !ByteString
     , ehNum        :: !Int
-    , ehProperties :: ![ElementProperty]
+    , ehProperties :: !(Vector ElementProperty)
     } deriving (Show, Eq)
 
 data ElementProperty =
@@ -71,14 +103,19 @@ data DataType =
     deriving (Show, Eq)
 
 data Scalar =
-    ScalarChar Int8 |
-    ScalarUChar Word8 |
-    ScalarShort Int16 |
-    ScalarUShort Word16 |
-    ScalarInt Int32 |
-    ScalarUInt Word32 |
-    ScalarFloat Float |
-    ScalarDouble Double
+    ScalarChar !Int8 |
+    ScalarUChar !Word8 |
+    ScalarShort !Int16 |
+    ScalarUShort !Word16 |
+    ScalarInt !Int32 |
+    ScalarUInt !Word32 |
+    ScalarFloat !Float |
+    ScalarDouble !Double
+    deriving (Show, Eq)
+
+data Value =
+    ValueS !Scalar |
+    ValueL !(Vector Scalar)
     deriving (Show, Eq)
 
 getScalarLE :: DataType -> Serialize.Get Scalar
@@ -101,15 +138,53 @@ getScalarBE UInt'   = ScalarUInt <$> Serialize.getWord32be
 getScalarBE Float'  = ScalarFloat <$> Serialize.getFloat32be
 getScalarBE Double' = ScalarDouble <$> Serialize.getFloat64be
 
-parseAscii :: DataType -> ByteString -> Either String (Scalar, ByteString)
-parseAscii Char' bs   = parseAsciiToIntegral ScalarChar bs
-parseAscii UChar' bs  = parseAsciiToIntegral ScalarUChar bs
-parseAscii Short' bs  = parseAsciiToIntegral ScalarShort bs
-parseAscii UShort' bs = parseAsciiToIntegral ScalarUShort bs
-parseAscii Int' bs    = parseAsciiToIntegral ScalarInt bs
-parseAscii UInt' bs   = parseAsciiToIntegral ScalarUInt bs
-parseAscii Float' bs  = parseAsciiRead ScalarFloat bs
-parseAscii Double' bs = parseAsciiRead ScalarDouble bs
+scalarParserAscii :: DataType -> Parser Scalar
+scalarParserAscii Char'   = decimalParserAscii ScalarChar
+scalarParserAscii UChar'  = decimalParserAscii ScalarUChar
+scalarParserAscii Short'  = decimalParserAscii ScalarShort
+scalarParserAscii UShort' = decimalParserAscii ScalarUShort
+scalarParserAscii Int'    = decimalParserAscii ScalarInt
+scalarParserAscii UInt'   = decimalParserAscii ScalarUInt
+scalarParserAscii Float'  = ScalarFloat <$> convertParser Attoparsec.rational
+scalarParserAscii Double' = ScalarDouble <$> convertParser Attoparsec.double
+
+scalarParser :: PLYFormat -> DataType -> Parser Scalar
+scalarParser PLYFormatBinaryLE t = scalarParserLE t
+scalarParser PLYFormatBinaryBE t = scalarParserBE t
+scalarParser PLYFormatAscii t    = scalarParserAscii t
+
+scalarParserLE :: DataType -> Parser Scalar
+scalarParserLE = binaryParser . getScalarLE
+
+scalarParserBE :: DataType -> Parser Scalar
+scalarParserBE = binaryParser . getScalarBE
+
+scalarListParser :: PLYFormat -> DataType -> DataType -> Parser (Vector Scalar)
+scalarListParser format st dt = do
+    s <- scalarParser format st
+    n <- lift $ castScalarFromIntegral s
+    Vector.replicateM n (scalarParser format dt)
+
+decimalParserAscii :: (Integral a) => (a -> Scalar) -> Parser Scalar
+decimalParserAscii f = f <$> convertParser Attoparsec.decimal
+
+convertParser :: Attoparsec.Parser a -> Parser a
+convertParser a = do
+    bs <- State.get
+    (r, rest) <- handleResult $ Attoparsec.parse a bs
+    State.put (BS.dropWhile Char.isSpace rest)
+    return r
+    where
+    handleResult (Attoparsec.Done bs r)    = lift . return $ (r, bs)
+    handleResult (Attoparsec.Fail i _ err) = lift . Left $ err
+    handleResult _                         = lift . Left $ "parse error"
+
+binaryParser :: Serialize.Get a -> Parser a
+binaryParser a = do
+    bs <- State.get
+    (r, rest) <- lift $ Serialize.runGetState a bs 0
+    State.put rest
+    return r
 
 class FromScalar a where
     fromScalar :: Scalar -> Either String a
@@ -146,6 +221,9 @@ instance FromScalar Double where
     fromScalar (ScalarDouble a) = Right a
     fromScalar _                = Left "fromScalar failed"
 
+fromScalarVector :: (FromScalar a) => Vector Scalar -> Either String (Vector a)
+fromScalarVector = Vector.mapM fromScalar
+
 castScalarToFrac :: (Num a, Fractional a) => Scalar -> a
 castScalarToFrac (ScalarChar a)   = fromIntegral a
 castScalarToFrac (ScalarUChar a)  = fromIntegral a
@@ -156,42 +234,32 @@ castScalarToFrac (ScalarUInt a)   = fromIntegral a
 castScalarToFrac (ScalarFloat a)  = realToFrac a
 castScalarToFrac (ScalarDouble a) = realToFrac a
 
-castScalarToInt :: (Integral a) => Scalar -> Either String a
-castScalarToInt (ScalarChar a)   = Right $ fromIntegral a
-castScalarToInt (ScalarUChar a)  = Right $ fromIntegral a
-castScalarToInt (ScalarShort a)  = Right $ fromIntegral a
-castScalarToInt (ScalarUShort a) = Right $ fromIntegral a
-castScalarToInt (ScalarInt a)    = Right $ fromIntegral a
-castScalarToInt (ScalarUInt a)   = Right $ fromIntegral a
-castScalarToInt (ScalarFloat a)  = Left "castScalarToInt failed"
-castScalarToInt (ScalarDouble a) = Left "castScalarToInt failed"
+castScalarFromIntegral :: (Integral a) => Scalar -> Either String a
+castScalarFromIntegral (ScalarChar a)   = Right $ fromIntegral a
+castScalarFromIntegral (ScalarUChar a)  = Right $ fromIntegral a
+castScalarFromIntegral (ScalarShort a)  = Right $ fromIntegral a
+castScalarFromIntegral (ScalarUShort a) = Right $ fromIntegral a
+castScalarFromIntegral (ScalarInt a)    = Right $ fromIntegral a
+castScalarFromIntegral (ScalarUInt a)   = Right $ fromIntegral a
+castScalarFromIntegral (ScalarFloat a)  = Left "castScalarToInt failed"
+castScalarFromIntegral (ScalarDouble a) = Left "castScalarToInt failed"
 
-parseAsciiToIntegral :: (Integral a) => (a -> Scalar) -> ByteString -> Either String (Scalar, ByteString)
-parseAsciiToIntegral f bs = do
-    (a, rest) <- maybe (Left "readInt failed") return (BS.readInt bs)
-    return (f (fromIntegral a), BS.dropWhile Char.isSpace rest)
-
-parseAsciiRead :: (Read a) => (a -> Scalar) -> ByteString -> Either String (Scalar, ByteString)
-parseAsciiRead f bs = do
-    let (token, rest) = BS.break Char.isSpace bs
-    a <- readEither . BS.unpack $ token
-    return (f a, BS.dropWhile Char.isSpace rest)
-
-parsePLYHeader :: ByteString -> Either String (PLYHeader, ByteString)
-parsePLYHeader bs = do
+headerParser :: Parser PLYHeader
+headerParser = do
+    bs <- State.get
     let (hbs, rest) = BS.breakSubstring headerEnd bs
     when (rest == BS.empty) $
-        Left "\"end_header\" not found"
+        lift (Left "\"end_header\" not found")
 
     let lines = removeComments . BS.split '\n' $ hbs
 
-    lines <-parseStart lines
-    (format, lines) <- parseFormat lines
-    ehs <- parseElementHeaders lines
+    lines <-lift $ parseStart lines
+    (format, lines) <- lift $ parseFormat lines
+    ehs <- lift $ parseElementHeaders lines
 
-    let header = PLYHeader format ehs
+    State.put $ fromMaybe rest (BS.stripPrefix headerEnd rest)
 
-    return (header, fromMaybe rest $ BS.stripPrefix headerEnd rest)
+    return $ PLYHeader format (Vector.fromList ehs)
 
     where
     headerEnd = "\nend_header\n"
@@ -229,7 +297,7 @@ parsePLYHeader bs = do
         properties <- mapM parseProperty propertyLines
 
         let name = ws !! 1
-            eh = ElementHeader name num properties
+            eh = ElementHeader name num (Vector.fromList properties)
         return (eh, rest)
 
     parseElementHeaders [] = return []
@@ -265,114 +333,133 @@ parsePLYHeader bs = do
     parseDataType "double" = return Double'
     parseDataType _        = Left "parse data type failed"
 
-parseScalar :: PLYFormat -> DataType -> ByteString -> Either String (Scalar, ByteString)
-parseScalar PLYFormatBinaryLE t bs = parseScalarLE t bs
-parseScalar PLYFormatBinaryBE t bs = parseScalarBE t bs
-parseScalar PLYFormatAscii t bs    = parseAscii t bs
+plyParser :: Parser PLY
+plyParser = do
+    header <- headerParser
+    let elems = phElementHeaders header
+        format = phFormat header
+    buffers <- Vector.mapM (elementBufferParser format) elems
+    return (PLY header buffers)
 
-parseScalarLE :: DataType -> ByteString -> Either String (Scalar, ByteString)
-parseScalarLE t bs =
-    Serialize.runGetState (getScalarLE t) bs 0
-
-parseScalarBE :: DataType -> ByteString -> Either String (Scalar, ByteString)
-parseScalarBE t bs =
-    Serialize.runGetState (getScalarBE t) bs 0
-
-parseList :: PLYFormat -> DataType -> DataType -> ByteString -> Either String ([Scalar], ByteString)
-parseList format dt st bs = do
-    (s, rest) <- parseScalar format st bs
-    n <- castScalarToInt s
-    foldlM parseListElem ([], rest) [1..n]
+elementBufferParser :: PLYFormat -> ElementHeader -> Parser Buffer
+elementBufferParser format eh =
+    Buffer <$> Vector.replicateM num (Vector.mapM (propertyParser format) properties)
     where
-    parseListElem (es, xs) _ = do
-        (e, xs') <- parseScalar format dt xs
-        return (es ++ [e], xs')
+    num = ehNum eh
+    properties = ehProperties eh
 
-parseVertex :: PLYFormat -> ByteString -> [ElementProperty] -> Either String (BasicVertex, ByteString)
-parseVertex format bs properties =
+propertyParser :: PLYFormat -> ElementProperty -> Parser Value
+propertyParser format (EPScalar (ScalarProperty _ t)) =
+    ValueS <$> scalarParser format t
+propertyParser format (EPList (ListProperty _ st dt)) =
+    ValueL <$> scalarListParser format st dt
+
+loadPLYFile :: FilePath -> IO PLY
+loadPLYFile path = do
+    bs <- BS.readFile path
+    either (throwIO . userError) return $ evalStateT plyParser bs
+
+loadGeometryFromPLYFile :: FilePath -> Scene -> IO Geometry
+loadGeometryFromPLYFile path scene = do
+    ply <- loadPLYFile path
+    createGeometryFromPLY ply scene
+
+createGeometryFromPLY :: PLY -> Scene -> IO Geometry
+createGeometryFromPLY (PLY (PLYHeader _ ehs) buffers) scene = do
+    vertexElemIndex <- maybe (throwIO . userError $ "vertex element not found") return
+        $ Vector.findIndex ((== "vertex") . ehName) ehs
+    let Buffer vertexBuffer = buffers Vector.! vertexElemIndex
+        vertexHeader = ehs Vector.! vertexElemIndex
+
+    vs <- either (throwIO . userError) return $
+        SV.generateM (Vector.length vertexBuffer) (\i -> toBasicVertex (ehProperties vertexHeader) (vertexBuffer Vector.! i))
+
+    geo <- addVerticesToGeometry newGeometry vs GL.GL_STATIC_READ scene
+
+    let indexElemIndex = Vector.findIndex (\a -> ehName a == "face") ehs
+
+    onJust indexElemIndex (return geo) $ \i -> do
+        let Buffer indexBuffer = buffers Vector.! i
+            indexHeader = ehs Vector.! i
+            xs = Vector.map (toIndices (ehProperties indexHeader)) indexBuffer
+            indices = Vector.concatMap id xs
+            indices' = SV.generate (Vector.length indices) (indices Vector.!)
+
+        ibuffer <- addIndexBufferUInt scene indices'
+        return $ setIndexBuffer geo ibuffer
+
+    where
+    onJust (Just a) _ f = f a
+    onJust  _ b _       = b
+
+toBasicVertex :: Vector ElementProperty -> Vector Value -> Either String BasicVertex
+toBasicVertex properties vs =
     let vertex = BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0 0) (V4 0 0 0 255)
-    in foldlM (handleVertexProperty format) (vertex, bs) properties
+    in Vector.foldM' handleVertexProperty vertex (Vector.zip properties vs)
 
-fromScalar' :: (FromScalar a) => (Scalar, ByteString) -> Either String (a, ByteString)
-fromScalar' (s, bs) = do
-    a <- fromScalar s
-    return (a, bs)
-
-handleVertexProperty :: PLYFormat -> (BasicVertex, ByteString) -> ElementProperty -> Either String (BasicVertex, ByteString)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "x" dataType)) = do
-    (p0, rest) <- fromScalar' =<< parseScalar format dataType bs
+handleVertexProperty :: BasicVertex -> (ElementProperty, Value) -> Either String BasicVertex
+handleVertexProperty v (EPScalar (ScalarProperty "x" dataType), ValueS a) = do
+    p0 <- fromScalar a
     let V3 _ p1 p2 = bvPosition v
         v' = v { bvPosition = V3 p0 p1 p2 }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "y" dataType)) = do
-    (p1, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "y" dataType), ValueS a) = do
+    p1 <- fromScalar a
     let V3 p0 _ p2 = bvPosition v
         v' = v { bvPosition = V3 p0 p1 p2 }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "z" dataType)) = do
-    (p2, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "z" dataType), ValueS a) = do
+    p2 <- fromScalar a
     let V3 p0 p1 _ = bvPosition v
         v' = v { bvPosition = V3 p0 p1 p2 }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "nx" dataType)) = do
-    (n0, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "nx" dataType), ValueS a) = do
+    n0 <- fromScalar a
     let V3 _ n1 n2 = bvNormal v
         v' = v { bvNormal = V3 n0 n1 n2 }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "ny" dataType)) = do
-    (n1, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "ny" dataType), ValueS a) = do
+    n1 <- fromScalar a
     let V3 n0 _ n2 = bvNormal v
         v' = v { bvNormal = V3 n0 n1 n2 }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "nz" dataType)) = do
-    (n2, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "nz" dataType), ValueS a) = do
+    n2 <- fromScalar a
     let V3 n0 n1 _ = bvNormal v
         v' = v { bvNormal = V3 n0 n1 n2 }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "s" dataType)) = do
-    (s, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "s" dataType), ValueS a) = do
+    s <- fromScalar a
     let V2 _ t = bvUv v
         v' = v { bvUv = V2 s t }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "t" dataType)) = do
-    (t, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "t" dataType), ValueS a) = do
+    t <- fromScalar a
     let V2 s _ = bvUv v
         v' = v { bvUv = V2 s t }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "red" dataType)) = do
-    (r, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "red" dataType), ValueS a) = do
+    r <- fromScalar a
     let V4 _ g b a = bvColor v
         v' = v { bvColor = V4 r g b a }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "green" dataType)) = do
-    (g, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "green" dataType), ValueS a) = do
+    g <- fromScalar a
     let V4 r _ b a = bvColor v
         v' = v { bvColor = V4 r g b a }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty "blue" dataType)) = do
-    (b, rest) <- fromScalar' =<< parseScalar format dataType bs
+    return v'
+handleVertexProperty v (EPScalar (ScalarProperty "blue" dataType), ValueS a) = do
+    b <- fromScalar a
     let V4 r g _ a = bvColor v
         v' = v { bvColor = V4 r g b a }
-    return (v', rest)
-handleVertexProperty format (v, bs) (EPScalar (ScalarProperty _ dataType)) = do
-    (_, rest) <- parseScalar format dataType bs
-    return (v, rest)
-handleVertexProperty format (v, bs) (EPList (ListProperty _ st dt)) = do
-    (_, rest) <- parseList format st dt bs
-    return (v, rest)
+    return v'
+handleVertexProperty v _ = return v
 
-parseVertexIndices :: PLYFormat -> ByteString -> [ElementProperty] -> Either String ([Int], ByteString)
-parseVertexIndices format bs =
-    foldlM (handleVertexIndicesProperty format) ([], bs)
+toIndices :: Vector ElementProperty -> Vector Value -> Vector Word32
+toIndices properties vs = Vector.foldl' handleVertexIndicesProperty mempty (Vector.zip properties vs)
 
-handleVertexIndicesProperty :: PLYFormat -> ([Int], ByteString) -> ElementProperty -> Either String ([Int], ByteString)
-handleVertexIndicesProperty format (xs, bs) (EPList (ListProperty "vertex_indices" st dt)) = do
-    (ys, rest) <- parseList format st dt bs
-    ys' <- mapM castScalarToInt ys
-    return (xs ++ ys', rest)
-handleVertexIndicesProperty format (xs, bs) (EPList (ListProperty _ st dt)) = do
-    (_, rest) <- parseList format st dt bs
-    return (xs, rest)
-handleVertexIndicesProperty format (xs, bs) (EPScalar (ScalarProperty _ dataType)) = do
-    (_, rest) <- parseScalar format dataType bs
-    return (xs, rest)
+handleVertexIndicesProperty :: Vector Word32 -> (ElementProperty, Value) -> Vector Word32
+handleVertexIndicesProperty indices (EPList (ListProperty "vertex_indices" _ _), ValueL xs) =
+    let r = Vector.mapM castScalarFromIntegral xs
+    in either (const indices) id r
+handleVertexIndicesProperty indices _ = indices
