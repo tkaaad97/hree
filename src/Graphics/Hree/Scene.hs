@@ -8,6 +8,9 @@ module Graphics.Hree.Scene
     , addBuffer
     , addMesh
     , deleteScene
+    , addIndexBufferUByte
+    , addIndexBufferUShort
+    , addIndexBufferUInt
     , addSampler
     , addTexture
     , newScene
@@ -42,7 +45,7 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Mutable as MBV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
-import Data.Word (Word8)
+import Data.Word (Word16, Word32, Word8)
 import Foreign (Ptr, Storable)
 import qualified Foreign (castPtr, copyArray, nullPtr, with, withArray)
 import qualified GLW
@@ -232,6 +235,21 @@ addBuffer scene bufferSource = do
     addBufferFunc buffer state =
         let buffers = buffer : ssBuffers state
         in (state { ssBuffers = buffers }, buffer)
+
+addIndexBufferUByte :: Scene -> SV.Vector Word8 -> IO IndexBuffer
+addIndexBufferUByte scene v = do
+    buffer <- addBuffer scene (BufferSource v GL.GL_UNSIGNED_BYTE)
+    return (IndexBuffer buffer GL.GL_UNSIGNED_BYTE (fromIntegral . SV.length $ v))
+
+addIndexBufferUShort :: Scene -> SV.Vector Word16 -> IO IndexBuffer
+addIndexBufferUShort scene v = do
+    buffer <- addBuffer scene (BufferSource v GL.GL_UNSIGNED_SHORT)
+    return (IndexBuffer buffer GL.GL_UNSIGNED_SHORT (fromIntegral . SV.length $ v))
+
+addIndexBufferUInt :: Scene -> SV.Vector Word32 -> IO IndexBuffer
+addIndexBufferUInt scene v = do
+    buffer <- addBuffer scene (BufferSource v GL.GL_UNSIGNED_INT)
+    return (IndexBuffer buffer GL.GL_UNSIGNED_INT (fromIntegral . SV.length $ v))
 
 addTexture :: Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D)
 addTexture scene name settings source =
