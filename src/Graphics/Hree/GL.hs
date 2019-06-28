@@ -81,7 +81,7 @@ updateBuffer buffer (BufferSource vec usage) = do
         size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
     V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
 
-mkVertexArray :: Map ByteString AttribBinding -> IntMap (GLW.Buffer, BindBufferSetting) -> Maybe GLW.Buffer -> ProgramInfo -> IO GLW.VertexArray
+mkVertexArray :: Map ByteString AttribBinding -> IntMap (GLW.Buffer, BindBufferSetting) -> Maybe IndexBuffer -> ProgramInfo -> IO GLW.VertexArray
 mkVertexArray attribBindings buffers indexBuffer programInfo = do
     GLW.glUseProgram program
     vao <- GLW.createObject (Proxy :: Proxy GLW.VertexArray)
@@ -111,7 +111,7 @@ mkVertexArray attribBindings buffers indexBuffer programInfo = do
             GLW.glVertexArrayBindingDivisor vao bi (fromIntegral divisor)
 
     setIndexBuffer vao (Just b) =
-        GLW.glVertexArrayElementBuffer vao b
+        GLW.glVertexArrayElementBuffer vao (ibBuffer b)
 
     setIndexBuffer _ Nothing = return ()
 

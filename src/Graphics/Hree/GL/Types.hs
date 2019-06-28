@@ -11,6 +11,7 @@ module Graphics.Hree.GL.Types
     , BufferSource(..)
     , BindBufferSetting(..)
     , DrawMethod(..)
+    , IndexBuffer(..)
     , ProgramInfo(..)
     , RenderInfo(..)
     , Uniform(..)
@@ -92,4 +93,10 @@ data AttribBinding = AttribBinding
 
 newtype Texture = Texture
     { unTexture :: (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler)
+    } deriving (Show, Eq)
+
+data IndexBuffer = IndexBuffer
+    { ibBuffer   :: !GLW.Buffer
+    , ibDataType :: !GL.GLenum
+    , ibCount    :: !GL.GLsizei
     } deriving (Show, Eq)

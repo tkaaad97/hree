@@ -127,12 +127,12 @@ resolveDrawMethod mesh =
     where
     resolve indicesCount Nothing Nothing =
         DrawArrays PrimitiveType.glTriangles 0 indicesCount
-    resolve indicesCount (Just _) Nothing =
-        DrawElements PrimitiveType.glTriangles indicesCount GL.GL_UNSIGNED_INT Foreign.nullPtr
+    resolve _ (Just (IndexBuffer _ dt indicesCount)) Nothing =
+        DrawElements PrimitiveType.glTriangles indicesCount dt Foreign.nullPtr
     resolve indicesCount Nothing (Just instanceCount) =
         DrawArraysInstanced PrimitiveType.glTriangles 0 indicesCount instanceCount
-    resolve indicesCount (Just _) (Just instanceCount) =
-        DrawElementsInstanced PrimitiveType.glTriangles indicesCount GL.GL_UNSIGNED_INT Foreign.nullPtr instanceCount
+    resolve _ (Just (IndexBuffer _ dt indicesCount)) (Just instanceCount) =
+        DrawElementsInstanced PrimitiveType.glTriangles indicesCount dt Foreign.nullPtr instanceCount
 
 meshIdToEntity :: MeshId -> Component.Entity
 meshIdToEntity = Component.Entity . unMeshId
@@ -157,7 +157,7 @@ addMesh scene mesh = do
             meshId = MeshId meshIdVal
             meshCounter = meshIdVal + 1
             bos = map fst . IntMap.elems $ buffers
-            bos' = maybe bos (: bos) maybeIndexBuffer
+            bos' = maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
             nubBufferIds = List.nub . map (fromIntegral . GLW.unBuffer) $ bos'
             minfo = MeshInfo meshId mesh bos' program vao
             programs = if programAdded

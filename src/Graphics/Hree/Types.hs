@@ -28,7 +28,7 @@ import Graphics.Hree.Program
 data Geometry = Geometry
     { geometryAttribBindings :: !(Map ByteString AttribBinding)
     , geometryBuffers        :: !(IntMap (GLW.Buffer, BindBufferSetting))
-    , geometryIndexBuffer    :: !(Maybe GLW.Buffer)
+    , geometryIndexBuffer    :: !(Maybe IndexBuffer)
     } deriving (Show)
 
 data Material = Material

@@ -5,6 +5,7 @@ module Graphics.Hree.Geometry
     , addVerticesToGeometry
     , newGeometry
     , newSpriteGeometry
+    , setIndexBuffer
     ) where
 
 import Data.ByteString (ByteString)
@@ -48,6 +49,9 @@ addVerticesToGeometry geometry storage usage scene = do
     toAttribBinding (VertexField name format) = AttribBinding (GLW.BindingIndex . fromIntegral $ bindingIndex) format
     newAttribBindings = Map.fromList $ zip keys bindings
     attribBindings' = Map.union attribBindings newAttribBindings
+
+setIndexBuffer :: Geometry -> IndexBuffer -> Geometry
+setIndexBuffer geo indexBuffer = geo { geometryIndexBuffer = Just indexBuffer }
 
 newSpriteGeometry :: Scene -> IO (Geometry, Vector SpriteOffset)
 newSpriteGeometry scene = do
