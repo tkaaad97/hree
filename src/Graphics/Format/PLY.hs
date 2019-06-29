@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 module Graphics.Format.PLY
     ( createGeometryFromPLY
-    , loadGeometryFromPLYFile
+    , loadGeometryFromFile
     , loadPLYFile
     ) where
 
@@ -359,8 +359,8 @@ loadPLYFile path = do
     bs <- BS.readFile path
     either (throwIO . userError) return $ evalStateT plyParser bs
 
-loadGeometryFromPLYFile :: FilePath -> Scene -> IO Geometry
-loadGeometryFromPLYFile path scene = do
+loadGeometryFromFile :: FilePath -> Scene -> IO Geometry
+loadGeometryFromFile path scene = do
     ply <- loadPLYFile path
     createGeometryFromPLY ply scene
 

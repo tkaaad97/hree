@@ -26,6 +26,7 @@ dependencies:
 - bytestring
 - cereal
 - containers
+- filepath
 - file-embed
 - gl
 - gl-wrapper
@@ -99,18 +100,6 @@ executables:
   sprite-instanced-1:
     main:                Main.hs
     source-dirs:         examples/sprite-instanced-1
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - examples-common
-    - hree
-    - GLFW-b
-
-  format-stl-1:
-    main:                Main.hs
-    source-dirs:         examples/format-stl-1
     ghc-options:
     - -threaded
     - -rtsopts

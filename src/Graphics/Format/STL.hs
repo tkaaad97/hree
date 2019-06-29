@@ -2,7 +2,7 @@ module Graphics.Format.STL
     ( Triangle(..)
     , STL(..)
     , createGeometryFromSTL
-    , loadGeometryFromSTLFile
+    , loadGeometryFromFile
     ) where
 
 import Data.Binary (Binary(..), Get(..))
@@ -104,8 +104,8 @@ createGeometryFromSTL stl scene = do
             normal = triangleNormal triangle
         in BasicVertex position normal (V2 0 0) (V4 255 255 255 255)
 
-loadGeometryFromSTLFile :: FilePath -> Scene -> IO (Geometry, SV.Vector BasicVertex)
-loadGeometryFromSTLFile path scene = do
+loadGeometryFromFile :: FilePath -> Scene -> IO Geometry
+loadGeometryFromFile path scene = do
     bs <- ByteString.readFile path
     let stl = Binary.decode bs
-    createGeometryFromSTL stl scene
+    fst <$> createGeometryFromSTL stl scene
