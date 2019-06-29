@@ -394,7 +394,7 @@ createGeometryFromPLY (PLY (PLYHeader _ ehs) buffers) scene = do
 
 toBasicVertex :: Vector ElementProperty -> Vector Value -> Either String BasicVertex
 toBasicVertex properties vs =
-    let vertex = BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0 0) (V4 0 0 0 255)
+    let vertex = BasicVertex (V3 0 0 0) (V3 0 0 0) (V2 0 0) (V4 255 255 255 255)
     in Vector.foldM' handleVertexProperty vertex (Vector.zip properties vs)
 
 handleVertexProperty :: BasicVertex -> (ElementProperty, Value) -> Either String BasicVertex
@@ -460,6 +460,17 @@ toIndices properties vs = Vector.foldl' handleVertexIndicesProperty mempty (Vect
 
 handleVertexIndicesProperty :: Vector Word32 -> (ElementProperty, Value) -> Vector Word32
 handleVertexIndicesProperty indices (EPList (ListProperty "vertex_indices" _ _), ValueL xs) =
-    let r = Vector.mapM castScalarFromIntegral xs
+    let xs' = case Vector.length xs of
+                3 -> xs
+                4 -> Vector.fromList
+                    [ xs Vector.! 0
+                    , xs Vector.! 1
+                    , xs Vector.! 2
+                    , xs Vector.! 2
+                    , xs Vector.! 3
+                    , xs Vector.! 0
+                    ]
+                _ -> mempty
+        r = Vector.mapM castScalarFromIntegral xs'
     in either (const indices) id r
 handleVertexIndicesProperty indices _ = indices
