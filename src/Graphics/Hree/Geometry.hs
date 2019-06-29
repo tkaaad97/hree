@@ -26,7 +26,7 @@ import Graphics.Hree.Types
 import Linear (V2(..), V3(..))
 
 newGeometry :: Geometry
-newGeometry = Geometry Map.empty IntMap.empty Nothing
+newGeometry = Geometry Map.empty IntMap.empty Nothing 0
 
 addAttribBindings :: Geometry -> Int -> Map ByteString AttribBinding -> (GLW.Buffer, BindBufferSetting) -> Geometry
 addAttribBindings geo bindingIndex xs b = geo'
@@ -39,9 +39,10 @@ addVerticesToGeometry :: forall a. (Storable a, Vertex a) => Geometry -> Vector 
 addVerticesToGeometry geometry storage usage scene = do
     buffer <- addBuffer scene (BufferSource storage usage)
     let buffers' = IntMap.insert bindingIndex (buffer, bbs) buffers
-    return (Geometry attribBindings' buffers' indexBuffer)
+    return (Geometry attribBindings' buffers' indexBuffer count)
     where
-    Geometry attribBindings buffers indexBuffer = geometry
+    Geometry attribBindings buffers indexBuffer c = geometry
+    count = if c == 0 then Vector.length storage else c
     bindingIndex = maybe 0 (+ 1) . fmap fst . IntMap.lookupMax $ buffers
     VertexSpec bbs fields = vertexSpec (Proxy :: Proxy a)
     keys = map vertexFieldAttribName fields

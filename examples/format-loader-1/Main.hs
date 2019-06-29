@@ -26,8 +26,8 @@ import System.Environment (getArgs)
 main :: IO ()
 main = do
     args <- getArgs
-    let path = if null args then "examples/format-stl-1/monkey.stl" else head args
-    withWindow width height "format-stl-1" (init path) onDisplay
+    let path = if null args then "examples/modles/stl/binary/monkey.stl" else head args
+    withWindow width height "format-loader-1" (init path) onDisplay
 
     where
     width  = 640
@@ -42,10 +42,12 @@ main = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
         scene <- newScene
-        (geometry, vs) <- STL.loadGeometryFromSTLFile path scene
+        geometry <- case extension of
+                        "stl" -> STL.loadGeometryFromSTLFile path scene
+                        "ply" -> PLY.loadGeometryFromPLYFile path scene
         let material = Material.basicMaterial Nothing
             material' = Material.setDirectionalLight material (V3 0.5 (-1) (-0.5))
-            mesh = Mesh geometry material' (Vector.length vs) Nothing
+            mesh = Mesh geometry material' Nothing
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

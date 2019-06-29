@@ -42,7 +42,7 @@ main = do
     init w = do
         scene <- newScene
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry vs GL.GL_STREAM_DRAW scene
-        let mesh = Mesh geometry material 6 Nothing
+        let mesh = Mesh geometry material Nothing
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

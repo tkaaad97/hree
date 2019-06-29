@@ -48,11 +48,11 @@ main = do
         GL.glBlendFunc GL.GL_SRC_ALPHA GL.GL_ONE_MINUS_SRC_ALPHA
         scene <- newScene
 
-        (geo, offsets) <- Geometry.newSpriteGeometry scene
+        (geo, _) <- Geometry.newSpriteGeometry scene
         geo' <- Geometry.addVerticesToGeometry geo spriteVertices GL.GL_STATIC_READ scene
         texture <- mkTexture scene
         let material = Material.spriteMaterial texture
-            mesh = Mesh geo' material (Vector.length offsets) (Just . Vector.length $ spriteVertices)
+            mesh = Mesh geo' material (Just . Vector.length $ spriteVertices)
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

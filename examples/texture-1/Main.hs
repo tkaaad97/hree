@@ -48,7 +48,7 @@ main = do
         texture <- mkTexture scene
         let material = Material.basicMaterial (Just texture)
             material' = Material.setDirectionalLight material (V3 0 0 (-1))
-            mesh = Mesh geometry material' 6 Nothing
+            mesh = Mesh geometry material' Nothing
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

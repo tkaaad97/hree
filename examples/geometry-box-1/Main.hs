@@ -48,12 +48,12 @@ main = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
         scene <- newScene
-        (geometry, ps) <- createBoxGeometry 0.5 0.5 0.5 scene
+        (geometry, _) <- createBoxGeometry 0.5 0.5 0.5 scene
         geometry' <- Geometry.addVerticesToGeometry geometry vs GL.GL_STATIC_READ scene
         texture <- mkTexture scene
         let material = Material.basicMaterial (Just texture)
             material' = Material.setDirectionalLight material (V3 0.5 (-1) (-1))
-            mesh = Mesh geometry' material' (Vector.length ps) Nothing
+            mesh = Mesh geometry' material' Nothing
         addMesh scene mesh
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

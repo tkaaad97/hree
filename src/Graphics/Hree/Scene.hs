@@ -19,7 +19,6 @@ module Graphics.Hree.Scene
     , translateMesh
     , rotateMesh
     , applyTransformToMesh
-    , updateMeshIndicesCount
     ) where
 
 import Control.Exception (bracketOnError, throwIO)
@@ -122,7 +121,7 @@ toRenderInfo defaultTexture transformStore matrixStore m = do
 
 resolveDrawMethod :: Mesh -> DrawMethod
 resolveDrawMethod mesh =
-    let indicesCount = fromIntegral . meshIndicesCount $ mesh
+    let indicesCount = fromIntegral . geometryVerticesCount . meshGeometry $ mesh
         indexBuffer = geometryIndexBuffer . meshGeometry $ mesh
         instanceCount = fromIntegral <$> meshInstanceCount mesh
     in resolve indicesCount indexBuffer instanceCount
@@ -210,14 +209,6 @@ applyTransformToMesh scene meshId f =
     where
     entity = meshIdToEntity meshId
     transformStore = sceneMeshTransformStore scene
-
-updateMeshIndicesCount :: Scene -> MeshId -> Int -> IO ()
-updateMeshIndicesCount scene meshId c =
-    void $ Component.modifyComponent entity f meshStore
-    where
-    f m = m { meshInfoMesh = (meshInfoMesh m) { meshIndicesCount = c } }
-    entity = meshIdToEntity meshId
-    meshStore = sceneMeshStore scene
 
 updateMeshInstanceCount :: Scene -> MeshId -> Maybe Int -> IO ()
 updateMeshInstanceCount scene meshId c =
