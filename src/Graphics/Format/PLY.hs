@@ -10,7 +10,8 @@ module Graphics.Format.PLY
     ) where
 
 import Control.Exception (throwIO)
-import Control.Monad (when)
+import Control.Monad (unless, when)
+import Control.Monad.ST (ST, runST)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict (StateT(..), evalStateT)
 import qualified Control.Monad.Trans.State.Strict as State (get, put)
@@ -28,15 +29,19 @@ import qualified Data.Char as Char (isSpace)
 import Data.Foldable (foldlM)
 import Data.Int
 import qualified Data.List as List (filter, span)
-import Data.Maybe (fromMaybe, maybe)
+import Data.Maybe (fromMaybe, isJust, maybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Serialize as Serialize
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector (concatMap, findIndex, foldM', foldl',
-                                        fromList, length, map, mapM, replicateM,
-                                        zip, (!))
-import qualified Data.Vector.Storable as SV (Vector, generate, generateM)
+import qualified Data.Vector as Vector (concatMap, find, findIndex, foldM',
+                                        foldl', fromList, length, map, mapM,
+                                        replicateM, zip, (!))
+import qualified Data.Vector.Storable as SV (Vector, freeze, generate,
+                                             generateM, length, (!))
+import qualified Data.Vector.Storable.Mutable as MSV (STVector, new, write)
+import qualified Data.Vector.Unboxed as UV (generate, mapM_)
 import Data.Word
+import Debug.Trace (traceShowId)
 import Foreign (sizeOf)
 import qualified Graphics.GL as GL
 import Graphics.Hree.Geometry (addVerticesToGeometry, newGeometry,
@@ -44,7 +49,8 @@ import Graphics.Hree.Geometry (addVerticesToGeometry, newGeometry,
 import Graphics.Hree.GL.Vertex (BasicVertex(..))
 import Graphics.Hree.Scene (addIndexBufferUInt)
 import Graphics.Hree.Types (Geometry, Scene)
-import Linear (V2(..), V3(..), V4(..))
+import Linear (Additive(..), V2(..), V3(..), V4(..))
+import qualified Linear (cross, normalize)
 import Text.Read (readEither)
 
 type Parser = StateT ByteString (Either String)
@@ -370,27 +376,39 @@ createGeometryFromPLY (PLY (PLYHeader _ ehs) buffers) scene = do
         $ Vector.findIndex ((== "vertex") . ehName) ehs
     let Buffer vertexBuffer = buffers Vector.! vertexElemIndex
         vertexHeader = ehs Vector.! vertexElemIndex
+        vprops = ehProperties vertexHeader
 
     vs <- either (throwIO . userError) return $
-        SV.generateM (Vector.length vertexBuffer) (\i -> toBasicVertex (ehProperties vertexHeader) (vertexBuffer Vector.! i))
+        SV.generateM (Vector.length vertexBuffer) (\i -> toBasicVertex vprops (vertexBuffer Vector.! i))
 
-    geo <- addVerticesToGeometry newGeometry vs GL.GL_STATIC_READ scene
+    let faceElemIndex = Vector.findIndex ((== "face") . ehName) ehs
+        maybeIndices = flip fmap faceElemIndex $ \i ->
+            let Buffer indexBuffer = buffers Vector.! i
+                indexHeader = ehs Vector.! i
+                xs = Vector.map (toIndices (ehProperties indexHeader)) indexBuffer
+                indices = Vector.concatMap id xs
+            in SV.generate (Vector.length indices) (indices Vector.!)
 
-    let indexElemIndex = Vector.findIndex (\a -> ehName a == "face") ehs
+    let (vs', maybeIndices') =
+            if not (hasNormalProps vprops)
+                then onJust maybeIndices (vs, maybeIndices) $ calculateNormals vs
+                else (vs, maybeIndices)
 
-    onJust indexElemIndex (return geo) $ \i -> do
-        let Buffer indexBuffer = buffers Vector.! i
-            indexHeader = ehs Vector.! i
-            xs = Vector.map (toIndices (ehProperties indexHeader)) indexBuffer
-            indices = Vector.concatMap id xs
-            indices' = SV.generate (Vector.length indices) (indices Vector.!)
+    geo <- addVerticesToGeometry newGeometry vs' GL.GL_STATIC_READ scene
 
-        ibuffer <- addIndexBufferUInt scene indices'
-        return $ setIndexBuffer geo ibuffer
+    onJust maybeIndices' (return geo) $
+        fmap (setIndexBuffer geo) . addIndexBufferUInt scene
 
     where
     onJust (Just a) _ f = f a
     onJust  _ b _       = b
+
+    isNormalProperty name (EPScalar (ScalarProperty n Float')) | n == name = True
+                                                               | otherwise = False
+    isNormalProperty _ _ = False
+
+    hasNormalProps props =
+        isJust (Vector.find (isNormalProperty "nx") props) && isJust (Vector.find (isNormalProperty "ny") props) && isJust (Vector.find (isNormalProperty "nz") props)
 
 toBasicVertex :: Vector ElementProperty -> Vector Value -> Either String BasicVertex
 toBasicVertex properties vs =
@@ -474,3 +492,32 @@ handleVertexIndicesProperty indices (EPList (ListProperty "vertex_indices" _ _),
         r = Vector.mapM castScalarFromIntegral xs'
     in either (const indices) id r
 handleVertexIndicesProperty indices _ = indices
+
+calculateNormals :: SV.Vector BasicVertex -> SV.Vector Word32 -> (SV.Vector BasicVertex, Maybe (SV.Vector Word32))
+calculateNormals vertices indices = (go, Nothing)
+    where
+    inum = SV.length indices
+    faces = UV.generate (inum `div` 3) (* 3)
+    go = runST $ do
+        vs <- MSV.new inum
+        UV.mapM_ (calcNormals vs) faces
+        SV.freeze vs
+
+    calcNormals :: MSV.STVector s BasicVertex -> Int -> ST s ()
+    calcNormals vs face = do
+        let i0 = indices SV.! face
+            i1 = indices SV.! (face + 1)
+            i2 = indices SV.! (face + 2)
+            a0 = vertices SV.! fromIntegral i0
+            a1 = vertices SV.! fromIntegral i1
+            a2 = vertices SV.! fromIntegral i2
+            p0 = bvPosition a0
+            p1 = bvPosition a1
+            p2 = bvPosition a2
+            v0 = p1 ^-^ p0
+            v1 = p2 ^-^ p0
+            n = Linear.normalize $ Linear.cross v0 v1
+
+        MSV.write vs face a0 { bvNormal = n }
+        MSV.write vs (face + 1) a1 { bvNormal = n }
+        MSV.write vs (face + 2) a2 { bvNormal = n }
