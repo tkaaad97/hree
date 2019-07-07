@@ -15,9 +15,9 @@ import Graphics.Hree.Geometry.Box
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
 import qualified Graphics.Hree.Material as Material
-import Graphics.Hree.Mesh (Mesh(..))
 import Graphics.Hree.Scene
 import qualified Graphics.Hree.Texture as Texture
+import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
 
@@ -54,7 +54,8 @@ main = do
         let material = Material.basicMaterial (Just texture)
             material' = Material.setDirectionalLight material (V3 0.5 (-1) (-1))
             mesh = Mesh geometry' material' Nothing
-        addMesh scene mesh
+        meshId <- addMesh scene mesh
+        addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 

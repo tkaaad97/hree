@@ -10,8 +10,8 @@ import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.Geometry.Box
 import Graphics.Hree.GL.Types
 import qualified Graphics.Hree.Material as Material
-import Graphics.Hree.Mesh (Mesh(..))
 import Graphics.Hree.Scene
+import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
 
@@ -36,19 +36,20 @@ main = do
         let material = Material.flatColorMaterial (V4 0.2 0.4 0.6 1)
             mesh = Mesh geometry material Nothing
         meshId <- addMesh scene mesh
+        nodeId <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
-        return (scene, camera, meshId)
+        return (scene, camera, nodeId)
 
     deltaAngle = pi / 300
 
-    onDisplay (s, c, m) w = do
+    onDisplay (s, c, n) w = do
         render
         GLFW.pollEvents
-        rotateMesh s m (V3 0 0 1) deltaAngle
-        onDisplay (s, c, m) w
+        rotateNode s n (V3 0 0 1) deltaAngle
+        onDisplay (s, c, n) w
 
         where
         render = do

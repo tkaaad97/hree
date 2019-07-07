@@ -4,6 +4,7 @@ module Graphics.Hree.Math
     , Vec4
     , Mat4
     , ColorW8
+    , Quaternion
     , Transform(..)
     , transformMatrix
     , zeroTransform

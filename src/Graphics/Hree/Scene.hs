@@ -7,23 +7,28 @@ module Graphics.Hree.Scene
     , SceneState(..)
     , addBuffer
     , addMesh
+    , addNode
     , deleteScene
     , addIndexBufferUByte
     , addIndexBufferUShort
     , addIndexBufferUInt
     , addSampler
     , addTexture
+    , newNode
     , newScene
     , removeMesh
+    , removeNode
     , renderScene
-    , translateMesh
-    , rotateMesh
+    , translateNode
+    , rotateNode
     , updateMeshInstanceCount
-    , applyTransformToMesh
+    , applyTransformToNode
     ) where
 
 import Control.Exception (bracketOnError, throwIO)
 import Control.Monad (void, when)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Maybe (MaybeT(..))
 import Data.Bits ((.|.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (index, length)
@@ -68,40 +73,50 @@ renderScene scene camera = do
     GLW.glClearColor 1 1 1 1
     GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
     state <- readIORef . sceneState $ scene
-    let defaultTexture = ssDefaultTexture state
-        meshStore = sceneMeshStore scene
-        transformStore = sceneMeshTransformStore scene
-        matrixStore = sceneMeshTransformMatrixStore scene
-    renderMeshes [("projectionViewMatrix", Uniform projectionViewMatrix)] defaultTexture meshStore transformStore matrixStore
+    renderNodes [("projectionViewMatrix", Uniform projectionViewMatrix)] scene state
 
-renderMeshes :: [(ByteString, Uniform)] -> Maybe Texture -> Component.ComponentStore BV.MVector MeshInfo -> Component.ComponentStore SV.MVector Transform -> Component.ComponentStore SV.MVector Mat4 ->  IO ()
-renderMeshes uniforms defaultTexture meshStore transformStore matrixStore = do
-    meshes <- Component.getComponentSlice meshStore
-    rs <- BV.mapM (toRenderInfo defaultTexture transformStore matrixStore) =<< BV.freeze meshes
+renderNodes :: [(ByteString, Uniform)] -> Scene -> SceneState -> IO ()
+renderNodes uniforms scene state = do
+    let nodeIds = ssRootNodes state
+    rs <- BV.concatMap id <$> BV.mapM (nodeToRenderInfos scene state) nodeIds
     renderMany uniforms rs
 
-toRenderInfo :: Maybe Texture -> Component.ComponentStore SV.MVector Transform -> Component.ComponentStore SV.MVector Mat4 -> MeshInfo -> IO RenderInfo
-toRenderInfo defaultTexture transformStore matrixStore m = do
-    transform <- fromMaybe zeroTransform <$> Component.readComponent entity transformStore
-    matrix <- if transformUpdated transform
-                then do
-                    let matrix = transformMatrix transform
-                    _ <- Component.writeComponent entity matrix matrixStore
-                    return matrix
-                else fromMaybe Linear.identity <$> Component.readComponent entity matrixStore
+nodeToRenderInfos :: Scene -> SceneState -> NodeId -> IO (BV.Vector RenderInfo)
+nodeToRenderInfos scene state nodeId = fmap (fromMaybe BV.empty) . runMaybeT $ do
+    node <- MaybeT $ Component.readComponent nodeEntity nodeStore
+    meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
+    meshInfo <- MaybeT $ Component.readComponent (meshIdToEntity meshId) meshStore
+    transform <- MaybeT $ Component.readComponent nodeEntity transformStore
+    matrix <- lift $
+        if transformUpdated transform
+            then do
+                let matrix = transformMatrix transform
+                _ <- Component.writeComponent nodeEntity matrix matrixStore
+                return matrix
+            else fromMaybe Linear.identity <$> Component.readComponent nodeEntity matrixStore
+    let renderInfo = toRenderInfo defaultTexture meshInfo matrix
+    return . BV.singleton $ renderInfo
+    where
+    defaultTexture = ssDefaultTexture state
+    nodeEntity = nodeIdToEntity nodeId
+    meshStore = sceneMeshStore scene
+    nodeStore = sceneNodeStore scene
+    transformStore = sceneNodeTransformStore scene
+    matrixStore = sceneNodeTransformMatrixStore scene
+
+toRenderInfo :: Maybe Texture -> MeshInfo -> Mat4 -> RenderInfo
+toRenderInfo defaultTexture meshInfo matrix =
     let maybeUniform = toUniformEntry "modelMatrix" (Uniform matrix)
         uniforms = Map.elems $ Map.mapMaybeWithKey toUniformEntry (materialUniforms material)
         uniforms' = maybe uniforms (: uniforms) maybeUniform
         renderInfo = RenderInfo program dm vao uniforms' textures
-    return renderInfo
+    in renderInfo
     where
-    meshId = meshInfoId m
-    entity = meshIdToEntity meshId
-    mesh = meshInfoMesh m
+    mesh = meshInfoMesh meshInfo
     material = meshMaterial mesh
-    program = meshInfoProgram m
-    vao = meshInfoVertexArray m
-    dm = resolveDrawMethod . meshInfoMesh $ m
+    program = meshInfoProgram meshInfo
+    vao = meshInfoVertexArray meshInfo
+    dm = resolveDrawMethod mesh
     uniformInfos = programInfoUniforms program
     toUniformEntry uniformName uniform = do
         uniformInfo <- Map.lookup uniformName uniformInfos
@@ -131,6 +146,9 @@ resolveDrawMethod mesh =
 meshIdToEntity :: MeshId -> Component.Entity
 meshIdToEntity = Component.Entity . unMeshId
 
+nodeIdToEntity :: NodeId -> Component.Entity
+nodeIdToEntity = Component.Entity . unNodeId
+
 addMesh :: Scene -> Mesh -> IO MeshId
 addMesh scene mesh = do
     (program, programAdded) <- mkProgramIfNotExists scene pspec
@@ -140,15 +158,12 @@ addMesh scene mesh = do
     let meshId = meshInfoId minfo
         entity = meshIdToEntity meshId
     Component.addComponent entity minfo (sceneMeshStore scene)
-    Component.addComponent entity zeroTransform (sceneMeshTransformStore scene)
-    Component.addComponent entity Linear.identity (sceneMeshTransformMatrixStore scene)
     return meshId
 
     where
     addMeshFunc program programAdded vao state =
-        let meshIdVal = ssMeshCounter state
-            meshId = MeshId meshIdVal
-            meshCounter = meshIdVal + 1
+        let meshId = ssMeshCounter state
+            meshIdNext = meshId + 1
             bos = map fst . IntMap.elems $ buffers
             bos' = maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
             minfo = MeshInfo meshId mesh bos' program vao
@@ -156,7 +171,7 @@ addMesh scene mesh = do
                         then Map.insert pspec program (ssPrograms state)
                         else ssPrograms state
             newState = state
-                { ssMeshCounter = meshCounter
+                { ssMeshCounter = meshIdNext
                 , ssPrograms = programs
                 }
         in (newState, minfo)
@@ -171,33 +186,67 @@ removeMesh scene meshId = do
     vao <- fmap meshInfoVertexArray <$> Component.readComponent entity (sceneMeshStore scene)
     maybe (return ()) GLW.deleteObject vao
     void $ Component.removeComponent entity (sceneMeshStore scene)
-    void $ Component.removeComponent entity (sceneMeshTransformStore scene)
-    void $ Component.removeComponent entity (sceneMeshTransformMatrixStore scene)
     where
     entity = meshIdToEntity meshId
 
-translateMesh :: Scene -> MeshId -> Vec3 -> IO ()
-translateMesh scene meshId v = applyTransformToMesh scene meshId f
+addNode :: Scene -> Node -> Bool -> IO NodeId
+addNode scene node isRoot = do
+    nodeInfo <- atomicModifyIORef' (sceneState scene) addNodeFunc
+    let nodeId = nodeInfoId nodeInfo
+        entity = nodeIdToEntity nodeId
+        transform = Transform (nodeTranslation node) (nodeRotation node) (nodeScale node) False
+        matrix = transformMatrix transform
+    Component.addComponent entity nodeInfo (sceneNodeStore scene)
+    Component.addComponent entity transform (sceneNodeTransformStore scene)
+    Component.addComponent entity matrix (sceneNodeTransformMatrixStore scene)
+    return nodeId
+    where
+    addNodeFunc state =
+        let nodeId = ssNodeCounter state
+            nodeIdNext = nodeId + 1
+            rootNodes = if isRoot
+                then BV.snoc (ssRootNodes state) nodeId
+                else ssRootNodes state
+            nodeInfo = NodeInfo nodeId node
+            newState = state
+                { ssNodeCounter = nodeIdNext
+                , ssRootNodes = rootNodes
+                }
+        in (newState, nodeInfo)
+
+removeNode :: Scene -> NodeId -> IO ()
+removeNode scene nodeId = do
+    void $ Component.removeComponent entity (sceneNodeStore scene)
+    void $ Component.removeComponent entity (sceneNodeTransformStore scene)
+    void $ Component.removeComponent entity (sceneNodeTransformMatrixStore scene)
+    where
+    entity = nodeIdToEntity nodeId
+
+newNode :: Node
+newNode = Node Nothing Nothing (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1)
+
+translateNode :: Scene -> NodeId -> Vec3 -> IO ()
+translateNode scene nodeId v = applyTransformToNode scene nodeId f
     where
     f transform = transform
         { transformTranslation = transformTranslation transform ^+^ v
         , transformUpdated = True
         }
 
-rotateMesh :: Scene -> MeshId -> Vec3 -> Float -> IO ()
-rotateMesh scene meshId axis angle = applyTransformToMesh scene meshId f
+rotateNode :: Scene -> NodeId -> Vec3 -> Float -> IO ()
+rotateNode scene nodeId axis angle = applyTransformToNode scene nodeId f
     where
     f transform = transform
         { transformQuaternion = transformQuaternion transform * Linear.axisAngle axis angle
         , transformUpdated = True
         }
 
-applyTransformToMesh :: Scene -> MeshId -> (Transform -> Transform) -> IO ()
-applyTransformToMesh scene meshId f =
+applyTransformToNode :: Scene -> NodeId -> (Transform -> Transform) -> IO ()
+applyTransformToNode scene nodeId f =
     void $ Component.modifyComponent entity f transformStore
     where
-    entity = meshIdToEntity meshId
-    transformStore = sceneMeshTransformStore scene
+    entity = nodeIdToEntity nodeId
+    transformStore = sceneNodeTransformStore scene
 
 updateMeshInstanceCount :: Scene -> MeshId -> Maybe Int -> IO ()
 updateMeshInstanceCount scene meshId c =
@@ -372,22 +421,25 @@ newScene :: IO Scene
 newScene = do
     ref <- newIORef initialSceneState
     meshes <- Component.newComponentStore defaultPreserveSize Proxy
+    nodes <- Component.newComponentStore defaultPreserveSize Proxy
     transforms <- Component.newComponentStore defaultPreserveSize Proxy
     matrices <- Component.newComponentStore defaultPreserveSize Proxy
-    return $ Scene ref meshes transforms matrices
+    return $ Scene ref meshes nodes transforms matrices
 
 defaultPreserveSize :: Int
 defaultPreserveSize = 10
 
 initialSceneState :: SceneState
 initialSceneState =
-    let counter = 1
+    let meshCounter = MeshId 1
+        nodeCounter = NodeId 1
+        rootNodes = BV.empty
         buffers = mempty
         textures = mempty
         samplers = mempty
         defaultTexture = Nothing
         programs = mempty
-    in SceneState counter buffers textures samplers defaultTexture programs
+    in SceneState meshCounter nodeCounter rootNodes buffers textures samplers defaultTexture programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
@@ -403,8 +455,8 @@ deleteScene scene = do
 
     where
     meshStore = sceneMeshStore scene
-    transformStore = sceneMeshTransformStore scene
-    matrixStore = sceneMeshTransformStore scene
+    transformStore = sceneNodeTransformStore scene
+    matrixStore = sceneNodeTransformStore scene
     deleteSceneFunc state =
         let buffers = ssBuffers state
             textures = Map.elems . ssTextures $ state

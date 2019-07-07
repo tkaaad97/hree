@@ -6,6 +6,9 @@ module Graphics.Hree.Types
     , Mesh(..)
     , MeshId(..)
     , MeshInfo(..)
+    , NodeId(..)
+    , Node(..)
+    , NodeInfo(..)
     , Scene(..)
     , SceneState(..)
     ) where
@@ -15,8 +18,10 @@ import Data.Hashable (Hashable(..))
 import Data.IntMap.Strict (IntMap)
 import Data.IORef (IORef)
 import Data.Map.Strict (Map)
-import qualified Data.Vector.Mutable as BV
-import qualified Data.Vector.Storable.Mutable as SV
+import qualified Data.Vector as BV
+import qualified Data.Vector.Mutable as MBV
+import qualified Data.Vector.Storable.Mutable as MSV
+import Foreign (Storable)
 import qualified GLW
 import qualified Graphics.Hree.Component as Component
 import Graphics.Hree.GL.Types
@@ -38,7 +43,7 @@ data Material = Material
 
 newtype MeshId = MeshId
     { unMeshId :: Int
-    } deriving (Show, Eq, Ord, Hashable)
+    } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
 
 data Mesh = Mesh
     { meshGeometry      :: !Geometry
@@ -54,15 +59,35 @@ data MeshInfo = MeshInfo
     , meshInfoVertexArray :: !GLW.VertexArray
     } deriving (Show)
 
+newtype NodeId = NodeId
+    { unNodeId :: Int
+    } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
+
+data Node = Node
+    { nodeName        :: !(Maybe ByteString)
+    , nodeMesh        :: !(Maybe MeshId)
+    , nodeTranslation :: !Vec3
+    , nodeRotation    :: !Quaternion
+    , nodeScale       :: !Vec3
+    } deriving (Show, Eq)
+
+data NodeInfo = NodeInfo
+    { nodeInfoId   :: !NodeId
+    , nodeInfoNode :: !Node
+    } deriving (Show, Eq)
+
 data Scene = Scene
     { sceneState                    :: !(IORef SceneState)
-    , sceneMeshStore                :: !(Component.ComponentStore BV.MVector MeshInfo)
-    , sceneMeshTransformStore       :: !(Component.ComponentStore SV.MVector Transform)
-    , sceneMeshTransformMatrixStore :: !(Component.ComponentStore SV.MVector Mat4)
+    , sceneMeshStore                :: !(Component.ComponentStore MBV.MVector MeshInfo)
+    , sceneNodeStore                :: !(Component.ComponentStore MBV.MVector NodeInfo)
+    , sceneNodeTransformStore       :: !(Component.ComponentStore MSV.MVector Transform)
+    , sceneNodeTransformMatrixStore :: !(Component.ComponentStore MSV.MVector Mat4)
     }
 
 data SceneState = SceneState
-    { ssMeshCounter    :: !Int
+    { ssMeshCounter    :: !MeshId
+    , ssNodeCounter    :: !NodeId
+    , ssRootNodes      :: !(BV.Vector NodeId)
     , ssBuffers        :: ![GLW.Buffer]
     , ssTextures       :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
     , ssSamplers       :: !(Map ByteString GLW.Sampler)

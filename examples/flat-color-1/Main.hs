@@ -9,8 +9,8 @@ import Graphics.Hree.CameraControl.SphericalControl
 import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.GL.Vertex
 import qualified Graphics.Hree.Material as Material
-import Graphics.Hree.Mesh (Mesh(..))
 import Graphics.Hree.Scene
+import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
 
@@ -43,7 +43,8 @@ main = do
         scene <- newScene
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry vs GL.GL_STREAM_DRAW scene
         let mesh = Mesh geometry material Nothing
-        addMesh scene mesh
+        meshId <- addMesh scene mesh
+        addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
         return (scene, camera)
