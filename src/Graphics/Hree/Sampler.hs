@@ -3,7 +3,6 @@ module Graphics.Hree.Sampler
     , defaultSamplerSettings
     ) where
 
-import qualified GLW
 import qualified Graphics.GL as GL
 import Linear (V4(..))
 

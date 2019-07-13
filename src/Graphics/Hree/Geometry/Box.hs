@@ -4,10 +4,9 @@ module Graphics.Hree.Geometry.Box
 
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
-import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.Geometry (Geometry, addVerticesToGeometry, newGeometry)
-import Graphics.Hree.GL.Vertex (PositionAndNormal(..), Vertex)
+import Graphics.Hree.GL.Vertex (PositionAndNormal(..))
 import Graphics.Hree.Types (Scene)
 import Linear (V3(..))
 

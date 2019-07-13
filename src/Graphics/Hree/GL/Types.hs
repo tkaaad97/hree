@@ -21,10 +21,7 @@ module Graphics.Hree.GL.Types
 
 import Data.ByteString (ByteString)
 import Data.Map.Strict (Map)
-import Data.Proxy (Proxy(..))
 import Data.Vector.Storable (Vector)
-import qualified Data.Vector.Storable as Vector
-import Data.Word (Word8)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable)
 import qualified GLW

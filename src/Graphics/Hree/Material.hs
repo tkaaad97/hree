@@ -10,11 +10,8 @@ module Graphics.Hree.Material
     , setDirectionalLight
     ) where
 
-import Data.ByteString (ByteString)
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (maybeToList)
-import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Program

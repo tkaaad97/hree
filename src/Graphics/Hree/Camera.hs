@@ -17,9 +17,8 @@ import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Linear (M44, V3, (!*!))
 import qualified Linear (identity, lookAt, normalize, ortho, perspective)
 
-newtype Camera = Camera
-    { unCamera :: IORef CameraState
-    } deriving Eq
+newtype Camera = Camera (IORef CameraState)
+    deriving Eq
 
 data CameraState = CameraState
     { cameraProjection      :: !Projection

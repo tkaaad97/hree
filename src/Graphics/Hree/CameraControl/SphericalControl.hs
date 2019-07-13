@@ -50,8 +50,7 @@ newSphericalControlDefault :: Camera -> IO SphericalControl
 newSphericalControlDefault = newSphericalControl defaultSphericalControlSettings
 
 enterSphericalControl :: SphericalControl -> SphericalControlMode -> V2 Float -> IO ()
-enterSphericalControl (SphericalControl settings camera ref) mode cp = do
-    LookAt eye center up <- getCameraLookAt camera
+enterSphericalControl (SphericalControl _ _ ref) mode cp = do
     let s = SphericalControlState mode cp
     writeIORef ref (Just s)
 

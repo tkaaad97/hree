@@ -18,6 +18,7 @@ module Graphics.Hree.Scene
     , renderScene
     , translateMesh
     , rotateMesh
+    , updateMeshInstanceCount
     , applyTransformToMesh
     ) where
 
@@ -29,24 +30,16 @@ import qualified Data.ByteString as ByteString (index, length)
 import qualified Data.ByteString.Char8 as ByteString (pack)
 import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
-import Data.Foldable (foldr')
-import Data.Hashable (Hashable)
-import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
-import qualified Data.List as List (nub)
-import Data.Map.Strict (Map)
+import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, isNothing, maybeToList)
+import Data.Maybe (fromMaybe, maybeToList)
 import Data.Proxy (Proxy(..))
-import qualified Data.Traversable as Traversable (mapM)
 import qualified Data.Vector as BV
-import qualified Data.Vector.Mutable as MBV
 import qualified Data.Vector.Storable as SV
-import qualified Data.Vector.Storable.Mutable as MSV
 import Data.Word (Word16, Word32, Word8)
-import Foreign (Ptr, Storable)
-import qualified Foreign (castPtr, copyArray, nullPtr, with, withArray)
+import Foreign (Ptr)
+import qualified Foreign (castPtr, copyArray, nullPtr, withArray)
 import qualified GLW
 import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit,
                                                     glDepthBufferBit)
@@ -59,7 +52,6 @@ import Graphics.Hree.Camera
 import qualified Graphics.Hree.Component as Component
 import Graphics.Hree.GL
 import Graphics.Hree.GL.Types
-import Graphics.Hree.GL.Vertex
 import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
@@ -94,7 +86,7 @@ toRenderInfo defaultTexture transformStore matrixStore m = do
     matrix <- if transformUpdated transform
                 then do
                     let matrix = transformMatrix transform
-                    Component.writeComponent entity matrix matrixStore
+                    _ <- Component.writeComponent entity matrix matrixStore
                     return matrix
                 else fromMaybe Linear.identity <$> Component.readComponent entity matrixStore
     let maybeUniform = toUniformEntry "modelMatrix" (Uniform matrix)
@@ -153,14 +145,12 @@ addMesh scene mesh = do
     return meshId
 
     where
-    insertsWith f kvs m = foldr' (uncurry $ IntMap.insertWith f) m kvs
     addMeshFunc program programAdded vao state =
         let meshIdVal = ssMeshCounter state
             meshId = MeshId meshIdVal
             meshCounter = meshIdVal + 1
             bos = map fst . IntMap.elems $ buffers
             bos' = maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
-            nubBufferIds = List.nub . map (fromIntegral . GLW.unBuffer) $ bos'
             minfo = MeshInfo meshId mesh bos' program vao
             programs = if programAdded
                         then Map.insert pspec program (ssPrograms state)
@@ -184,7 +174,6 @@ removeMesh scene meshId = do
     void $ Component.removeComponent entity (sceneMeshTransformStore scene)
     void $ Component.removeComponent entity (sceneMeshTransformMatrixStore scene)
     where
-    state = sceneState scene
     entity = meshIdToEntity meshId
 
 translateMesh :: Scene -> MeshId -> Vec3 -> IO ()
@@ -265,12 +254,13 @@ addTextureInternal renameOnConflict scene name settings source =
     dataType = sourceDataType source
     pixels = sourcePixels source
 
+    tryCount :: Int
     tryCount = 10
 
     addTextureAction True texture = do
         r <- atomicModifyIORef' (sceneState scene) (addTextureFunc name texture)
         name' <- maybe (tryAddTexture name texture tryCount) return r
-        initializeTexture texture
+        _ <- initializeTexture texture
         return $ Just (name', texture)
 
     addTextureAction False texture = do
@@ -311,6 +301,7 @@ addSamplerInternal renameOnConflict scene name =
         (addSamplerAction renameOnConflict)
 
     where
+    tryCount :: Int
     tryCount = 10
     addSamplerAction True sampler = do
         r <- atomicModifyIORef' (sceneState scene) (addSamplerFunc name sampler)

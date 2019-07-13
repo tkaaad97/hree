@@ -70,12 +70,12 @@ addComponent e a store = do
         MV.unsafeWrite evec i e
         HT.insert emap e i
 
-    genComponentIndex store = do
+    genComponentIndex v = do
         s <- readIORef ref
         let currentSize = componentStoreSize s
             reservedSize = MV.length $ componentStoreVec s
         when (reservedSize <= currentSize) $
-            extendComponentStore store =<< decideSize currentSize
+            extendComponentStore v =<< decideSize currentSize
         atomicModifyIORef' ref (genIdentifier currentSize)
         where
         ref = unComponentStore store
@@ -110,10 +110,10 @@ removeComponent e store = do
             vec = componentStoreVec s
             evec = componentStoreEntityVec s
             emap = componentStoreEntityMap s
-        last <- MV.unsafeRead evec j
+        last' <- MV.unsafeRead evec j
         MV.unsafeSwap vec i j
         MV.unsafeSwap evec i j
-        HT.mutate emap last (const (Just i, ()))
+        HT.mutate emap last' (const (Just i, ()))
         HT.delete emap e
         return True
 

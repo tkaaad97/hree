@@ -17,18 +17,15 @@ module Graphics.Hree.Program
 
 import Control.Exception (throwIO)
 import Control.Monad (unless)
-import Control.Monad.IO.Class (MonadIO)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString (pack, useAsCStringLen)
-import Data.Coerce (Coercible(..))
 import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(..))
 import Foreign (Ptr)
-import qualified Foreign (alloca, allocaArray, peek, peekArray, with)
+import qualified Foreign (alloca, allocaArray, peek, with)
 import qualified Foreign.C.String as Foreign (peekCStringLen)
 import qualified GLW
 import qualified Graphics.GL as GL
@@ -99,23 +96,23 @@ mkProgram (ProgramSpec vspec fspec) = do
 
 mkVertexShader :: VertexShaderSpec -> IO (GLW.Shader 'GLW.GL_VERTEX_SHADER)
 mkVertexShader BasicVertexShader =
-    mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) $(embedFile "shader/basic-vertex.glsl")
+    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/basic-vertex.glsl")
 mkVertexShader FlatColorVertexShader =
-    mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) $(embedFile "shader/flat-color-vertex.glsl")
+    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/flat-color-vertex.glsl")
 mkVertexShader SpriteVertexShader =
-    mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) $(embedFile "shader/sprite-vertex.glsl")
+    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/sprite-vertex.glsl")
 mkVertexShader TestVertexShader =
-    mkShader (Proxy :: Proxy GLW.GL_VERTEX_SHADER) $(embedFile "shader/test-vertex.glsl")
+    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/test-vertex.glsl")
 
 mkFragmentShader :: FragmentShaderSpec -> IO (GLW.Shader 'GLW.GL_FRAGMENT_SHADER)
 mkFragmentShader BasicFragmentShader =
-    mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/basic-fragment.glsl")
+    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/basic-fragment.glsl")
 mkFragmentShader FlatColorFragmentShader =
-    mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/flat-color-fragment.glsl")
+    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/flat-color-fragment.glsl")
 mkFragmentShader SpriteFragmentShader =
-    mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/sprite-fragment.glsl")
+    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/sprite-fragment.glsl")
 mkFragmentShader TestFragmentShader =
-    mkShader (Proxy :: Proxy GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/test-fragment.glsl")
+    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/test-fragment.glsl")
 
 mkShader :: forall (k :: GLW.ShaderType). GLW.SingShaderType k => Proxy k -> ByteString -> IO (GLW.Shader k)
 mkShader _ source =
@@ -153,10 +150,10 @@ getActivePorts construct getLocation pname f program = do
         Foreign.alloca $ \tp ->
         Foreign.allocaArray maxNameBytes $ \np -> do
             f program (fromIntegral i) (fromIntegral maxNameBytes) lp sp tp np
-            length <- Foreign.peek lp
+            len <- Foreign.peek lp
             size <- Foreign.peek sp
             dataType <- Foreign.peek tp
-            name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral length)
+            name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral len)
             l <- fromMaybe (error "getLocation failed") <$> getLocation program np
             return $ construct name l (fromIntegral size) dataType
 
@@ -171,10 +168,10 @@ throwIfProgramErrorStatus program statusName messagePrefix = Foreign.alloca $ \p
     unless (status == GL.GL_TRUE) $
         Foreign.alloca $ \sizePtr ->
         Foreign.allocaArray bufSize $ \buf -> do
-            log' <- GLW.glGetProgramInfoLog program (fromIntegral bufSize) sizePtr buf
+            GLW.glGetProgramInfoLog program (fromIntegral bufSize) sizePtr buf
             logSize <- Foreign.peek sizePtr
-            log <- Foreign.peekCStringLen (buf, fromIntegral logSize)
-            throwIO . userError $ messagePrefix ++ ": " ++ log
+            log' <- Foreign.peekCStringLen (buf, fromIntegral logSize)
+            throwIO . userError $ messagePrefix ++ ": " ++ log'
     where
     bufSize = 256
 
@@ -189,9 +186,9 @@ throwIfShaderErrorStatus shader statusName messagePrefix = Foreign.alloca $ \p -
     unless (status == GL.GL_TRUE) $
         Foreign.alloca $ \sizePtr ->
         Foreign.allocaArray bufSize $ \buf -> do
-            log' <- GLW.glGetShaderInfoLog shader (fromIntegral bufSize) sizePtr buf
+            GLW.glGetShaderInfoLog shader (fromIntegral bufSize) sizePtr buf
             logSize <- Foreign.peek sizePtr
-            log <- Foreign.peekCStringLen (buf, fromIntegral logSize)
-            throwIO . userError $ messagePrefix ++ ": " ++ log
+            log' <- Foreign.peekCStringLen (buf, fromIntegral logSize)
+            throwIO . userError $ messagePrefix ++ ": " ++ log'
     where
     bufSize = 256

@@ -13,10 +13,8 @@ module Graphics.Hree.Types
 import Data.ByteString (ByteString)
 import Data.Hashable (Hashable(..))
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (IORef)
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 import qualified Data.Vector.Mutable as BV
 import qualified Data.Vector.Storable.Mutable as SV
 import qualified GLW

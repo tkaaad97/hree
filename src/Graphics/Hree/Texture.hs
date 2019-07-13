@@ -30,7 +30,6 @@ module Graphics.Hree.Texture
     , getTextureParameter
     ) where
 
-import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Foreign (Ptr)
 import qualified Foreign (alloca, castPtr, peek, with)

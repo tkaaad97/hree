@@ -8,7 +8,6 @@ module Graphics.Hree.GL
 import Control.Exception (throwIO)
 import Control.Monad (void, when)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as ByteString
 import Data.Foldable (foldrM)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -17,10 +16,9 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (mapMaybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Storable as V
-import qualified Foreign (Storable(..), alloca, allocaArray, castPtr)
+import qualified Foreign (Storable(..), castPtr)
 import qualified GLW
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
-import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
 
@@ -98,7 +96,7 @@ mkVertexArray attribBindings buffers indexBuffer programInfo = do
 
     setAttrib vao (k, a) = do
         let binding = attribBindingIndex a
-        buffer <- maybe (throwIO . userError $ "binding buffer not found") return (IntMap.lookup (fromIntegral . GLW.unBindingIndex $ binding) buffers)
+        _ <- maybe (throwIO . userError $ "binding buffer not found") return (IntMap.lookup (fromIntegral . GLW.unBindingIndex $ binding) buffers)
         let maybeLocation = aiAttribLocation <$> Map.lookup k attribInfos
         maybe (return ())
             (\location -> setVertexArrayAttribFormatAndBinding vao location a)

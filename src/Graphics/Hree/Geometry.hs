@@ -9,7 +9,6 @@ module Graphics.Hree.Geometry
     ) where
 
 import Data.ByteString (ByteString)
-import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -47,7 +46,7 @@ addVerticesToGeometry geometry storage usage scene = do
     VertexSpec bbs fields = vertexSpec (Proxy :: Proxy a)
     keys = map vertexFieldAttribName fields
     bindings = map toAttribBinding fields
-    toAttribBinding (VertexField name format) = AttribBinding (GLW.BindingIndex . fromIntegral $ bindingIndex) format
+    toAttribBinding (VertexField _ format) = AttribBinding (GLW.BindingIndex . fromIntegral $ bindingIndex) format
     newAttribBindings = Map.fromList $ zip keys bindings
     attribBindings' = Map.union attribBindings newAttribBindings
 
