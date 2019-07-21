@@ -14,6 +14,7 @@ module Graphics.Hree.Types
     ) where
 
 import Data.ByteString (ByteString)
+import qualified Data.Component as Component
 import Data.Hashable (Hashable(..))
 import Data.IntMap.Strict (IntMap)
 import Data.IORef (IORef)
@@ -23,7 +24,6 @@ import qualified Data.Vector.Mutable as MBV
 import qualified Data.Vector.Storable.Mutable as MSV
 import Foreign (Storable)
 import qualified GLW
-import qualified Graphics.Hree.Component as Component
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Math
 import Graphics.Hree.Program
@@ -78,10 +78,10 @@ data NodeInfo = NodeInfo
 
 data Scene = Scene
     { sceneState                    :: !(IORef SceneState)
-    , sceneMeshStore                :: !(Component.ComponentStore MBV.MVector MeshInfo)
-    , sceneNodeStore                :: !(Component.ComponentStore MBV.MVector NodeInfo)
-    , sceneNodeTransformStore       :: !(Component.ComponentStore MSV.MVector Transform)
-    , sceneNodeTransformMatrixStore :: !(Component.ComponentStore MSV.MVector Mat4)
+    , sceneMeshStore                :: !(Component.ComponentStore MBV.MVector MeshId MeshInfo)
+    , sceneNodeStore                :: !(Component.ComponentStore MBV.MVector NodeId NodeInfo)
+    , sceneNodeTransformStore       :: !(Component.ComponentStore MSV.MVector NodeId Transform)
+    , sceneNodeTransformMatrixStore :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
     }
 
 data SceneState = SceneState

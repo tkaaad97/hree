@@ -3,6 +3,7 @@ module SceneSpec
     ( spec
     ) where
 
+import qualified Data.Component as Component
 import qualified Data.IntMap as IntMap
 import Data.IORef (readIORef)
 import qualified Data.Map.Strict as Map
@@ -15,7 +16,6 @@ import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree.Component as Component
 import qualified Graphics.Hree.Geometry as Hree
 import qualified Graphics.Hree.GL.Vertex as Hree
 import qualified Graphics.Hree.Material as Hree

@@ -2,11 +2,11 @@ module ComponentSpec
     ( spec
     ) where
 
+import Data.Component
 import qualified Data.HashTable.IO as HT
 import Data.IORef (readIORef)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Storable.Mutable as MV
-import Graphics.Hree.Component
 import Linear (V3(..))
 import Test.Hspec
 
@@ -15,7 +15,7 @@ spec = do
     describe "newComponentStore" $ do
         it "preserve store vectors" $ do
             let preserve = 10
-            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double)))
+            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double))) :: IO (ComponentStore MV.MVector Int (V3 Double))
             state <- readIORef (unComponentStore store)
             componentStoreSize state `shouldBe` 0
             MV.length (componentStoreVec state) `shouldBe` preserve
@@ -24,11 +24,11 @@ spec = do
     describe "addComponent" $ do
         it "add new component" $ do
             let preserve = 10
-                entity1 = Entity 1
+                entity1 = 1
                 component1 = V3 1 2 3
-                entity2 = Entity 2
+                entity2 = 2
                 component2 = V3 4 5 6
-            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double)))
+            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double))) :: IO (ComponentStore MV.MVector Int (V3 Double))
             addComponent entity1 component1 store
             addComponent entity2 component2 store
             c1 <- readComponent entity1 store
@@ -40,11 +40,11 @@ spec = do
 
         it "extend size when no space" $ do
             let preserve = 1
-                entity1 = Entity 1
+                entity1 = 1
                 component1 = V3 1 2 3
-                entity2 = Entity 2
+                entity2 = 2
                 component2 = V3 4 5 6
-            store <- newComponentStore preserve (Proxy :: (Proxy (MV.IOVector (V3 Double))))
+            store <- newComponentStore preserve (Proxy :: (Proxy (MV.IOVector (V3 Double)))) :: IO (ComponentStore MV.MVector Int (V3 Double))
 
             addComponent entity1 component1 store
             c1 <- readComponent entity1 store
@@ -61,9 +61,9 @@ spec = do
     describe "removeComponent" $ do
         it "remove component" $ do
             let preserve = 10
-                entity1 = Entity 1
+                entity1 = 1
                 component1 = V3 1 2 3
-            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double)))
+            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double))) :: IO (ComponentStore MV.MVector Int (V3 Double))
             addComponent entity1 component1 store
             c1 <- readComponent entity1 store
             c1 `shouldBe` Just component1
@@ -74,18 +74,18 @@ spec = do
 
         it "relocate component" $ do
             let preserve = 10
-                entity1 = Entity 1
+                entity1 = 1
                 component1 = V3 1 2 3
-                entity2 = Entity 2
+                entity2 = 2
                 component2 = V3 4 5 6
-                entity3 = Entity 3
+                entity3 = 3
                 component3 = V3 7 8 9
-            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double)))
+            store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double))) :: IO (ComponentStore MV.MVector Int (V3 Double))
 
             addComponent entity1 component1 store
             addComponent entity2 component2 store
             addComponent entity3 component3 store
-            removeComponent entity1 store
+            _ <- removeComponent entity1 store
 
             state <- readIORef (unComponentStore store)
             let size = componentStoreSize state
