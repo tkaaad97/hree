@@ -72,7 +72,7 @@ data Node = Node
     { nodeName        :: !(Maybe ByteString)
     , nodeMesh        :: !(Maybe MeshId)
     , nodeSkin        :: !(Maybe SkinId)
-    , nodeChildren    :: !(SV.Vector NodeId)
+    , nodeChildren    :: !(BV.Vector NodeId)
     , nodeTranslation :: !Vec3
     , nodeRotation    :: !Quaternion
     , nodeScale       :: !Vec3
@@ -84,12 +84,13 @@ data NodeInfo = NodeInfo
     } deriving (Show, Eq)
 
 data Scene = Scene
-    { sceneState                    :: !(IORef SceneState)
-    , sceneMeshStore                :: !(Component.ComponentStore MBV.MVector MeshId MeshInfo)
-    , sceneNodeStore                :: !(Component.ComponentStore MBV.MVector NodeId NodeInfo)
-    , sceneNodeTransformStore       :: !(Component.ComponentStore MSV.MVector NodeId Transform)
-    , sceneNodeTransformMatrixStore :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
-    , sceneSkinStore                :: !(Component.ComponentStore MBV.MVector SkinId Skin)
+    { sceneState                          :: !(IORef SceneState)
+    , sceneMeshStore                      :: !(Component.ComponentStore MBV.MVector MeshId MeshInfo)
+    , sceneNodeStore                      :: !(Component.ComponentStore MBV.MVector NodeId NodeInfo)
+    , sceneNodeTransformStore             :: !(Component.ComponentStore MSV.MVector NodeId Transform)
+    , sceneNodeTransformMatrixStore       :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
+    , sceneNodeGlobalTransformMatrixStore :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
+    , sceneSkinStore                      :: !(Component.ComponentStore MBV.MVector SkinId Skin)
     }
 
 data SceneState = SceneState

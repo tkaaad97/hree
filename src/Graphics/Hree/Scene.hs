@@ -62,7 +62,7 @@ import Graphics.Hree.Mesh
 import Graphics.Hree.Program
 import Graphics.Hree.Texture
 import Graphics.Hree.Types
-import Linear ((^+^))
+import Linear ((!*!), (^+^))
 import qualified Linear
 import qualified System.Random.MWC as Random (asGenIO, uniformR,
                                               withSystemRandom)
@@ -78,30 +78,47 @@ renderScene scene camera = do
 renderNodes :: [(ByteString, Uniform)] -> Scene -> SceneState -> IO ()
 renderNodes uniforms scene state = do
     let nodeIds = ssRootNodes state
-    rs <- BV.concatMap id <$> BV.mapM (nodeToRenderInfos scene state) nodeIds
+    rs <- BV.concatMap id <$> BV.mapM (nodeToRenderInfos scene state zeroTransform Linear.identity False) nodeIds
     renderMany uniforms rs
 
-nodeToRenderInfos :: Scene -> SceneState -> NodeId -> IO (BV.Vector RenderInfo)
-nodeToRenderInfos scene state nodeId = fmap (fromMaybe BV.empty) . runMaybeT $ do
+nodeToRenderInfos :: Scene -> SceneState -> Transform -> Mat4 -> Bool -> NodeId -> IO (BV.Vector RenderInfo)
+nodeToRenderInfos scene state parentTransform parentGlobalMatrix parentGlobalUpdated nodeId = fmap (fromMaybe BV.empty) . runMaybeT $ do
     node <- MaybeT $ Component.readComponent nodeId nodeStore
     meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
     meshInfo <- MaybeT $ Component.readComponent meshId meshStore
     transform <- MaybeT $ Component.readComponent nodeId transformStore
-    matrix <- lift $
+
+    localMatrix <- lift $
         if transformUpdated transform
             then do
                 let matrix = transformMatrix transform
                 _ <- Component.writeComponent nodeId matrix matrixStore
                 return matrix
             else fromMaybe Linear.identity <$> Component.readComponent nodeId matrixStore
-    let renderInfo = toRenderInfo defaultTexture meshInfo matrix
-    return . BV.singleton $ renderInfo
+
+    let globalUpdated = parentGlobalUpdated || transformUpdated parentTransform || transformUpdated transform
+    globalMatrix <- lift $
+        if globalUpdated
+            then do
+                let matrix = parentGlobalMatrix !*! localMatrix
+                _ <- Component.writeComponent nodeId matrix globalMatrixStore
+                return matrix
+            else fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
+
+    let renderInfo = toRenderInfo defaultTexture meshInfo globalMatrix
+        childNodeIds = nodeChildren . nodeInfoNode $ node
+    children <- BV.concatMap id <$>
+        lift (BV.mapM (nodeToRenderInfos scene state transform globalMatrix globalUpdated) childNodeIds)
+
+    return $ BV.snoc children renderInfo
+
     where
     defaultTexture = ssDefaultTexture state
     meshStore = sceneMeshStore scene
     nodeStore = sceneNodeStore scene
     transformStore = sceneNodeTransformStore scene
     matrixStore = sceneNodeTransformMatrixStore scene
+    globalMatrixStore = sceneNodeGlobalTransformMatrixStore scene
 
 toRenderInfo :: Maybe Texture -> MeshInfo -> Mat4 -> RenderInfo
 toRenderInfo defaultTexture meshInfo matrix =
@@ -210,7 +227,7 @@ removeNode scene nodeId = do
     void $ Component.removeComponent nodeId (sceneNodeTransformMatrixStore scene)
 
 newNode :: Node
-newNode = Node Nothing Nothing Nothing SV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1)
+newNode = Node Nothing Nothing Nothing BV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1)
 
 translateNode :: Scene -> NodeId -> Vec3 -> IO ()
 translateNode scene nodeId v = applyTransformToNode scene nodeId f
@@ -409,8 +426,9 @@ newScene = do
     nodes <- Component.newComponentStore defaultPreserveSize Proxy
     transforms <- Component.newComponentStore defaultPreserveSize Proxy
     matrices <- Component.newComponentStore defaultPreserveSize Proxy
+    globalMatrices <- Component.newComponentStore defaultPreserveSize Proxy
     skins <- Component.newComponentStore defaultPreserveSize Proxy
-    return $ Scene ref meshes nodes transforms matrices skins
+    return $ Scene ref meshes nodes transforms matrices globalMatrices skins
 
 defaultPreserveSize :: Int
 defaultPreserveSize = 10
