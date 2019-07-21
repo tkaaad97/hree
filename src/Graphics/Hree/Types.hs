@@ -72,6 +72,7 @@ data Node = Node
     { nodeName        :: !(Maybe ByteString)
     , nodeMesh        :: !(Maybe MeshId)
     , nodeSkin        :: !(Maybe SkinId)
+    , nodeChildren    :: !(SV.Vector NodeId)
     , nodeTranslation :: !Vec3
     , nodeRotation    :: !Quaternion
     , nodeScale       :: !Vec3
