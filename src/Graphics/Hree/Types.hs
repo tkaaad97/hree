@@ -21,6 +21,7 @@ import Data.IORef (IORef)
 import Data.Map.Strict (Map)
 import qualified Data.Vector as BV
 import qualified Data.Vector.Mutable as MBV
+import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import Foreign (Storable)
 import qualified GLW
@@ -63,9 +64,14 @@ newtype NodeId = NodeId
     { unNodeId :: Int
     } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
 
+newtype SkinId = SkinId
+    { unSkinId :: Int
+    } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
+
 data Node = Node
     { nodeName        :: !(Maybe ByteString)
     , nodeMesh        :: !(Maybe MeshId)
+    , nodeSkin        :: !(Maybe SkinId)
     , nodeTranslation :: !Vec3
     , nodeRotation    :: !Quaternion
     , nodeScale       :: !Vec3
@@ -82,6 +88,7 @@ data Scene = Scene
     , sceneNodeStore                :: !(Component.ComponentStore MBV.MVector NodeId NodeInfo)
     , sceneNodeTransformStore       :: !(Component.ComponentStore MSV.MVector NodeId Transform)
     , sceneNodeTransformMatrixStore :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
+    , sceneSkinStore                :: !(Component.ComponentStore MBV.MVector SkinId Skin)
     }
 
 data SceneState = SceneState
@@ -94,3 +101,8 @@ data SceneState = SceneState
     , ssDefaultTexture :: !(Maybe Texture)
     , ssPrograms       :: !(Map ProgramSpec ProgramInfo)
     }
+
+data Skin = Skin
+    { skinInverseBindMatrices :: !(SV.Vector Mat4)
+    , skinJoints              :: !(SV.Vector NodeId)
+    } deriving (Show, Eq)

@@ -210,7 +210,7 @@ removeNode scene nodeId = do
     void $ Component.removeComponent nodeId (sceneNodeTransformMatrixStore scene)
 
 newNode :: Node
-newNode = Node Nothing Nothing (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1)
+newNode = Node Nothing Nothing Nothing (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1)
 
 translateNode :: Scene -> NodeId -> Vec3 -> IO ()
 translateNode scene nodeId v = applyTransformToNode scene nodeId f
@@ -409,7 +409,8 @@ newScene = do
     nodes <- Component.newComponentStore defaultPreserveSize Proxy
     transforms <- Component.newComponentStore defaultPreserveSize Proxy
     matrices <- Component.newComponentStore defaultPreserveSize Proxy
-    return $ Scene ref meshes nodes transforms matrices
+    skins <- Component.newComponentStore defaultPreserveSize Proxy
+    return $ Scene ref meshes nodes transforms matrices skins
 
 defaultPreserveSize :: Int
 defaultPreserveSize = 10
