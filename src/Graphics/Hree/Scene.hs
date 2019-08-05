@@ -77,48 +77,68 @@ renderScene scene camera = do
 
 renderNodes :: [(ByteString, Uniform)] -> Scene -> SceneState -> IO ()
 renderNodes uniforms scene state = do
+    _ <- runMaybeT $ updateNodeMatrices scene state
+    _ <- runMaybeT $ renderMany uniforms <$> nodeToRenderInfos scene state
+    return ()
+
+foldNodes :: Scene -> SceneState -> (NodeInfo -> a -> b -> MaybeT IO (a, b)) -> a -> b -> MaybeT IO b
+foldNodes scene state f a b = do
     let nodeIds = ssRootNodes state
-    rs <- BV.concatMap id <$> BV.mapM (nodeToRenderInfos scene state zeroTransform Linear.identity False) nodeIds
-    renderMany uniforms rs
-
-nodeToRenderInfos :: Scene -> SceneState -> Transform -> Mat4 -> Bool -> NodeId -> IO (BV.Vector RenderInfo)
-nodeToRenderInfos scene state parentTransform parentGlobalMatrix parentGlobalUpdated nodeId = fmap (fromMaybe BV.empty) . runMaybeT $ do
-    node <- MaybeT $ Component.readComponent nodeId nodeStore
-    meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
-    meshInfo <- MaybeT $ Component.readComponent meshId meshStore
-    transform <- MaybeT $ Component.readComponent nodeId transformStore
-
-    localMatrix <- lift $
-        if transformUpdated transform
-            then do
-                let matrix = transformMatrix transform
-                _ <- Component.writeComponent nodeId matrix matrixStore
-                return matrix
-            else fromMaybe Linear.identity <$> Component.readComponent nodeId matrixStore
-
-    let globalUpdated = parentGlobalUpdated || transformUpdated parentTransform || transformUpdated transform
-    globalMatrix <- lift $
-        if globalUpdated
-            then do
-                let matrix = parentGlobalMatrix !*! localMatrix
-                _ <- Component.writeComponent nodeId matrix globalMatrixStore
-                return matrix
-            else fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
-
-    let renderInfo = toRenderInfo defaultTexture meshInfo globalMatrix
-        childNodeIds = nodeChildren . nodeInfoNode $ node
-    children <- BV.concatMap id <$>
-        lift (BV.mapM (nodeToRenderInfos scene state transform globalMatrix globalUpdated) childNodeIds)
-
-    return $ BV.snoc children renderInfo
-
+    nodes <- BV.mapM (MaybeT . flip Component.readComponent nodeStore) nodeIds
+    BV.foldM' (go a) b nodes
     where
-    defaultTexture = ssDefaultTexture state
-    meshStore = sceneMeshStore scene
     nodeStore = sceneNodeStore scene
+    go x0 y0 node = do
+        (x1, y1) <- f node x0 y0
+        let nodeIds = nodeChildren . nodeInfoNode $ node
+        nodes <- BV.mapM (MaybeT . flip Component.readComponent nodeStore) nodeIds
+        BV.foldM' (go x1) y1 nodes
+
+updateNodeMatrices :: Scene -> SceneState -> MaybeT IO ()
+updateNodeMatrices scene state = foldNodes scene state go (zeroTransform, Linear.identity, False) ()
+    where
     transformStore = sceneNodeTransformStore scene
     matrixStore = sceneNodeTransformMatrixStore scene
     globalMatrixStore = sceneNodeGlobalTransformMatrixStore scene
+
+    go node (parentTransform, parentGlobalMatrix, parentGlobalUpdated) _ = do
+        let nodeId = nodeInfoId node
+        transform <- MaybeT $ Component.readComponent nodeId transformStore
+
+        localMatrix <- lift $
+            if transformUpdated transform
+                then do
+                    let matrix = transformMatrix transform
+                    _ <- Component.writeComponent nodeId matrix matrixStore
+                    return matrix
+                else fromMaybe Linear.identity <$> Component.readComponent nodeId matrixStore
+
+        let globalUpdated = parentGlobalUpdated || transformUpdated parentTransform || transformUpdated transform
+        globalMatrix <- lift $
+            if globalUpdated
+                then do
+                    let matrix = parentGlobalMatrix !*! localMatrix
+                    _ <- Component.writeComponent nodeId matrix globalMatrixStore
+                    return matrix
+                else fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
+
+        return ((transform, globalMatrix, globalUpdated), ())
+
+nodeToRenderInfos :: Scene -> SceneState -> MaybeT IO [RenderInfo]
+nodeToRenderInfos scene state =
+    foldNodes scene state go () []
+    where
+    defaultTexture = ssDefaultTexture state
+    meshStore = sceneMeshStore scene
+    globalMatrixStore = sceneNodeGlobalTransformMatrixStore scene
+
+    go node () xs = do
+        let nodeId = nodeInfoId node
+        meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
+        meshInfo <- MaybeT $ Component.readComponent meshId meshStore
+        globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
+        let renderInfo = toRenderInfo defaultTexture meshInfo globalMatrix
+        return ((), renderInfo : xs)
 
 toRenderInfo :: Maybe Texture -> MeshInfo -> Mat4 -> RenderInfo
 toRenderInfo defaultTexture meshInfo matrix =
