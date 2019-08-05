@@ -78,7 +78,7 @@ renderScene scene camera = do
 renderNodes :: [(ByteString, Uniform)] -> Scene -> SceneState -> IO ()
 renderNodes uniforms scene state = do
     _ <- runMaybeT $ updateNodeMatrices scene state
-    _ <- runMaybeT $ renderMany uniforms <$> nodeToRenderInfos scene state
+    maybe (return ()) (renderMany uniforms) =<< runMaybeT (nodeToRenderInfos scene state)
     return ()
 
 foldNodes :: Scene -> SceneState -> (NodeInfo -> a -> b -> MaybeT IO (a, b)) -> a -> b -> MaybeT IO b
@@ -222,9 +222,11 @@ addNode scene node isRoot = do
     let nodeId = nodeInfoId nodeInfo
         transform = Transform (nodeTranslation node) (nodeRotation node) (nodeScale node) False
         matrix = transformMatrix transform
+        globalMatrix = Linear.identity
     Component.addComponent nodeId nodeInfo (sceneNodeStore scene)
     Component.addComponent nodeId transform (sceneNodeTransformStore scene)
     Component.addComponent nodeId matrix (sceneNodeTransformMatrixStore scene)
+    Component.addComponent nodeId globalMatrix (sceneNodeGlobalTransformMatrixStore scene)
     return nodeId
     where
     addNodeFunc state =
