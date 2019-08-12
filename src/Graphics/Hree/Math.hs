@@ -13,9 +13,9 @@ module Graphics.Hree.Math
 import Data.Word (Word8)
 import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
-import Linear ((^*))
-import qualified Linear (M44, Quaternion(..), V2, V3(..), V4, fromQuaternion,
-                         mkTransformationMat)
+import Linear ((!*!), (^*))
+import qualified Linear (M44, Quaternion(..), V2, V3(..), V4(..),
+                         fromQuaternion, mkTransformationMat)
 
 type Vec2 = Linear.V2 Float
 
@@ -64,6 +64,5 @@ instance Storable Transform where
 
 transformMatrix :: Transform -> Mat4
 transformMatrix (Transform t q (Linear.V3 sx sy sz) _) =
-    let Linear.V3 v0 v1 v2 = Linear.fromQuaternion q
-        m = Linear.V3 (v0 ^* sx) (v1 ^* sy) (v2 ^* sz)
-    in Linear.mkTransformationMat m t
+    let m = Linear.fromQuaternion q
+    in Linear.mkTransformationMat m t !*! Linear.V4 (Linear.V4 sx 0 0 0) (Linear.V4 0 sy 0 0) (Linear.V4 0 0 sz 0) (Linear.V4 0 0 0 1)
