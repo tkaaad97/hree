@@ -13,7 +13,7 @@ import qualified Graphics.Hree.Material as Material
 import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
-import Linear (V2(..), V3(..), V4(..))
+import Linear (V2(..), V3(..), V4(..), inv44)
 
 main :: IO ()
 main = do
@@ -28,6 +28,8 @@ main = do
 
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
+    inverseBindMatrix = Linear.inv44 (V4 (V4 1 0 0 0) (V4 0 1 0 0.05) (V4 0 0 1 0) (V4 0 0 0 1))
+
     init w = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
@@ -39,8 +41,23 @@ main = do
             mesh = Mesh geometry material Nothing
         childMeshId <- addMesh scene childMesh
         meshId <- addMesh scene mesh
-        childNodeId <- addNode scene newNode{ nodeMesh = Just childMeshId, nodeTranslation = V3 0.5 0 0, nodeScale = V3 0.5 1 1 } False
-        nodeId <- addNode scene newNode{ nodeMesh = Just meshId, nodeTranslation = V3 0 0 0, nodeChildren = BV.fromList [childNodeId] } True
+
+        let childNode = newNode
+                { nodeMesh = Just childMeshId
+                , nodeTranslation = V3 0.5 0 0
+                , nodeScale = V3 0.5 1 1
+                , nodeInverseBindMatrix = inverseBindMatrix
+                }
+        childNodeId <- addNode scene childNode False
+
+        let node = newNode
+                { nodeMesh = Just meshId
+                , nodeTranslation = V3 0 0 0
+                , nodeChildren = BV.fromList [childNodeId]
+                , nodeInverseBindMatrix = inverseBindMatrix
+                }
+        nodeId <- addNode scene node True
+
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 

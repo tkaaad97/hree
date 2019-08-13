@@ -134,10 +134,12 @@ nodeToRenderInfos scene state =
 
     go node () xs = do
         let nodeId = nodeInfoId node
+            inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
         meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
         meshInfo <- MaybeT $ Component.readComponent meshId meshStore
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
-        let renderInfo = toRenderInfo defaultTexture meshInfo globalMatrix
+        let matrix = globalMatrix !*! inverseBindMatrix
+        let renderInfo = toRenderInfo defaultTexture meshInfo matrix
         return ((), renderInfo : xs)
 
 toRenderInfo :: Maybe Texture -> MeshInfo -> Mat4 -> RenderInfo
@@ -249,7 +251,7 @@ removeNode scene nodeId = do
     void $ Component.removeComponent nodeId (sceneNodeTransformMatrixStore scene)
 
 newNode :: Node
-newNode = Node Nothing Nothing Nothing BV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1)
+newNode = Node Nothing Nothing Nothing BV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1) Linear.identity
 
 translateNode :: Scene -> NodeId -> Vec3 -> IO ()
 translateNode scene nodeId v = applyTransformToNode scene nodeId f

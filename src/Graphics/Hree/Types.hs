@@ -69,13 +69,14 @@ newtype SkinId = SkinId
     } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
 
 data Node = Node
-    { nodeName        :: !(Maybe ByteString)
-    , nodeMesh        :: !(Maybe MeshId)
-    , nodeSkin        :: !(Maybe SkinId)
-    , nodeChildren    :: !(BV.Vector NodeId)
-    , nodeTranslation :: !Vec3
-    , nodeRotation    :: !Quaternion
-    , nodeScale       :: !Vec3
+    { nodeName              :: !(Maybe ByteString)
+    , nodeMesh              :: !(Maybe MeshId)
+    , nodeSkin              :: !(Maybe SkinId)
+    , nodeChildren          :: !(BV.Vector NodeId)
+    , nodeTranslation       :: !Vec3
+    , nodeRotation          :: !Quaternion
+    , nodeScale             :: !Vec3
+    , nodeInverseBindMatrix :: !Mat4
     } deriving (Show, Eq)
 
 data NodeInfo = NodeInfo
