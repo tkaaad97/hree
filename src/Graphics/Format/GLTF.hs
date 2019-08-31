@@ -1,10 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Graphics.Format.GLTF
-    (
+    ( Buffer(..)
+    , BufferView(..)
+    , Accessor(..)
+    , Mesh(..)
+    , Primitive(..)
+    , GLTF(..)
+    , loadGLTFFile
     ) where
 
-import qualified Data.Aeson as Aeson (FromJSON(..), withObject, (.!=), (.:),
-                                      (.:?))
+import qualified Data.Aeson as Aeson (FromJSON(..), eitherDecodeFileStrict',
+                                      withObject, (.!=), (.:), (.:?))
+import Data.Either (either)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Vector as BV (Vector)
@@ -15,10 +22,11 @@ data Buffer = Buffer
     } deriving (Show, Eq)
 
 data BufferView = BufferView
-    { bufferViewBufferId :: !Int
-    , bufferViewLength   :: !Int
-    , bufferViewOffset   :: !Int
-    , bufferViewName     :: !(Maybe Text)
+    { bufferViewBuffer     :: !Int
+    , bufferViewByteLength :: !Int
+    , bufferViewByteOffset :: !Int
+    , bufferViewTarget     :: !(Maybe Int)
+    , bufferViewName       :: !(Maybe Text)
     } deriving (Show, Eq)
 
 data Accessor = Accessor
@@ -43,6 +51,13 @@ data Primitive = Primitive
     , primitiveMode       :: !(Maybe Int)
     } deriving (Show, Eq)
 
+data GLTF = GLTF
+    { gltfMeshes      :: !(BV.Vector Mesh)
+    , gltfBuffers     :: !(BV.Vector Buffer)
+    , gltfBufferViews :: !(BV.Vector BufferView)
+    , gltfAccessors   :: !(BV.Vector Accessor)
+    } deriving (Show, Eq)
+
 instance Aeson.FromJSON Buffer where
     parseJSON = Aeson.withObject "Buffer" $ \v -> do
         len <- v Aeson..: "byteLength"
@@ -54,8 +69,9 @@ instance Aeson.FromJSON BufferView where
         buffer <- v Aeson..: "buffer"
         offset <- v Aeson..:? "byteOffset" Aeson..!= 0
         len <- v Aeson..: "byteLength"
+        target <- v Aeson..:? "target"
         name <- v Aeson..:? "name"
-        return $ BufferView buffer len offset name
+        return $ BufferView buffer len offset target name
 
 instance Aeson.FromJSON Accessor where
     parseJSON = Aeson.withObject "Accessor" $ \v -> do
@@ -81,3 +97,14 @@ instance Aeson.FromJSON Primitive where
         material <- v Aeson..:? "material"
         mode <- v Aeson..:? "mode"
         return $ Primitive attributes indices material mode
+
+instance Aeson.FromJSON GLTF where
+    parseJSON = Aeson.withObject "GLTF" $ \v -> do
+        meshes <- v Aeson..: "meshes"
+        buffers <- v Aeson..: "buffers"
+        bufferViews <- v Aeson..: "bufferViews"
+        accessors <- v Aeson..: "accessors"
+        return $ GLTF meshes buffers bufferViews accessors
+
+loadGLTFFile :: FilePath -> IO GLTF
+loadGLTFFile filepath = either error return =<< Aeson.eitherDecodeFileStrict' filepath
