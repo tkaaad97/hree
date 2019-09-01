@@ -14,7 +14,26 @@ spec = do
     describe "parse" $ do
         it "minimal1" $ do
             let expected = GLTF.GLTF
-                    { GLTF.gltfMeshes = BV.fromList
+                    { GLTF.gltfScenes = BV.fromList
+                        [ GLTF.Scene
+                            { GLTF.sceneNodes = BV.fromList [ 0 ]
+                            , GLTF.sceneName = Nothing
+                            }
+                        ]
+                    , GLTF.gltfNodes = BV.fromList
+                        [ GLTF.Node
+                            { GLTF.nodeCamera = Nothing
+                            , GLTF.nodeChildren = BV.empty
+                            , GLTF.nodeSkin = Nothing
+                            , GLTF.nodeMatrix = Nothing
+                            , GLTF.nodeMesh = Just 0
+                            , GLTF.nodeRotation = Nothing
+                            , GLTF.nodeScale = Nothing
+                            , GLTF.nodeTranslation = Nothing
+                            , GLTF.nodeName = Nothing
+                            }
+                        ]
+                    , GLTF.gltfMeshes = BV.fromList
                         [ GLTF.Mesh
                             { GLTF.meshPrimitives = BV.fromList
                                 [ GLTF.Primitive

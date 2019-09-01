@@ -5,16 +5,24 @@ module Graphics.Format.GLTF
     , Accessor(..)
     , Mesh(..)
     , Primitive(..)
+    , Node(..)
+    , Scene(..)
     , GLTF(..)
     , loadGLTFFile
     ) where
 
-import qualified Data.Aeson as Aeson (FromJSON(..), eitherDecodeFileStrict',
-                                      withObject, (.!=), (.:), (.:?))
+import qualified Data.Aeson as Aeson (FromJSON(..), Value,
+                                      eitherDecodeFileStrict', withObject,
+                                      (.!=), (.:), (.:?))
+import qualified Data.Aeson.Types as Aeson (Parser)
 import Data.Either (either)
 import Data.Map.Strict (Map)
+import Data.Maybe (maybe)
 import Data.Text (Text)
-import qualified Data.Vector as BV (Vector)
+import qualified Data.Vector as BV (Vector, empty)
+import qualified Data.Vector as UV (Vector, empty, length, (!))
+import Graphics.Hree.Math
+import qualified Linear (Quaternion(..), V3(..), V4(..))
 
 data Buffer = Buffer
     { bufferByteLength :: !Int
@@ -51,8 +59,27 @@ data Primitive = Primitive
     , primitiveMode       :: !(Maybe Int)
     } deriving (Show, Eq)
 
+data Scene = Scene
+    { sceneNodes :: !(BV.Vector Int)
+    , sceneName  :: !(Maybe Text)
+    } deriving (Show, Eq)
+
+data Node = Node
+    { nodeCamera      :: !(Maybe Int)
+    , nodeChildren    :: !(BV.Vector Int)
+    , nodeSkin        :: !(Maybe Int)
+    , nodeMatrix      :: !(Maybe Mat4)
+    , nodeMesh        :: !(Maybe Int)
+    , nodeRotation    :: !(Maybe Quaternion)
+    , nodeScale       :: !(Maybe Vec3)
+    , nodeTranslation :: !(Maybe Vec3)
+    , nodeName        :: !(Maybe Text)
+    } deriving (Show, Eq)
+
 data GLTF = GLTF
-    { gltfMeshes      :: !(BV.Vector Mesh)
+    { gltfScenes      :: !(BV.Vector Scene)
+    , gltfNodes       :: !(BV.Vector Node)
+    , gltfMeshes      :: !(BV.Vector Mesh)
     , gltfBuffers     :: !(BV.Vector Buffer)
     , gltfBufferViews :: !(BV.Vector BufferView)
     , gltfAccessors   :: !(BV.Vector Accessor)
@@ -98,13 +125,79 @@ instance Aeson.FromJSON Primitive where
         mode <- v Aeson..:? "mode"
         return $ Primitive attributes indices material mode
 
+instance Aeson.FromJSON Scene where
+    parseJSON = Aeson.withObject "Scene" $ \v -> do
+        nodes <- v Aeson..:? "nodes" Aeson..!= BV.empty
+        name <- v Aeson..:? "name"
+        return $ Scene nodes name
+
+instance Aeson.FromJSON Node where
+    parseJSON = Aeson.withObject "Node" $ \v -> do
+        camera <- v Aeson..:? "camera"
+        children <- v Aeson..:? "children" Aeson..!= BV.empty
+        skin <- v Aeson..:? "skin"
+        matrix <- mapM fromVectorToMat4 =<< v Aeson..:? "matrix"
+        mesh <- v Aeson..:? "mesh"
+        rotation <- mapM fromVectorToQuaternion =<< v Aeson..:? "rotation"
+        scale <- mapM fromVectorToVec3 =<< v Aeson..:? "scale"
+        translation <- mapM fromVectorToVec3 =<< v Aeson..:? "translation"
+        name <- v Aeson..:? "name"
+        return $ Node camera children skin matrix mesh rotation scale translation name
+
 instance Aeson.FromJSON GLTF where
     parseJSON = Aeson.withObject "GLTF" $ \v -> do
+        scenes <- v Aeson..:? "scenes" Aeson..!= BV.empty
+        nodes <- v Aeson..:? "nodes" Aeson..!= BV.empty
         meshes <- v Aeson..: "meshes"
         buffers <- v Aeson..: "buffers"
         bufferViews <- v Aeson..: "bufferViews"
         accessors <- v Aeson..: "accessors"
-        return $ GLTF meshes buffers bufferViews accessors
+        return $ GLTF scenes nodes meshes buffers bufferViews accessors
+
+fromVectorToVec3 :: UV.Vector Float -> Aeson.Parser Vec3
+fromVectorToVec3 v
+    | UV.length v == 3 =
+        let a0 = v UV.! 0
+            a1 = v UV.! 1
+            a2 = v UV.! 2
+        in return $ Linear.V3 a0 a1 a2
+    | otherwise = fail "bad array size"
+
+fromVectorToQuaternion :: UV.Vector Float -> Aeson.Parser Quaternion
+fromVectorToQuaternion v
+    | UV.length v == 4 =
+        let a0 = v UV.! 0
+            a1 = v UV.! 1
+            a2 = v UV.! 2
+            a3 = v UV.! 3
+        in return $ Linear.Quaternion a0 (Linear.V3 a1 a2 a3)
+    | otherwise = fail "bad array size"
+
+fromVectorToMat4 :: UV.Vector Float -> Aeson.Parser Mat4
+fromVectorToMat4 v
+    | UV.length v == 16 =
+        let a00 = v UV.! 0
+            a01 = v UV.! 1
+            a02 = v UV.! 2
+            a03 = v UV.! 3
+            a10 = v UV.! 4
+            a11 = v UV.! 5
+            a12 = v UV.! 6
+            a13 = v UV.! 7
+            a20 = v UV.! 8
+            a21 = v UV.! 9
+            a22 = v UV.! 10
+            a23 = v UV.! 11
+            a30 = v UV.! 12
+            a31 = v UV.! 13
+            a32 = v UV.! 14
+            a33 = v UV.! 15
+            r0 = Linear.V4 a00 a01 a02 a03
+            r1 = Linear.V4 a10 a11 a12 a13
+            r2 = Linear.V4 a20 a21 a22 a23
+            r3 = Linear.V4 a30 a31 a32 a33
+        in return $ Linear.V4 r0 r1 r2 r3
+    | otherwise = fail "bad array size"
 
 loadGLTFFile :: FilePath -> IO GLTF
 loadGLTFFile filepath = either error return =<< Aeson.eitherDecodeFileStrict' filepath
