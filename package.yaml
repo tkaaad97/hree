@@ -25,8 +25,10 @@ dependencies:
 - attoparsec
 - binary
 - bytestring
+- base64-bytestring
 - cereal
 - containers
+- directory
 - filepath
 - file-embed
 - gl
