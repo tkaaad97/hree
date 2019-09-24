@@ -36,7 +36,7 @@ addAttribBindings geo bindingIndex xs b = geo'
 
 addVerticesToGeometry :: forall a. (Storable a, Vertex a) => Geometry -> Vector a -> GL.GLenum -> Scene -> IO Geometry
 addVerticesToGeometry geometry storage usage scene = do
-    buffer <- addBuffer scene (BufferSource storage usage)
+    buffer <- addBuffer scene (BufferSourceVector storage usage)
     let buffers' = IntMap.insert bindingIndex (buffer, bbs) buffers
     return (Geometry attribBindings' buffers' indexBuffer count)
     where

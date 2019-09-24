@@ -8,6 +8,8 @@ module Graphics.Hree.GL
 import Control.Exception (throwIO)
 import Control.Monad (void, when)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString (length)
+import qualified Data.ByteString.Unsafe as ByteString (unsafeUseAsCString)
 import Data.Foldable (foldrM)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -66,18 +68,26 @@ drawWith (DrawArraysInstanced mode index num inum) = GLW.glDrawArraysInstanced m
 drawWith (DrawElementsInstanced mode num dataType indices inum) = GLW.glDrawElementsInstanced mode num dataType indices inum
 
 mkBuffer :: BufferSource -> IO GLW.Buffer
-mkBuffer (BufferSource vec usage) = do
+mkBuffer (BufferSourceVector vec usage) = do
     let n = V.length vec
         size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
     return buffer
+mkBuffer (BufferSourceByteString bs usage) = do
+    let size = fromIntegral $ ByteString.length bs
+    buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
+    ByteString.unsafeUseAsCString bs $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
+    return buffer
 
 updateBuffer :: GLW.Buffer -> BufferSource -> IO ()
-updateBuffer buffer (BufferSource vec usage) = do
+updateBuffer buffer (BufferSourceVector vec usage) = do
     let n = V.length vec
         size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
     V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
+updateBuffer buffer (BufferSourceByteString bs usage) = do
+    let size = fromIntegral $ ByteString.length bs
+    ByteString.unsafeUseAsCString bs $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
 
 mkVertexArray :: Map ByteString AttribBinding -> IntMap (GLW.Buffer, BindBufferSetting) -> Maybe IndexBuffer -> ProgramInfo -> IO GLW.VertexArray
 mkVertexArray attribBindings buffers indexBuffer programInfo = do

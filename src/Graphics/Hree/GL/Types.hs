@@ -73,7 +73,9 @@ data DrawMethod =
     DrawElementsInstanced !GLW.PrimitiveType !GL.GLsizei !GL.GLenum !(Ptr ()) !GL.GLsizei
     deriving (Show, Eq)
 
-data BufferSource = forall a. Storable a => BufferSource !(Vector a) !GL.GLenum
+data BufferSource =
+    forall a. Storable a => BufferSourceVector !(Vector a) !GL.GLenum |
+    BufferSourceByteString !ByteString !GL.GLenum
 
 type BindingIndex = Int
 
