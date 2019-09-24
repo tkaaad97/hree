@@ -16,7 +16,7 @@ import qualified Data.Aeson as Aeson (FromJSON(..), eitherDecodeFileStrict',
                                       withObject, (.!=), (.:), (.:?))
 import qualified Data.Aeson.Types as Aeson (Parser)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString (readFile, stripPrefix)
+import qualified Data.ByteString as ByteString (readFile, stripPrefix, take)
 import qualified Data.ByteString.Base64 as Base64 (decode)
 import qualified Data.ByteString.Char8 as ByteString (break, drop, dropWhile,
                                                       unpack)
@@ -24,9 +24,14 @@ import Data.Either (either)
 import Data.Map.Strict (Map)
 import Data.Maybe (maybe)
 import Data.Text (Text)
-import qualified Data.Vector as BV (Vector, empty)
+import qualified Data.Text.Encoding as Text (encodeUtf8)
+import qualified Data.Vector as BV (Vector, empty, mapM)
 import qualified Data.Vector as UV (Vector, length, (!))
+import qualified GLW (Buffer)
+import qualified Graphics.GL as GL
+import qualified Graphics.Hree.GL.Types as Hree (BufferSource(..))
 import Graphics.Hree.Math
+import qualified Graphics.Hree.Scene as Hree (Scene, addBuffer)
 import qualified Linear (Quaternion(..), V3(..), V4(..))
 import System.Directory (canonicalizePath)
 import System.FilePath ((</>))
@@ -209,14 +214,25 @@ fromVectorToMat4 v
 loadGLTFFile :: FilePath -> IO GLTF
 loadGLTFFile filepath = either error return =<< Aeson.eitherDecodeFileStrict' filepath
 
-parseUri :: FilePath -> ByteString -> IO ByteString
-parseUri cd uri =
+parseUri :: FilePath -> Int -> ByteString -> IO ByteString
+parseUri cd byteLength uri =
     case scheme of
-        "data" -> either (throwIO . userError) return . Base64.decode . ByteString.drop 1 . ByteString.dropWhile (/= ',') $ remainder
+        "data" -> do
+            bs <- either (throwIO . userError) return . Base64.decode . ByteString.drop 1 . ByteString.dropWhile (/= ',') $ remainder
+            return $ ByteString.take byteLength bs
         "file" -> do
             relativePath <- maybe (throwIO . userError $ "file uri parse error") return $ ByteString.stripPrefix "://" remainder
             path <- canonicalizePath $ cd </> ByteString.unpack relativePath
-            ByteString.readFile path
+            bs <- ByteString.readFile path
+            return $ ByteString.take byteLength bs
         _ -> throwIO . userError $ "unknown scheme: " ++ ByteString.unpack scheme
     where
     (scheme, remainder) = ByteString.break (/= ':') uri
+
+createBuffer :: FilePath -> Hree.Scene -> Buffer -> IO GLW.Buffer
+createBuffer cd scene (Buffer byteLength uri) = do
+    bs <- parseUri cd byteLength (Text.encodeUtf8 uri)
+    Hree.addBuffer scene (Hree.BufferSourceByteString bs GL.GL_STATIC_READ)
+
+createBuffers :: FilePath -> Hree.Scene -> BV.Vector Buffer -> IO (BV.Vector GLW.Buffer)
+createBuffers cd scene = BV.mapM (createBuffer cd scene)
