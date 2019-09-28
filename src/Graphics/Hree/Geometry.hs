@@ -27,10 +27,11 @@ import Linear (V2(..), V3(..))
 newGeometry :: Geometry
 newGeometry = Geometry Map.empty IntMap.empty Nothing 0
 
-addAttribBindings :: Geometry -> Int -> Map ByteString AttribBinding -> (GLW.Buffer, BindBufferSetting) -> Geometry
+addAttribBindings :: Geometry -> Int -> Map ByteString AttribFormat -> (GLW.Buffer, BindBufferSetting) -> Geometry
 addAttribBindings geo bindingIndex xs b = geo'
     where
-    attribBindings = Map.union (geometryAttribBindings geo) xs
+    adding = Map.map (AttribBinding (GLW.BindingIndex $ fromIntegral bindingIndex)) xs
+    attribBindings = Map.union (geometryAttribBindings geo) adding
     buffers = IntMap.insert bindingIndex b (geometryBuffers geo)
     geo' = geo { geometryAttribBindings = attribBindings, geometryBuffers = buffers }
 
