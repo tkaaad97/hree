@@ -58,6 +58,7 @@ spec = do
                             { GLTF.bufferViewBuffer = 0
                             , GLTF.bufferViewByteOffset = 0
                             , GLTF.bufferViewByteLength = 6
+                            , GLTF.bufferViewByteStride = Nothing
                             , GLTF.bufferViewTarget = Just 34963
                             , GLTF.bufferViewName = Nothing
                             }
@@ -65,6 +66,7 @@ spec = do
                             { GLTF.bufferViewBuffer = 0
                             , GLTF.bufferViewByteOffset = 8
                             , GLTF.bufferViewByteLength = 36
+                            , GLTF.bufferViewByteStride = Nothing
                             , GLTF.bufferViewTarget = Just 34962
                             , GLTF.bufferViewName = Nothing
                             }
@@ -73,18 +75,18 @@ spec = do
                         [ GLTF.Accessor
                             { GLTF.accessorBufferView = 0
                             , GLTF.accessorByteOffset = 0
-                            , GLTF.accessorComponentType = 5123
+                            , GLTF.accessorComponentType = GLTF.UnsignedShort'
                             , GLTF.accessorCount = 3
-                            , GLTF.accessorType = "SCALAR"
+                            , GLTF.accessorType = GLTF.Scalar
                             , GLTF.accessorNormalized = False
                             , GLTF.accessorName = Nothing
                             }
                         , GLTF.Accessor
                             { GLTF.accessorBufferView = 1
                             , GLTF.accessorByteOffset = 0
-                            , GLTF.accessorComponentType = 5126
+                            , GLTF.accessorComponentType = GLTF.Float'
                             , GLTF.accessorCount = 3
-                            , GLTF.accessorType = "VEC3"
+                            , GLTF.accessorType = GLTF.Vec3
                             , GLTF.accessorNormalized = False
                             , GLTF.accessorName = Nothing
                             }
