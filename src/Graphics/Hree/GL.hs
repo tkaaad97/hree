@@ -127,11 +127,11 @@ mkVertexArray attribBindings buffers indexBuffer programInfo = do
 setVertexArrayAttribFormatAndBinding :: GLW.VertexArray -> GLW.AttribLocation -> AttribBinding -> IO ()
 setVertexArrayAttribFormatAndBinding vao attribLocation (AttribBinding binding format) = do
     GLW.glVertexArrayAttribBinding vao attribLocation binding
-    GLW.glVertexArrayAttribFormat vao attribLocation formatSize formatDataType formatNormalized formatRelativeOffset
+    GLW.glVertexArrayAttribFormat vao attribLocation formatSize formatComponentType formatNormalized formatRelativeOffset
     GLW.glEnableVertexArrayAttrib vao attribLocation
 
     where
-    AttribFormat fsize formatDataType fnormalized foffset = format
+    AttribFormat fsize formatComponentType fnormalized foffset = format
     formatSize = fromIntegral fsize
     formatNormalized = fromIntegral . fromEnum $ fnormalized
     formatRelativeOffset = fromIntegral foffset

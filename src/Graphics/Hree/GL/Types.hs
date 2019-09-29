@@ -40,7 +40,7 @@ data UniformInfo = UniformInfo
 
 data AttribFormat = AttribFormat
     { attribFormatSize           :: !Int
-    , attribFormatDataType       :: !GL.GLuint
+    , attribFormatComponentType  :: !GL.GLenum
     , attribFormatNormalized     :: !Bool
     , attribFormatRelativeOffset :: !Int
     } deriving (Show, Eq)
