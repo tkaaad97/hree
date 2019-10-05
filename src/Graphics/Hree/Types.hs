@@ -19,6 +19,7 @@ import Data.Hashable (Hashable(..))
 import Data.IntMap.Strict (IntMap)
 import Data.IORef (IORef)
 import Data.Map.Strict (Map)
+import Data.Text (Text)
 import qualified Data.Vector as BV
 import qualified Data.Vector.Mutable as MBV
 import qualified Data.Vector.Storable as SV
@@ -69,7 +70,7 @@ newtype SkinId = SkinId
     } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
 
 data Node = Node
-    { nodeName              :: !(Maybe ByteString)
+    { nodeName              :: !(Maybe Text)
     , nodeMesh              :: !(Maybe MeshId)
     , nodeSkin              :: !(Maybe SkinId)
     , nodeChildren          :: !(BV.Vector NodeId)

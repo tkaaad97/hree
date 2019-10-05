@@ -21,6 +21,7 @@ module Graphics.Format.GLTF
     ) where
 
 import Control.Exception (throwIO)
+import Control.Monad (void)
 import qualified Data.Aeson as Aeson (FromJSON(..), eitherDecodeFileStrict',
                                       withObject, (.!=), (.:), (.:?))
 import qualified Data.Aeson.Types as Aeson (Parser)
@@ -37,7 +38,7 @@ import Data.Maybe (fromMaybe, maybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
-import qualified Data.Vector as BV (Vector, empty, mapM, (!?))
+import qualified Data.Vector as BV (Vector, empty, imapM_, map, mapM, (!), (!?))
 import qualified Data.Vector as UV (Vector, length, (!))
 import qualified GLW (Buffer)
 import qualified Graphics.GL as GL
@@ -47,9 +48,11 @@ import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
                                                  BufferSource(..))
 import qualified Graphics.Hree.Material as Hree (basicMaterial)
 import Graphics.Hree.Math
-import qualified Graphics.Hree.Scene as Hree (Scene, addBuffer, addMesh)
-import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId)
-import qualified Linear (Quaternion(..), V3(..), V4(..))
+import qualified Graphics.Hree.Scene as Hree (Scene, addBuffer, addMesh,
+                                              addNode, newNode, updateNode)
+import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId,
+                                              Node(..), NodeId)
+import qualified Linear (Quaternion(..), V3(..), V4(..), zero)
 import System.Directory (canonicalizePath)
 import System.FilePath ((</>))
 
@@ -409,3 +412,46 @@ groupAttributes buffers bufferViews accessors primitive = do
         let (common, _) = head group
         in (common, map snd group)
     sameBufferView ((a, _), _) ((b, _), _) = a == b
+
+createNodes :: Hree.Scene -> BV.Vector Node -> BV.Vector Int -> BV.Vector (BV.Vector Hree.MeshId) -> IO ()
+createNodes scene nodes rootNodes meshes = do
+    nodeIds <- BV.mapM (createNode scene) nodes
+    BV.imapM_ (setNodeChildren scene nodeIds) nodes
+    BV.imapM_ (createMeshNodes scene nodeIds meshes) nodes
+
+createNode :: Hree.Scene -> Node -> IO Hree.NodeId
+createNode scene a =
+    Hree.addNode scene node False
+    where
+    translation = fromMaybe Linear.zero (nodeTranslation a)
+    rotation = fromMaybe Linear.zero (nodeRotation a)
+    scale = fromMaybe (Linear.V3 1 1 1) (nodeScale a)
+    node = Hree.newNode
+            { Hree.nodeName = nodeName a
+            , Hree.nodeTranslation = translation
+            , Hree.nodeRotation = rotation
+            , Hree.nodeScale = scale
+            }
+
+setNodeChildren :: Hree.Scene -> BV.Vector Hree.NodeId -> Int -> Node -> IO ()
+setNodeChildren scene nodeIds i a =
+    void $ Hree.updateNode scene nodeId f
+    where
+    nodeId = nodeIds BV.! i
+    children = BV.map (nodeIds BV.!) (nodeChildren a)
+    f node = node { Hree.nodeChildren = children }
+
+createMeshNodes :: Hree.Scene -> BV.Vector Hree.NodeId -> BV.Vector (BV.Vector Hree.MeshId) -> Int -> Node -> IO ()
+createMeshNodes scene nodeIds meshes i a =
+    flip (maybe (return ())) (nodeMesh a) $ \j -> do
+        let nodeId = nodeIds BV.! i
+            meshIds = meshes BV.! j
+        children <- BV.mapM (createMeshNode scene) meshIds
+        void . Hree.updateNode scene nodeId $ \node ->
+            node { Hree.nodeChildren = Hree.nodeChildren node `mappend` children }
+
+createMeshNode :: Hree.Scene -> Hree.MeshId -> IO Hree.NodeId
+createMeshNode scene meshId =
+    Hree.addNode scene node False
+    where
+    node = Hree.newNode { Hree.nodeMesh = Just meshId }
