@@ -6,23 +6,25 @@ module Graphics.Hree.Scene
     , Scene(..)
     , SceneState(..)
     , addBuffer
+    , addIndexBufferUByte
+    , addIndexBufferUInt
+    , addIndexBufferUShort
     , addMesh
     , addNode
-    , deleteScene
-    , addIndexBufferUByte
-    , addIndexBufferUShort
-    , addIndexBufferUInt
+    , addRootNodes
     , addSampler
     , addTexture
+    , applyTransformToNode
+    , deleteScene
     , newNode
     , newScene
     , removeMesh
     , removeNode
     , renderScene
-    , translateNode
     , rotateNode
+    , translateNode
     , updateMeshInstanceCount
-    , applyTransformToNode
+    , updateNode
     ) where
 
 import Control.Exception (bracketOnError, throwIO)
@@ -249,6 +251,21 @@ removeNode scene nodeId = do
     void $ Component.removeComponent nodeId (sceneNodeStore scene)
     void $ Component.removeComponent nodeId (sceneNodeTransformStore scene)
     void $ Component.removeComponent nodeId (sceneNodeTransformMatrixStore scene)
+
+updateNode :: Scene -> NodeId -> (Node -> Node) -> IO Bool
+updateNode scene nodeId f =
+    Component.modifyComponent nodeId g nodeStore
+    where
+    nodeStore = sceneNodeStore scene
+    g a = a { nodeInfoNode = f (nodeInfoNode a) }
+
+addRootNodes :: Scene -> BV.Vector NodeId -> IO ()
+addRootNodes scene nodeIds = atomicModifyIORef' (sceneState scene) addRootNodesFunc
+    where
+    addRootNodesFunc state =
+        let rootNodeIds = ssRootNodes state
+            state' = state { ssRootNodes = rootNodeIds `mappend` nodeIds }
+        in (state', ())
 
 newNode :: Node
 newNode = Node Nothing Nothing Nothing BV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1) Linear.identity
