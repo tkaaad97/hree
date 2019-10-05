@@ -340,6 +340,14 @@ createBuffer cd scene (Buffer byteLength uri) = do
 createBuffers :: FilePath -> Hree.Scene -> BV.Vector Buffer -> IO (BV.Vector GLW.Buffer)
 createBuffers cd scene = BV.mapM (createBuffer cd scene)
 
+createGLTFMeshes :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector Hree.MeshId))
+createGLTFMeshes scene buffers bufferViews accessors =
+    BV.mapM (createMeshes scene buffers bufferViews accessors)
+
+createMeshes :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Mesh -> IO (BV.Vector Hree.MeshId)
+createMeshes scene buffers bufferViews accessors =
+    BV.mapM (createMeshFromPrimitive scene buffers bufferViews accessors) . meshPrimitives
+
 createMeshFromPrimitive :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Primitive -> IO Hree.MeshId
 createMeshFromPrimitive scene buffers bufferViews accessors primitive = do
     groups <- either error return $ groupAttributes buffers bufferViews accessors primitive
