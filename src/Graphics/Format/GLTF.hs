@@ -350,7 +350,7 @@ parseUri cd byteLength uri =
             return $ ByteString.take byteLength bs
         _ -> throwIO . userError $ "unknown scheme: " ++ ByteString.unpack scheme
     where
-    (scheme, remainder) = ByteString.break (/= ':') uri
+    (scheme, remainder) = ByteString.break (== ':') uri
 
 createBuffer :: FilePath -> Hree.Scene -> Buffer -> IO GLW.Buffer
 createBuffer cd scene (Buffer byteLength uri) = do
