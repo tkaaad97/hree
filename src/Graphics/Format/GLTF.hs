@@ -22,7 +22,7 @@ module Graphics.Format.GLTF
     ) where
 
 import Control.Exception (throwIO)
-import Control.Monad (void)
+import Control.Monad (unless, void)
 import qualified Data.Aeson as Aeson (FromJSON(..), eitherDecodeFileStrict',
                                       withObject, (.!=), (.:), (.:?))
 import qualified Data.Aeson.Types as Aeson (Parser)
@@ -46,7 +46,8 @@ import qualified Graphics.GL as GL
 import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
 import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
                                                  BindBufferSetting(..),
-                                                 BufferSource(..))
+                                                 BufferSource(..),
+                                                 IndexBuffer(..))
 import qualified Graphics.Hree.Material as Hree (basicMaterial,
                                                  flatColorMaterial)
 import Graphics.Hree.Math
@@ -374,9 +375,13 @@ createMeshFromPrimitive scene buffers bufferViews accessors primitive = do
     groups <- either error return $ groupAttributes buffers bufferViews accessors primitive
     let (_, geometry) = foldl addAttribBindings (1, Hree.newGeometry) groups
         verticesCount = minimum . map (accessorCount . snd) . concatMap snd $ groups
-        geometry' = geometry { Hree.geometryVerticesCount = verticesCount }
+        geometry1 = geometry { Hree.geometryVerticesCount = verticesCount }
+
+    geometry2 <- flip (maybe (return geometry1)) (primitiveIndices primitive) $
+        either error return . setIndexBuffer geometry1 buffers bufferViews accessors
+
     let material = Hree.flatColorMaterial (Linear.V4 1 0 0 1) -- Hree.basicMaterial Nothing
-        mesh = Hree.Mesh geometry' material Nothing
+        mesh = Hree.Mesh geometry2 material Nothing
     Hree.addMesh scene mesh
 
 addAttribBindings :: (Int, Hree.Geometry) -> ((BufferView, GLW.Buffer), [(Text, Accessor)]) -> (Int, Hree.Geometry)
@@ -442,6 +447,29 @@ groupAttributes buffers bufferViews accessors primitive = do
         let (common, _) = head group
         in (common, map snd group)
     sameBufferView ((a, _), _) ((b, _), _) = a == b
+
+setIndexBuffer :: Hree.Geometry -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> Either String Hree.Geometry
+setIndexBuffer geometry buffers bufferViews accessors i = do
+    accessor <- maybe (fail $ "invalid accessor identifier: " ++ show i) return $ accessors BV.!? i
+    bufferView <- maybe (fail $ "invalid bufferView identifier: " ++ show (accessorBufferView accessor)) return $ bufferViews BV.!? accessorBufferView accessor
+    buffer <- maybe (fail $ "invalid buffer identifier: " ++ show (bufferViewBuffer bufferView)) return $ buffers BV.!? bufferViewBuffer bufferView
+    indexBuffer <- createIndexBuffer buffer bufferView accessor
+    return $ geometry { Hree.geometryIndexBuffer = Just indexBuffer }
+
+createIndexBuffer :: GLW.Buffer -> BufferView -> Accessor -> Either String Hree.IndexBuffer
+createIndexBuffer buffer bufferView accessor = do
+    unless (accessorType accessor == Scalar) $
+        fail ("accessorType should be SCALAR. but actual accessorType: " ++ show (accessorType accessor))
+    dataType <- convertToIndexBufferDataType (accessorComponentType accessor)
+    let count = accessorCount accessor
+        offset = bufferViewByteOffset bufferView
+    return $ Hree.IndexBuffer buffer dataType (fromIntegral count) offset
+
+convertToIndexBufferDataType :: ComponentType -> Either String GL.GLenum
+convertToIndexBufferDataType UnsignedByte' = return GL.GL_UNSIGNED_BYTE
+convertToIndexBufferDataType UnsignedShort' = return GL.GL_UNSIGNED_SHORT
+convertToIndexBufferDataType UnsignedInt' = return GL.GL_UNSIGNED_INT
+convertToIndexBufferDataType a = fail $ "invalid componentType: " ++ show a
 
 createNodes :: Hree.Scene -> BV.Vector Node -> BV.Vector Int -> BV.Vector (BV.Vector Hree.MeshId) -> IO ()
 createNodes scene nodes rootNodes meshes = do
