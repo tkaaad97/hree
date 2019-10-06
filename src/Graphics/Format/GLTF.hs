@@ -11,6 +11,7 @@ module Graphics.Format.GLTF
     , Scene(..)
     , GLTF(..)
     , loadGLTFFile
+    , loadSceneFromFile
     , marshalComponentType
     , unmarshalComponentType
     , componentByteSize
@@ -54,7 +55,7 @@ import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId,
                                               Node(..), NodeId)
 import qualified Linear (Quaternion(..), V3(..), V4(..), zero)
 import System.Directory (canonicalizePath)
-import System.FilePath ((</>))
+import System.FilePath (dropFileName, (</>))
 
 data ComponentType =
     Byte' |
@@ -319,6 +320,22 @@ fromVectorToMat4 v
 
 loadGLTFFile :: FilePath -> IO GLTF
 loadGLTFFile filepath = either error return =<< Aeson.eitherDecodeFileStrict' filepath
+
+loadSceneFromFile :: FilePath -> Hree.Scene -> IO GLTF
+loadSceneFromFile path scene = do
+    gltf <- loadGLTFFile path
+    let buffers_ = gltfBuffers gltf
+        bufferViews_ = gltfBufferViews gltf
+        accessors_ = gltfAccessors gltf
+        meshes_ = gltfMeshes gltf
+        nodes_ = gltfNodes gltf
+        scenes_ = gltfScenes gltf
+        rootNodes = maybe mempty sceneNodes $ scenes_ BV.!? 0
+        basepath = dropFileName path
+    buffers <- createBuffers basepath scene buffers_
+    meshes <- createGLTFMeshes scene buffers bufferViews_ accessors_ meshes_
+    createNodes scene nodes_ rootNodes meshes
+    return gltf
 
 parseUri :: FilePath -> Int -> ByteString -> IO ByteString
 parseUri cd byteLength uri =
