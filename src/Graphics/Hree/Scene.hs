@@ -41,7 +41,7 @@ import qualified Data.Component as Component
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe, maybeToList)
+import Data.Maybe (catMaybes, fromMaybe, maybeToList)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
@@ -128,13 +128,17 @@ updateNodeMatrices scene state = foldNodes scene state go (zeroTransform, Linear
 
 nodeToRenderInfos :: Scene -> SceneState -> MaybeT IO [RenderInfo]
 nodeToRenderInfos scene state =
-    foldNodes scene state go () []
+    catMaybes <$> foldNodes scene state go () []
     where
     defaultTexture = ssDefaultTexture state
     meshStore = sceneMeshStore scene
     globalMatrixStore = sceneNodeGlobalTransformMatrixStore scene
 
     go node () xs = do
+        maybeRenderInfo <- lift . runMaybeT . f $ node
+        return ((), maybeRenderInfo : xs)
+
+    f node = do
         let nodeId = nodeInfoId node
             inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
         meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
@@ -142,7 +146,7 @@ nodeToRenderInfos scene state =
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
         let matrix = globalMatrix !*! inverseBindMatrix
         let renderInfo = toRenderInfo defaultTexture meshInfo matrix
-        return ((), renderInfo : xs)
+        return renderInfo
 
 toRenderInfo :: Maybe Texture -> MeshInfo -> Mat4 -> RenderInfo
 toRenderInfo defaultTexture meshInfo matrix =
