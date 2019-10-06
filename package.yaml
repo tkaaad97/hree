@@ -124,6 +124,18 @@ executables:
     - hree
     - GLFW-b
 
+  gltf-minimal-1:
+    main:                Main.hs
+    source-dirs:         examples/gltf-minimal-1
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - examples-common
+    - hree
+    - GLFW-b
+
   child-node-1:
     main:                Main.hs
     source-dirs:         examples/child-node-1
