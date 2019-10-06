@@ -47,7 +47,7 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word16, Word32, Word8)
 import Foreign (Ptr)
-import qualified Foreign (castPtr, copyArray, nullPtr, withArray)
+import qualified Foreign (castPtr, copyArray, nullPtr, plusPtr, withArray)
 import qualified GLW
 import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit,
                                                     glDepthBufferBit)
@@ -180,12 +180,12 @@ resolveDrawMethod mesh =
     where
     resolve indicesCount Nothing Nothing =
         DrawArrays PrimitiveType.glTriangles 0 indicesCount
-    resolve _ (Just (IndexBuffer _ dt indicesCount)) Nothing =
-        DrawElements PrimitiveType.glTriangles indicesCount dt Foreign.nullPtr
+    resolve _ (Just (IndexBuffer _ dt indicesCount offset)) Nothing =
+        DrawElements PrimitiveType.glTriangles indicesCount dt (Foreign.nullPtr `Foreign.plusPtr` offset)
     resolve indicesCount Nothing (Just instanceCount) =
         DrawArraysInstanced PrimitiveType.glTriangles 0 indicesCount instanceCount
-    resolve _ (Just (IndexBuffer _ dt indicesCount)) (Just instanceCount) =
-        DrawElementsInstanced PrimitiveType.glTriangles indicesCount dt Foreign.nullPtr instanceCount
+    resolve _ (Just (IndexBuffer _ dt indicesCount offset)) (Just instanceCount) =
+        DrawElementsInstanced PrimitiveType.glTriangles indicesCount dt (Foreign.nullPtr `Foreign.plusPtr` offset) instanceCount
 
 addMesh :: Scene -> Mesh -> IO MeshId
 addMesh scene mesh = do
@@ -315,17 +315,17 @@ addBuffer scene bufferSource = do
 addIndexBufferUByte :: Scene -> SV.Vector Word8 -> IO IndexBuffer
 addIndexBufferUByte scene v = do
     buffer <- addBuffer scene (BufferSourceVector v GL.GL_STATIC_READ)
-    return (IndexBuffer buffer GL.GL_UNSIGNED_BYTE (fromIntegral . SV.length $ v))
+    return (IndexBuffer buffer GL.GL_UNSIGNED_BYTE (fromIntegral . SV.length $ v) 0)
 
 addIndexBufferUShort :: Scene -> SV.Vector Word16 -> IO IndexBuffer
 addIndexBufferUShort scene v = do
     buffer <- addBuffer scene (BufferSourceVector v GL.GL_STATIC_READ)
-    return (IndexBuffer buffer GL.GL_UNSIGNED_SHORT (fromIntegral . SV.length $ v))
+    return (IndexBuffer buffer GL.GL_UNSIGNED_SHORT (fromIntegral . SV.length $ v) 0)
 
 addIndexBufferUInt :: Scene -> SV.Vector Word32 -> IO IndexBuffer
 addIndexBufferUInt scene v = do
     buffer <- addBuffer scene (BufferSourceVector v GL.GL_STATIC_READ)
-    return (IndexBuffer buffer GL.GL_UNSIGNED_INT (fromIntegral . SV.length $ v))
+    return (IndexBuffer buffer GL.GL_UNSIGNED_INT (fromIntegral . SV.length $ v) 0)
 
 addTexture :: Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D)
 addTexture scene name settings source =

@@ -95,7 +95,8 @@ newtype Texture = Texture
     } deriving (Show, Eq)
 
 data IndexBuffer = IndexBuffer
-    { ibBuffer   :: !GLW.Buffer
-    , ibDataType :: !GL.GLenum
-    , ibCount    :: !GL.GLsizei
+    { ibBuffer     :: !GLW.Buffer
+    , ibDataType   :: !GL.GLenum
+    , ibCount      :: !GL.GLsizei
+    , ibByteOffset :: !Int
     } deriving (Show, Eq)
