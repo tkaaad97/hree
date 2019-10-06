@@ -447,6 +447,8 @@ createNodes scene nodes rootNodes meshes = do
     nodeIds <- BV.mapM (createNode scene) nodes
     BV.imapM_ (setNodeChildren scene nodeIds) nodes
     BV.imapM_ (createMeshNodes scene nodeIds meshes) nodes
+    let rootNodeIds = BV.map (nodeIds BV.!) rootNodes
+    Hree.addRootNodes scene rootNodeIds
 
 createNode :: Hree.Scene -> Node -> IO Hree.NodeId
 createNode scene a =
