@@ -388,7 +388,7 @@ addAttribBindings (bindingIndex, geometry0) ((bufferView, buffer), attribs) =
     bbs = Hree.BindBufferSetting offset stride 0
     vertexCount = minimum . map (accessorCount . snd) $ attribs
     attribFormats = Map.fromList . map f $ attribs
-    f (key, accessor) = (Text.encodeUtf8 key, accessorToAttribFormat accessor)
+    f (key, accessor) = (convertAttribName key, accessorToAttribFormat accessor)
 
 accessorToAttribFormat :: Accessor -> Hree.AttribFormat
 accessorToAttribFormat accessor =
@@ -400,6 +400,18 @@ accessorToAttribFormat accessor =
     offset = accessorByteOffset accessor
     formatComponentType = componentTypeToGLenum componentType
     num = numberOfComponent valueType
+
+convertAttribName :: Text -> ByteString
+convertAttribName name
+    | name == "POSITION" = "position"
+    | name == "NORMAL" = "normal"
+    | name == "TANGENT" = "tangent"
+    | name == "TEXCOORD_0" = "uv"
+    | name == "TEXCOORD_1" = "uv1"
+    | name == "COLOR_0" = "color"
+    | name == "JOINTS_0" = "joint"
+    | name == "WEIGHTS_0" = "weight"
+    | otherwise = "unknown"
 
 calcStrideFromAccessors :: [Accessor] -> Int
 calcStrideFromAccessors = sum . map accessorByteStride
