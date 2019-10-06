@@ -104,7 +104,7 @@ data SceneState = SceneState
     , ssSamplers       :: !(Map ByteString GLW.Sampler)
     , ssDefaultTexture :: !(Maybe Texture)
     , ssPrograms       :: !(Map ProgramSpec ProgramInfo)
-    }
+    } deriving (Show)
 
 data Skin = Skin
     { skinInverseBindMatrices :: !(SV.Vector Mat4)
