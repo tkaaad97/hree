@@ -47,12 +47,13 @@ import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
 import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
                                                  BindBufferSetting(..),
                                                  BufferSource(..))
-import qualified Graphics.Hree.Material as Hree (basicMaterial)
+import qualified Graphics.Hree.Material as Hree (basicMaterial,
+                                                 flatColorMaterial)
 import Graphics.Hree.Math
-import qualified Graphics.Hree.Scene as Hree (Scene, addBuffer, addMesh,
-                                              addNode, newNode, updateNode)
+import qualified Graphics.Hree.Scene as Hree (addBuffer, addMesh, addNode,
+                                              addRootNodes, newNode, updateNode)
 import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId,
-                                              Node(..), NodeId)
+                                              Node(..), NodeId, Scene)
 import qualified Linear (Quaternion(..), V3(..), V4(..), zero)
 import System.Directory (canonicalizePath)
 import System.FilePath (dropFileName, (</>))
@@ -372,21 +373,21 @@ createMeshFromPrimitive :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector Buffe
 createMeshFromPrimitive scene buffers bufferViews accessors primitive = do
     groups <- either error return $ groupAttributes buffers bufferViews accessors primitive
     let (_, geometry) = foldl addAttribBindings (1, Hree.newGeometry) groups
-    let material = Hree.basicMaterial Nothing
-        mesh = Hree.Mesh geometry material Nothing
+        verticesCount = minimum . map (accessorCount . snd) . concatMap snd $ groups
+        geometry' = geometry { Hree.geometryVerticesCount = verticesCount }
+    let material = Hree.flatColorMaterial (Linear.V4 1 0 0 1) -- Hree.basicMaterial Nothing
+        mesh = Hree.Mesh geometry' material Nothing
     Hree.addMesh scene mesh
 
 addAttribBindings :: (Int, Hree.Geometry) -> ((BufferView, GLW.Buffer), [(Text, Accessor)]) -> (Int, Hree.Geometry)
 addAttribBindings (bindingIndex, geometry0) ((bufferView, buffer), attribs) =
     let geometry1 = Hree.addAttribBindings geometry0 bindingIndex attribFormats (buffer, bbs)
-        geometry2 = geometry1 { Hree.geometryVerticesCount = min vertexCount (Hree.geometryVerticesCount geometry0) }
-    in (bindingIndex + 1, geometry2)
+    in (bindingIndex + 1, geometry1)
     where
     accessors = map snd attribs
     offset = bufferViewByteOffset bufferView
     stride = fromMaybe (calcStrideFromAccessors accessors) $ bufferViewByteStride bufferView
     bbs = Hree.BindBufferSetting offset stride 0
-    vertexCount = minimum . map (accessorCount . snd) $ attribs
     attribFormats = Map.fromList . map f $ attribs
     f (key, accessor) = (convertAttribName key, accessorToAttribFormat accessor)
 
