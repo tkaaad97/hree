@@ -21,6 +21,8 @@ module Graphics.Format.GLTF
     , numberOfComponent
     ) where
 
+import qualified Codec.Picture as Picture
+import qualified Codec.Picture.Types as Picture
 import Control.Exception (throwIO)
 import Control.Monad (unless, void)
 import qualified Data.Aeson as Aeson (FromJSON(..), Object, Value,
@@ -28,7 +30,8 @@ import qualified Data.Aeson as Aeson (FromJSON(..), Object, Value,
                                       (.!=), (.:), (.:?))
 import qualified Data.Aeson.Types as Aeson (Parser)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString (readFile, stripPrefix, take)
+import qualified Data.ByteString as ByteString (drop, isPrefixOf, readFile,
+                                                stripPrefix, take)
 import qualified Data.ByteString.Base64 as Base64 (decode)
 import qualified Data.ByteString.Char8 as ByteString (break, drop, dropWhile,
                                                       unpack)
@@ -581,3 +584,54 @@ createMeshNode scene meshId =
     Hree.addNode scene node False
     where
     node = Hree.newNode { Hree.nodeMesh = Just meshId }
+
+createImage :: FilePath -> BV.Vector ByteString -> BV.Vector BufferView -> Image -> IO (Picture.Image Picture.PixelRGBA8)
+createImage cd buffers bufferViews image = go (imageUri image) (imageBufferView image) (imageMimeType image)
+    where
+    go (Just uri) _ mimeType = createImageFromUri cd (Text.encodeUtf8 uri) mimeType
+    go _ (Just bvid) mimeType = createImageFromBuffer buffers bufferViews bvid mimeType
+    go _ _ _ = throwIO . userError $ "invalid image: " ++ show image
+
+createImageFromUri :: FilePath -> ByteString -> Maybe Text -> IO (Picture.Image Picture.PixelRGBA8)
+createImageFromUri cd uri mimeType
+    | ByteString.isPrefixOf "data://" uri = do
+        bs <- either (throwIO . userError) return . Base64.decode . ByteString.drop 1 . ByteString.dropWhile (/= ',') $ uri
+        decodeImage mimeType bs
+    | otherwise = do
+        path <- canonicalizePath $ cd </> ByteString.unpack uri
+        readImage mimeType path
+
+createImageFromBuffer :: BV.Vector ByteString -> BV.Vector BufferView -> Int -> Maybe Text -> IO (Picture.Image Picture.PixelRGBA8)
+createImageFromBuffer buffers bufferViews bvid mimeType = decodeImage mimeType =<< sliceBuffer
+    where
+    sliceBuffer = do
+        bufferView <- maybe (throwIO . userError $ "invalid bufferView identifier: " ++ show bvid) return $ bufferViews BV.!? bvid
+        let bid = bufferViewBuffer bufferView
+            offset = bufferViewByteOffset bufferView
+            length = bufferViewByteLength bufferView
+        buffer <- maybe (throwIO . userError $ "invalid buffer identifier: " ++ show bid) return $ buffers BV.!? bid
+        return . ByteString.take length . ByteString.drop offset $ buffer
+
+decodeImage :: Maybe Text -> ByteString -> IO (Picture.Image Picture.PixelRGBA8)
+decodeImage mimeType bs
+    | mimeType == Just "image/png" = do
+        image <- either (throwIO . userError) return . Picture.decodePng $ bs
+        return (Picture.convertRGBA8 image)
+    | mimeType == Just "image/jpeg" = do
+        image <- either (throwIO . userError) return . Picture.decodeJpeg $ bs
+        return (Picture.convertRGBA8 image)
+    | otherwise = do
+        image <- either (throwIO . userError) return . Picture.decodeImage $ bs
+        return (Picture.convertRGBA8 image)
+
+readImage :: Maybe Text -> FilePath -> IO (Picture.Image Picture.PixelRGBA8)
+readImage mimeType path
+    | mimeType == Just "image/png" = do
+        image <- either (throwIO . userError) return =<< Picture.readPng path
+        return (Picture.convertRGBA8 image)
+    | mimeType == Just "image/jpeg" = do
+        image <- either (throwIO . userError) return =<< Picture.readJpeg path
+        return (Picture.convertRGBA8 image)
+    | otherwise = do
+        image <- either (throwIO . userError) return =<< Picture.readImage path
+        return (Picture.convertRGBA8 image)
