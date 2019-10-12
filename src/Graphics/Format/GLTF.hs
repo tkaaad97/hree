@@ -23,8 +23,9 @@ module Graphics.Format.GLTF
 
 import Control.Exception (throwIO)
 import Control.Monad (unless, void)
-import qualified Data.Aeson as Aeson (FromJSON(..), eitherDecodeFileStrict',
-                                      withObject, (.!=), (.:), (.:?))
+import qualified Data.Aeson as Aeson (FromJSON(..), Object, Value,
+                                      eitherDecodeFileStrict', withObject,
+                                      (.!=), (.:), (.:?))
 import qualified Data.Aeson.Types as Aeson (Parser)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (readFile, stripPrefix, take)
@@ -131,6 +132,15 @@ data Node = Node
     , nodeName        :: !(Maybe Text)
     } deriving (Show, Eq)
 
+data Image = Image
+    { imageUri        :: !(Maybe Text)
+    , imageMimeType   :: !(Maybe Text)
+    , imageBufferView :: !(Maybe Int)
+    , imageName       :: !(Maybe Text)
+    , imageExtensions :: !(Maybe Aeson.Object)
+    , imageExtras     :: !(Maybe Aeson.Value)
+    } deriving (Show, Eq)
+
 data GLTF = GLTF
     { gltfScenes      :: !(BV.Vector Scene)
     , gltfNodes       :: !(BV.Vector Node)
@@ -138,6 +148,7 @@ data GLTF = GLTF
     , gltfBuffers     :: !(BV.Vector Buffer)
     , gltfBufferViews :: !(BV.Vector BufferView)
     , gltfAccessors   :: !(BV.Vector Accessor)
+    , gltfImages      :: !(BV.Vector Image)
     } deriving (Show, Eq)
 
 instance Aeson.FromJSON Buffer where
@@ -202,15 +213,26 @@ instance Aeson.FromJSON Node where
         name <- v Aeson..:? "name"
         return $ Node camera children skin matrix mesh rotation scale translation name
 
+instance Aeson.FromJSON Image where
+    parseJSON = Aeson.withObject "Image" $ \v -> do
+        uri <- v Aeson..:? "uri"
+        mimeType <- v Aeson..:? "mimeType"
+        bufferView <- v Aeson..:? "bufferView"
+        name <- v Aeson..:? "name"
+        extensions <- v Aeson..:? "extensions"
+        extras <- v Aeson..:? "extras"
+        return $ Image uri mimeType bufferView name extensions extras
+
 instance Aeson.FromJSON GLTF where
     parseJSON = Aeson.withObject "GLTF" $ \v -> do
         scenes <- v Aeson..:? "scenes" Aeson..!= BV.empty
         nodes <- v Aeson..:? "nodes" Aeson..!= BV.empty
-        meshes <- v Aeson..: "meshes"
-        buffers <- v Aeson..: "buffers"
-        bufferViews <- v Aeson..: "bufferViews"
-        accessors <- v Aeson..: "accessors"
-        return $ GLTF scenes nodes meshes buffers bufferViews accessors
+        meshes <- v Aeson..: "meshes" Aeson..!= BV.empty
+        buffers <- v Aeson..: "buffers" Aeson..!= BV.empty
+        bufferViews <- v Aeson..: "bufferViews" Aeson..!= BV.empty
+        accessors <- v Aeson..: "accessors" Aeson..!= BV.empty
+        images <- v Aeson..:? "images" Aeson..!= BV.empty
+        return $ GLTF scenes nodes meshes buffers bufferViews accessors images
 
 marshalComponentType :: ComponentType -> Int
 marshalComponentType Byte'          = 5120

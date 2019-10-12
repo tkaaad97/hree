@@ -91,6 +91,7 @@ spec = do
                             , GLTF.accessorName = Nothing
                             }
                         ]
+                    , GLTF.gltfImages = mempty
                     }
             parsed <- GLTF.loadGLTFFile "test/files/minimal1.gltf"
             parsed `shouldBe` expected
