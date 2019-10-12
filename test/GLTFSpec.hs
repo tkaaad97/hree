@@ -92,6 +92,8 @@ spec = do
                             }
                         ]
                     , GLTF.gltfImages = mempty
+                    , GLTF.gltfSamplers = mempty
+                    , GLTF.gltfTextures = mempty
                     }
             parsed <- GLTF.loadGLTFFile "test/files/minimal1.gltf"
             parsed `shouldBe` expected

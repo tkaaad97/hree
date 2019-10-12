@@ -141,6 +141,24 @@ data Image = Image
     , imageExtras     :: !(Maybe Aeson.Value)
     } deriving (Show, Eq)
 
+data Sampler = Sampler
+    { samplerMagFilter  :: !(Maybe Int)
+    , samplerMinFilter  :: !(Maybe Int)
+    , samplerWrapS      :: !Int
+    , samplerWrapT      :: !Int
+    , samplerName       :: !(Maybe Text)
+    , samplerExtensions :: !(Maybe Aeson.Object)
+    , samplerExtras     :: !(Maybe Aeson.Value)
+    } deriving (Show, Eq)
+
+data Texture = Texture
+    { textureSampler    :: !(Maybe Int)
+    , textureSource     :: !(Maybe Int)
+    , textureName       :: !(Maybe Text)
+    , textureExtensions :: !(Maybe Aeson.Object)
+    , textureExtras     :: !(Maybe Aeson.Value)
+    } deriving (Show, Eq)
+
 data GLTF = GLTF
     { gltfScenes      :: !(BV.Vector Scene)
     , gltfNodes       :: !(BV.Vector Node)
@@ -149,6 +167,8 @@ data GLTF = GLTF
     , gltfBufferViews :: !(BV.Vector BufferView)
     , gltfAccessors   :: !(BV.Vector Accessor)
     , gltfImages      :: !(BV.Vector Image)
+    , gltfSamplers    :: !(BV.Vector Sampler)
+    , gltfTextures    :: !(BV.Vector Texture)
     } deriving (Show, Eq)
 
 instance Aeson.FromJSON Buffer where
@@ -223,6 +243,28 @@ instance Aeson.FromJSON Image where
         extras <- v Aeson..:? "extras"
         return $ Image uri mimeType bufferView name extensions extras
 
+instance Aeson.FromJSON Sampler where
+    parseJSON = Aeson.withObject "Sampler" $ \v -> do
+        magFilter <- v Aeson..:? "magFilter"
+        minFilter <- v Aeson..:? "minFilter"
+        wrapS <- v Aeson..: "wrapS" Aeson..!= defaultWrap
+        wrapT <- v Aeson..: "wrapT" Aeson..!= defaultWrap
+        name <- v Aeson..:? "name"
+        extensions <- v Aeson..:? "extensions"
+        extras <- v Aeson..:? "extras"
+        return $ Sampler magFilter minFilter wrapS wrapT name extensions extras
+        where
+        defaultWrap = 10497
+
+instance Aeson.FromJSON Texture where
+    parseJSON = Aeson.withObject "Texture" $ \v -> do
+        sampler <- v Aeson..:? "sampler"
+        source <- v Aeson..:? "source"
+        name <- v Aeson..:? "name"
+        extensions <- v Aeson..:? "extension"
+        extras <- v Aeson..:? "extras"
+        return $ Texture sampler source name extensions extras
+
 instance Aeson.FromJSON GLTF where
     parseJSON = Aeson.withObject "GLTF" $ \v -> do
         scenes <- v Aeson..:? "scenes" Aeson..!= BV.empty
@@ -232,7 +274,9 @@ instance Aeson.FromJSON GLTF where
         bufferViews <- v Aeson..: "bufferViews" Aeson..!= BV.empty
         accessors <- v Aeson..: "accessors" Aeson..!= BV.empty
         images <- v Aeson..:? "images" Aeson..!= BV.empty
-        return $ GLTF scenes nodes meshes buffers bufferViews accessors images
+        samplers <- v Aeson..:? "samplers" Aeson..!= BV.empty
+        textures <- v Aeson..:? "textures" Aeson..!= BV.empty
+        return $ GLTF scenes nodes meshes buffers bufferViews accessors images samplers textures
 
 marshalComponentType :: ComponentType -> Int
 marshalComponentType Byte'          = 5120
