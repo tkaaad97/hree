@@ -1,24 +1,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Graphics.Format.GLTF
-    ( ComponentType(..)
-    , ValueType(..)
+    ( Accessor(..)
     , Buffer(..)
     , BufferView(..)
-    , Accessor(..)
-    , Mesh(..)
-    , Primitive(..)
-    , Node(..)
-    , Scene(..)
+    , ComponentType(..)
     , GLTF(..)
+    , Mesh(..)
+    , Node(..)
+    , Primitive(..)
+    , Scene(..)
+    , ValueType(..)
+    , componentByteSize
+    , componentTypeToGLenum
+    , createImageFromUri
     , loadGLTFFile
     , loadSceneFromFile
     , marshalComponentType
-    , unmarshalComponentType
-    , componentByteSize
-    , componentTypeToGLenum
     , marshalValueType
-    , unmarshalValueType
     , numberOfComponent
+    , unmarshalComponentType
+    , unmarshalValueType
     ) where
 
 import qualified Codec.Picture as Picture
@@ -594,7 +595,7 @@ createImage cd buffers bufferViews image = go (imageUri image) (imageBufferView 
 
 createImageFromUri :: FilePath -> ByteString -> Maybe Text -> IO (Picture.Image Picture.PixelRGBA8)
 createImageFromUri cd uri mimeType
-    | ByteString.isPrefixOf "data://" uri = do
+    | ByteString.isPrefixOf "data:" uri = do
         bs <- either (throwIO . userError) return . Base64.decode . ByteString.drop 1 . ByteString.dropWhile (/= ',') $ uri
         decodeImage mimeType bs
     | otherwise = do
