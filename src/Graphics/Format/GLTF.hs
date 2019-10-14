@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Graphics.Format.GLTF
     ( Accessor(..)
@@ -45,8 +46,11 @@ import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
 import qualified Data.Vector as BV (Vector, empty, imapM_, map, mapM, (!), (!?))
-import qualified Data.Vector as UV (Vector, length, (!))
-import qualified GLW (Buffer)
+import qualified Data.Vector.Storable as SV (unsafeWith)
+import qualified Data.Vector.Unboxed as UV (Vector, length, (!))
+import Foreign (castPtr)
+import qualified GLW
+import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
 import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
@@ -57,7 +61,10 @@ import qualified Graphics.Hree.Material as Hree (basicMaterial,
                                                  flatColorMaterial)
 import Graphics.Hree.Math
 import qualified Graphics.Hree.Scene as Hree (addBuffer, addMesh, addNode,
-                                              addRootNodes, newNode, updateNode)
+                                              addRootNodes, addTexture, newNode,
+                                              updateNode)
+import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
+                                                TextureSourceData(..))
 import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId,
                                               Node(..), NodeId, Scene)
 import qualified Linear (Quaternion(..), V3(..), V4(..), zero)
@@ -636,3 +643,15 @@ readImage mimeType path
     | otherwise = do
         image <- either (throwIO . userError) return =<< Picture.readImage path
         return (Picture.convertRGBA8 image)
+
+createTexture :: FilePath -> Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> Image -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D)
+createTexture cd scene buffers bufferViews image = do
+    source <- createImage cd buffers bufferViews image
+    let name = Text.encodeUtf8 $ fromMaybe "glTF_texture_" (imageName image)
+        width = fromIntegral $ Picture.imageWidth source
+        height = fromIntegral $ Picture.imageHeight source
+        settings = Hree.TextureSettings 0 GL.GL_RGBA width height False
+    (_, texture) <- SV.unsafeWith (Picture.imageData source) $ \ptr -> do
+        let sourceData = Hree.TextureSourceData width height PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (castPtr ptr)
+        Hree.addTexture scene name settings sourceData
+    return texture
