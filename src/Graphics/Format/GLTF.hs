@@ -60,9 +60,14 @@ import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
 import qualified Graphics.Hree.Material as Hree (basicMaterial,
                                                  flatColorMaterial)
 import Graphics.Hree.Math
+import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
+                                                        glTextureMinFilter,
+                                                        glTextureWrapS,
+                                                        glTextureWrapT,
+                                                        setSamplerParameter)
 import qualified Graphics.Hree.Scene as Hree (addBuffer, addMesh, addNode,
-                                              addRootNodes, addTexture, newNode,
-                                              updateNode)
+                                              addRootNodes, addSampler,
+                                              addTexture, newNode, updateNode)
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
                                                 TextureSourceData(..))
 import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId,
@@ -580,7 +585,7 @@ setNodeChildren scene nodeIds i a =
 
 createMeshNodes :: Hree.Scene -> BV.Vector Hree.NodeId -> BV.Vector (BV.Vector Hree.MeshId) -> Int -> Node -> IO ()
 createMeshNodes scene nodeIds meshes i a =
-    flip (maybe (return ())) (nodeMesh a) $ \j -> do
+    whenJust (nodeMesh a) $ \j -> do
         let nodeId = nodeIds BV.! i
             meshIds = meshes BV.! j
         children <- BV.mapM (createMeshNode scene) meshIds
@@ -655,3 +660,38 @@ createTexture cd scene buffers bufferViews image = do
         let sourceData = Hree.TextureSourceData width height PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (castPtr ptr)
         Hree.addTexture scene name settings sourceData
     return texture
+
+createSampler :: Hree.Scene -> Sampler -> IO GLW.Sampler
+createSampler scene sampler = do
+    let name = Text.encodeUtf8 $ fromMaybe "glTF_sampler_" (samplerName sampler)
+    (_, a) <- Hree.addSampler scene name
+    whenJust (samplerMagFilter sampler >>= unmarshalSamplerFilterParameter) $
+        Hree.Sampler.setSamplerParameter a Hree.Sampler.glTextureMagFilter
+    whenJust (samplerMinFilter sampler >>= unmarshalSamplerFilterParameter) $
+        Hree.Sampler.setSamplerParameter a Hree.Sampler.glTextureMinFilter
+    whenJust (unmarshalSamplerWrapParameter . samplerWrapS $ sampler) $
+        Hree.Sampler.setSamplerParameter a Hree.Sampler.glTextureWrapS
+    whenJust (unmarshalSamplerWrapParameter . samplerWrapT $ sampler) $
+        Hree.Sampler.setSamplerParameter a Hree.Sampler.glTextureWrapT
+    return a
+
+unmarshalSamplerFilterParameter :: Int -> Maybe GL.GLint
+unmarshalSamplerFilterParameter a
+    | a == 9728 = Just GL.GL_NEAREST
+    | a == 9729 = Just GL.GL_LINEAR
+    | a == 9984 = Just GL.GL_NEAREST_MIPMAP_NEAREST
+    | a == 9985 = Just GL.GL_LINEAR_MIPMAP_NEAREST
+    | a == 9986 = Just GL.GL_NEAREST_MIPMAP_LINEAR
+    | a == 9987 = Just GL.GL_LINEAR_MIPMAP_LINEAR
+    | otherwise = Nothing
+
+unmarshalSamplerWrapParameter :: Int -> Maybe GL.GLint
+unmarshalSamplerWrapParameter a
+    | a == 33071 = Just GL.GL_CLAMP_TO_EDGE
+    | a == 33648 = Just GL.GL_MIRRORED_REPEAT
+    | a == 10497 = Just GL.GL_REPEAT
+    | otherwise = Nothing
+
+whenJust :: (Monad m) => Maybe a -> (a -> m ()) -> m ()
+whenJust Nothing _  = return ()
+whenJust (Just a) f = f a
