@@ -10,7 +10,8 @@ in vec2 uvSize;
 
 out vec2 fragmentUv;
 
-uniform mat4 projectionViewMatrix = mat4(1.0);
+uniform mat4 projectionMatrix = mat4(1.0);
+uniform mat4 viewMatrix = mat4(1.0);
 uniform mat4 modelMatrix = mat4(1.0);
 uniform vec3 rotateAxis = vec3(0.0, 0.0, 1.0);
 
@@ -35,6 +36,6 @@ mat3 rotateMatrix(vec3 axis, float angle)
 void main()
 {
     vec3 offset = position + rotateMatrix(rotateAxis, angle) * vec3(size.x * positionOffset.x, size.y * positionOffset.y, size.z * positionOffset.z);
-    gl_Position = projectionViewMatrix * modelMatrix * vec4(offset, 1.0);
+    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(offset, 1.0);
     fragmentUv = uv + vec2(uvOffset.x * uvSize.x, uvOffset.y * uvSize.y);
 }

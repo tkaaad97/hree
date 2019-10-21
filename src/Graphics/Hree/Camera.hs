@@ -7,7 +7,7 @@ module Graphics.Hree.Camera
     , orthographic
     , perspective
     , getCameraLookAt
-    , getCameraMatrix
+    , getCameraMatrices
     , getCameraProjection
     , updateProjection
     , updateLookAt
@@ -21,10 +21,11 @@ newtype Camera = Camera (IORef CameraState)
     deriving Eq
 
 data CameraState = CameraState
-    { cameraProjection      :: !Projection
-    , cameraLookAt          :: !LookAt
-    , cameraStateMatrix     :: !(M44 Float)
-    , cameraStateNeedUpdate :: !Bool
+    { cameraProjection            :: !Projection
+    , cameraLookAt                :: !LookAt
+    , cameraStateProjectionMatrix :: !(M44 Float)
+    , cameraStateViewMatrix       :: !(M44 Float)
+    , cameraStateNeedUpdate       :: !Bool
     } deriving (Show, Eq)
 
 data LookAt = LookAt
@@ -59,16 +60,17 @@ lookAt :: V3 Float -> V3 Float -> V3 Float -> LookAt
 lookAt eye center up = LookAt eye center (Linear.normalize up)
 
 newCamera :: Projection -> LookAt -> IO Camera
-newCamera p l = Camera <$> newIORef (CameraState p l Linear.identity True)
+newCamera p l = Camera <$> newIORef (CameraState p l Linear.identity Linear.identity True)
 
-getCameraMatrix :: Camera -> IO (M44 Float)
-getCameraMatrix (Camera cameraRef) =
+getCameraMatrices :: Camera -> IO (M44 Float, M44 Float)
+getCameraMatrices (Camera cameraRef) =
     atomicModifyIORef' cameraRef f
     where
-    f (CameraState p l _ True) =
-        let m = projectionMatrix p !*! lookAtMatrix l
-        in (CameraState p l m False, m)
-    f a @ (CameraState _ _ m False) = (a, m)
+    f (CameraState p l _ _ True) =
+        let pm = projectionMatrix p
+            vm = lookAtMatrix l
+        in (CameraState p l pm vm False, (pm, vm))
+    f a @ (CameraState _ _ pm vm False) = (a, (pm, vm))
 
 projectionMatrix :: Projection -> M44 Float
 projectionMatrix (Perspective fov aspect near far) = Linear.perspective fov aspect near far
@@ -81,13 +83,13 @@ updateProjection :: Camera -> Projection -> IO ()
 updateProjection (Camera cameraRef) p =
     atomicModifyIORef' cameraRef f
     where
-    f (CameraState _ l m _) = (CameraState p l m True, ())
+    f (CameraState _ l pm vm _) = (CameraState p l pm vm True, ())
 
 updateLookAt :: Camera -> LookAt -> IO ()
 updateLookAt (Camera cameraRef) l =
     atomicModifyIORef' cameraRef f
     where
-    f (CameraState p _ m _) = (CameraState p l m True, ())
+    f (CameraState p _ pm vm _) = (CameraState p l pm vm True, ())
 
 getCameraLookAt :: Camera -> IO LookAt
 getCameraLookAt (Camera cameraRef) = cameraLookAt <$> readIORef cameraRef
