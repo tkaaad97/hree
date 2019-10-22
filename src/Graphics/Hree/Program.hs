@@ -11,6 +11,7 @@ module Graphics.Hree.Program
     , basicProgramSpec
     , flatColorProgramSpec
     , spriteProgramSpec
+    , standardProgramSpec
     , testProgramSpec
     , mkProgram
     ) where
@@ -36,6 +37,7 @@ data VertexShaderSpec =
     BasicVertexShader |
     FlatColorVertexShader |
     SpriteVertexShader |
+    StandardVertexShader |
     TestVertexShader
     deriving (Show, Eq, Ord)
 
@@ -43,6 +45,7 @@ data FragmentShaderSpec =
     BasicFragmentShader |
     FlatColorFragmentShader |
     SpriteFragmentShader |
+    StandardFragmentShader |
     TestFragmentShader
     deriving (Show, Eq, Ord)
 
@@ -59,6 +62,9 @@ flatColorProgramSpec = ProgramSpec FlatColorVertexShader FlatColorFragmentShader
 
 spriteProgramSpec :: ProgramSpec
 spriteProgramSpec = ProgramSpec SpriteVertexShader SpriteFragmentShader
+
+standardProgramSpec :: ProgramSpec
+standardProgramSpec = ProgramSpec StandardVertexShader StandardFragmentShader
 
 testProgramSpec :: ProgramSpec
 testProgramSpec = ProgramSpec TestVertexShader TestFragmentShader
@@ -101,6 +107,8 @@ mkVertexShader FlatColorVertexShader =
     mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/flat-color-vertex.glsl")
 mkVertexShader SpriteVertexShader =
     mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/sprite-vertex.glsl")
+mkVertexShader StandardVertexShader =
+    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/standard-vertex.glsl")
 mkVertexShader TestVertexShader =
     mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/test-vertex.glsl")
 
@@ -111,6 +119,8 @@ mkFragmentShader FlatColorFragmentShader =
     mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/flat-color-fragment.glsl")
 mkFragmentShader SpriteFragmentShader =
     mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/sprite-fragment.glsl")
+mkFragmentShader StandardFragmentShader =
+    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/standard-fragment.glsl")
 mkFragmentShader TestFragmentShader =
     mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/test-fragment.glsl")
 

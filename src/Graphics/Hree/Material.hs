@@ -6,6 +6,7 @@ module Graphics.Hree.Material
     , basicMaterial
     , flatColorMaterial
     , spriteMaterial
+    , standardMaterial
     , testMaterial
     , setDirectionalLight
     ) where
@@ -38,6 +39,16 @@ spriteMaterial a = Material u t p
     u = Map.empty
     t = [a]
     p = spriteProgramSpec
+
+standardMaterial :: Float -> Float -> Maybe Texture -> Material
+standardMaterial metalness roughness a = Material u t p
+    where
+    u = Map.fromList
+        [ ("metalness", Uniform metalness)
+        , ("roughness", Uniform roughness)
+        ]
+    t = maybeToList a
+    p = standardProgramSpec
 
 testMaterial :: Material
 testMaterial = Material u t p
