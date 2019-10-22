@@ -39,7 +39,7 @@ main = do
         scene <- newScene
         geometry <- STL.loadGeometryFromFile path scene
         let material = Material.standardMaterial metalness roughness Nothing
-            material' = Material.setDirectionalLight material (V3 0.5 (-1) (-0.5))
+            material' = Material.setDirectionalLight material (V3 (-1) 0 (-5))
             mesh = Mesh geometry material' Nothing
         meshId <- addMesh scene mesh
         addNode scene newNode{ nodeMesh = Just meshId } True

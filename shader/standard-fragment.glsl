@@ -17,7 +17,7 @@ uniform vec3 directionalLight = vec3(0.0, 0.0, 0.0);
 
 const float pi = 3.141592653589793;
 const float epsilon = 1.0E-6;
-const vec3 dieletricSpecular = vec3(0.04, 0.04, 0.04);
+const vec3 dielectricSpecular = vec3(0.04, 0.04, 0.04);
 const vec3 black = vec3(0.0, 0.0, 0.0);
 
 vec3 diffuse(vec3 a)
@@ -27,8 +27,8 @@ vec3 diffuse(vec3 a)
 
 vec3 calcFresnelSchlick(vec3 base, float metalness, float dotVH)
 {
-    vec3 f0 = mix(dieletricSpecular, base, metalness);
-    vec3 F = f0 + (vec3(1.0) - f0) * pow(1.0 - dotVH, 5.0);
+    vec3 f0 = mix(dielectricSpecular, base, metalness);
+    vec3 F = f0 + (1.0 - f0) * pow(clamp(1.0 - dotVH, 0.0, 1.0), 5.0);
     return F;
 }
 
@@ -36,18 +36,23 @@ float calcVisibilityOcclusion(float alpha2, float dotNL, float dotNV)
 {
     float GGXV = dotNL * sqrt(dotNV * dotNV * (1.0 - alpha2) + alpha2);
     float GGXL = dotNV * sqrt(dotNL * dotNL * (1.0 - alpha2) + alpha2);
-    return 0.5 / (GGXV + GGXL);
+    float GGX = GGXV + GGXL;
+    if (GGX > 0.0) {
+        return 0.5 / (GGXV + GGXL);
+    }
+    return 0.0;
 }
 
 float calcMicrofacetDistribution(float alpha2, float dotNH)
 {
-    float D = alpha2 / max((pi * (dotNH * dotNH * (alpha2 - 1.0) + 1.0)), epsilon);
+    float f = dotNH * (dotNH * alpha2 - dotNH) + 1.0;
+    float D = alpha2 / max(pi * f * f, epsilon);
     return D;
 }
 
 vec3 calcPointShade(vec3 pointToLight, vec3 normal, vec3 view, vec3 color, float metalness, float roughness)
 {
-    float alpha = roughness;
+    float alpha = roughness * roughness;
     float alpha2 = alpha * alpha;
     vec3 n = normalize(normal);
     vec3 v = normalize(view);
@@ -62,7 +67,7 @@ vec3 calcPointShade(vec3 pointToLight, vec3 normal, vec3 view, vec3 color, float
     float V = calcVisibilityOcclusion(alpha2, dotNL, dotNV);
     float D = calcMicrofacetDistribution(alpha2, dotNH);
 
-    vec3 diffuseOut = (vec3(1.0) - F) * diffuse(color);
+    vec3 diffuseOut = (1.0 - F) * diffuse(color);
     vec3 specularOut = F * V * D;
     return dotNL * (diffuseOut + specularOut);
 }
@@ -76,8 +81,8 @@ vec3 applyDirectionalLight(vec3 lightDir, vec3 normal, vec3 view, vec3 color, fl
 void main()
 {
     vec3 view = (viewMatrix * vec4(fragmentPosition, 1.0)).xyz;
-    vec4 a = (texture2D(texture, fragmentUv) * baseColor) * fragmentColor;
-    vec3 diffuseColor = a.rgb * (1.0 - metalness);
+    vec4 a = texture2D(texture, fragmentUv) * baseColor;
+    vec3 diffuseColor = mix(a.rgb * (1.0 - dielectricSpecular.r), black, metalness);
 
     vec3 color = vec3(0.0, 0.0, 0.0);
     color += applyDirectionalLight(directionalLight, fragmentNormal, view, diffuseColor, metalness, roughness);
