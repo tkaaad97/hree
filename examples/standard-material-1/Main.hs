@@ -22,6 +22,8 @@ main = do
             []        -> (0.5, 0.5)
             [a]       -> (read a, 0.5)
             a : b : _ -> (read a, read b)
+    putStrLn $ "metalness: " ++ show metalness
+    putStrLn $ "roughness: " ++ show roughness
     withWindow width height "standard-material-1" (init path metalness roughness) onDisplay
 
     where

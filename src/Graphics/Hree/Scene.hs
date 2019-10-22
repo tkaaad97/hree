@@ -72,10 +72,17 @@ import qualified System.Random.MWC as Random (asGenIO, uniformR,
 renderScene :: Scene -> Camera -> IO ()
 renderScene scene camera = do
     (projectionMatrix, viewMatrix) <- getCameraMatrices camera
+    LookAt eye _ _ <- getCameraLookAt camera
     GLW.glClearColor 1 1 1 1
     GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
     state <- readIORef . sceneState $ scene
-    renderNodes [("projectionMatrix", Uniform projectionMatrix), ("viewMatrix", Uniform viewMatrix)] scene state
+    renderNodes
+        [ ("projectionMatrix", Uniform projectionMatrix)
+        , ("viewMatrix", Uniform viewMatrix)
+        , ("viewPosition", Uniform eye)
+        ]
+        scene
+        state
 
 renderNodes :: [(ByteString, Uniform)] -> Scene -> SceneState -> IO ()
 renderNodes uniforms scene state = do
