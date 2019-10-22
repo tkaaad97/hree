@@ -12,6 +12,6 @@ uniform vec3 directionalLight = vec3(0.0, 0.0, 0.0);
 void main()
 {
     float diffuse = clamp(dot(fragmentNormal, -normalize(directionalLight)), 0.1, 1.0);
-    vec4 textureColor = texture2D(texture, fragmentUv);
-    outColor = vec4(diffuse * mix(fragmentColor.xyz, textureColor.xyz, textureColor.w), fragmentColor.w);
+    vec4 color = texture2D(texture, fragmentUv) * fragmentColor;
+    outColor = diffuse * color;
 }

@@ -450,7 +450,7 @@ mkDefaultTextureIfNotExists scene = do
     maybe (mkDefaultTexture scene) return maybeDefaultTexture
 
 mkDefaultTexture :: Scene -> IO Texture
-mkDefaultTexture scene = Foreign.withArray [0, 0, 0, 1] $ \p -> do
+mkDefaultTexture scene = Foreign.withArray [255, 255, 255, 255] $ \p -> do
     let settings = TextureSettings 1 GL.GL_RGBA8 1 1 False
         source = TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
     (_, texture) <- addTexture scene defaultTextureName settings source
