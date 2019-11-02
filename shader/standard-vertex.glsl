@@ -19,7 +19,7 @@ void main()
     vec4 modelPosition = modelMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * viewMatrix * modelPosition;
     fragmentPosition = modelPosition.xyz;
-    fragmentNormal = normalize((modelMatrix * vec4(normal, 1.0)).xyz);
+    fragmentNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
     fragmentUv = uv;
     fragmentColor = color;
 }

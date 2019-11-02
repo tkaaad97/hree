@@ -92,11 +92,13 @@ void main()
 {
     float metalnessClamped = clamp(metalness, 0.0, 1.0);
     float roughnessClamped = clamp(roughness, 0.0, 1.0);
-    vec3 view = viewPosition - fragmentPosition;
+    vec3 view = -(viewMatrix * vec4(fragmentPosition, 1.0)).xyz;
+    vec3 normal = (viewMatrix * vec4(fragmentNormal, 0.0)).xyz;
+    vec3 light = (viewMatrix * vec4(directionalLight, 0.0)).xyz;
     vec4 a = texture2D(texture, fragmentUv) * baseColor;
     vec3 diffuseColor = mix(a.rgb * (1.0 - dielectricSpecular.r), black, metalnessClamped);
 
     vec3 color = vec3(0.0, 0.0, 0.0);
-    color += applyDirectionalLight(directionalLight, fragmentNormal, view, diffuseColor, metalnessClamped, roughnessClamped);
+    color += applyDirectionalLight(light, normal, view, diffuseColor, metalnessClamped, roughnessClamped);
     outColor = vec4(toneMapping(color), 1.0);
 }
