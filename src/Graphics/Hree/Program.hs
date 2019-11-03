@@ -101,7 +101,9 @@ standardProgramSpec :: ProgramSpec
 standardProgramSpec = EmbeddedProgram StandardProgram defaultOptions
 
 testProgramSpec :: ProgramSpec
-testProgramSpec = EmbeddedProgram TestProgram defaultOptions
+testProgramSpec = EmbeddedProgram TestProgram options
+    where
+    options = defaultOptions { optionsGlslVersion = Nothing }
 
 instance Hashable Options where
 
