@@ -1,89 +1,145 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
 module Graphics.Hree.Program
-    ( VertexShaderSpec(..)
-    , FragmentShaderSpec(..)
+    ( Options(..)
+    , ShaderSource(..)
+    , ProgramName
     , ProgramSpec(..)
     , basicProgramSpec
     , flatColorProgramSpec
+    , getProgramName
     , spriteProgramSpec
     , standardProgramSpec
     , testProgramSpec
+    , unProgramName
     , mkProgram
     ) where
 
 import Control.Exception (throwIO)
 import Control.Monad (unless)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString (intercalate)
 import qualified Data.ByteString.Char8 as ByteString (pack, useAsCStringLen)
 import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Proxy (Proxy(..))
+import Data.Text (Text)
+import qualified Data.Text as Text (replace)
+import qualified Data.Text.Lazy as Text (toStrict)
+import qualified Data.Text.Lazy.Builder as Text.Builder (fromText, singleton,
+                                                         toLazyText)
+import qualified Data.Text.Lazy.Builder.Int as Text.Builder (decimal)
 import Foreign (Ptr)
 import qualified Foreign (alloca, allocaArray, peek, with)
 import qualified Foreign.C.String as Foreign (peekCStringLen)
+import GHC.Generics (Generic)
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
 
-data VertexShaderSpec =
-    BasicVertexShader |
-    FlatColorVertexShader |
-    SpriteVertexShader |
-    StandardVertexShader |
-    TestVertexShader
-    deriving (Show, Eq, Ord)
+data EmbeddedProgramType =
+    BasicProgram |
+    FlatColorProgram |
+    SpriteProgram |
+    StandardProgram |
+    TestProgram
+    deriving (Show, Eq, Enum, Generic)
 
-data FragmentShaderSpec =
-    BasicFragmentShader |
-    FlatColorFragmentShader |
-    SpriteFragmentShader |
-    StandardFragmentShader |
-    TestFragmentShader
-    deriving (Show, Eq, Ord)
+data Options = Options
+    { optionsGlslVersion    :: !(Maybe Int)
+    , optionsHasNormalMap   :: !Bool
+    , optionsHasVertexColor :: !Bool
+    , optionsMaxLightCount  :: !Int
+    } deriving (Show, Eq, Generic)
 
-data ProgramSpec = ProgramSpec
-    { vertexShaderSpec   :: !VertexShaderSpec
-    , fragmentShaderSpec :: !FragmentShaderSpec
-    } deriving (Show, Eq, Ord)
+data ShaderSource = ShaderSource
+    { shaderSourceName :: !Text
+    , shaderSourceBody :: !ByteString
+    } deriving (Show, Eq)
+
+data ProgramSpec =
+    EmbeddedProgram
+    { embeddedProgramType    :: !EmbeddedProgramType
+    , embeddedProgramOptions :: !Options
+    } |
+    UserProgram
+    { vertexShaderSource   :: !ShaderSource
+    , fragmentShaderSource :: !ShaderSource
+    } deriving (Show, Eq)
+
+newtype ProgramName = ProgramName
+    { unProgramName :: Text
+    } deriving (Show, Eq, Ord, Hashable)
+
+defaultOptions :: Options
+defaultOptions = Options
+    { optionsGlslVersion = Just 450
+    , optionsHasNormalMap = False
+    , optionsHasVertexColor = True
+    , optionsMaxLightCount = 10
+    }
 
 basicProgramSpec :: ProgramSpec
-basicProgramSpec = ProgramSpec BasicVertexShader BasicFragmentShader
+basicProgramSpec = EmbeddedProgram BasicProgram defaultOptions
 
 flatColorProgramSpec :: ProgramSpec
-flatColorProgramSpec = ProgramSpec FlatColorVertexShader FlatColorFragmentShader
+flatColorProgramSpec = EmbeddedProgram FlatColorProgram defaultOptions
 
 spriteProgramSpec :: ProgramSpec
-spriteProgramSpec = ProgramSpec SpriteVertexShader SpriteFragmentShader
+spriteProgramSpec = EmbeddedProgram SpriteProgram defaultOptions
 
 standardProgramSpec :: ProgramSpec
-standardProgramSpec = ProgramSpec StandardVertexShader StandardFragmentShader
+standardProgramSpec = EmbeddedProgram StandardProgram defaultOptions
 
 testProgramSpec :: ProgramSpec
-testProgramSpec = ProgramSpec TestVertexShader TestFragmentShader
+testProgramSpec = EmbeddedProgram TestProgram defaultOptions
 
-instance Hashable VertexShaderSpec where
-    hash _ = 0
-    hashWithSalt = const
+instance Hashable Options where
 
-instance Hashable FragmentShaderSpec where
-    hash _ = 0
-    hashWithSalt = const
+getProgramName :: ProgramSpec -> ProgramName
+getProgramName (EmbeddedProgram progType options) = ProgramName . Text.toStrict . Text.Builder.toLazyText $
+    Text.Builder.fromText "embedded:" `mappend`
+    Text.Builder.fromText (embeddedProgramName progType) `mappend`
+    Text.Builder.singleton ':' `mappend`
+    (Text.Builder.decimal . hash $ options)
+getProgramName (UserProgram (ShaderSource vname _) (ShaderSource fname _)) = ProgramName . Text.toStrict . Text.Builder.toLazyText $
+    Text.Builder.fromText "user:" `mappend`
+    Text.Builder.fromText vname' `mappend`
+    Text.Builder.singleton ':' `mappend`
+    Text.Builder.fromText fname'
+    where
+    vname' = Text.replace ":" "::" vname
+    fname' = Text.replace ":" "::" fname
 
-instance Hashable ProgramSpec where
-    hashWithSalt s (ProgramSpec a b) = s `hashWithSalt` a `hashWithSalt` b
+embeddedProgramName :: EmbeddedProgramType -> Text
+embeddedProgramName BasicProgram     = "basic"
+embeddedProgramName FlatColorProgram = "flatcolor"
+embeddedProgramName SpriteProgram    = "sprite"
+embeddedProgramName StandardProgram  = "standard"
+embeddedProgramName TestProgram      = "test"
 
 mkProgram :: ProgramSpec -> IO ProgramInfo
-mkProgram (ProgramSpec vspec fspec) = do
-    vshader <- mkVertexShader vspec
-    fshader <- mkFragmentShader fspec
+mkProgram (EmbeddedProgram progType options) = do
+    let header = renderOptions options
+        vsource = header `mappend` getEmbeddedVertexShaderSource progType
+        fsource = header `mappend` getEmbeddedFragmentShaderSource progType
+    mkProgram' vsource fsource
+mkProgram (UserProgram (ShaderSource _ vsource) (ShaderSource _ fsource)) =
+    mkProgram' vsource fsource
+
+mkProgram' :: ByteString -> ByteString -> IO ProgramInfo
+mkProgram' vsource fsource = do
+    vshader <- mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) vsource
+    fshader <- mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) fsource
     program <- GLW.createObject (Proxy :: Proxy GLW.Program)
     GLW.glAttachShader program vshader
     GLW.glAttachShader program fshader
@@ -100,29 +156,32 @@ mkProgram (ProgramSpec vspec fspec) = do
 
     return $ ProgramInfo program attribMap uniformMap
 
-mkVertexShader :: VertexShaderSpec -> IO (GLW.Shader 'GLW.GL_VERTEX_SHADER)
-mkVertexShader BasicVertexShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/basic-vertex.glsl")
-mkVertexShader FlatColorVertexShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/flat-color-vertex.glsl")
-mkVertexShader SpriteVertexShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/sprite-vertex.glsl")
-mkVertexShader StandardVertexShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/standard-vertex.glsl")
-mkVertexShader TestVertexShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) $(embedFile "shader/test-vertex.glsl")
+getEmbeddedVertexShaderSource :: EmbeddedProgramType -> ByteString
+getEmbeddedVertexShaderSource BasicProgram = $(embedFile "shader/basic-vertex.glsl")
+getEmbeddedVertexShaderSource FlatColorProgram = $(embedFile "shader/flat-color-vertex.glsl")
+getEmbeddedVertexShaderSource SpriteProgram = $(embedFile "shader/sprite-vertex.glsl")
+getEmbeddedVertexShaderSource StandardProgram = $(embedFile "shader/standard-vertex.glsl")
+getEmbeddedVertexShaderSource TestProgram = $(embedFile "shader/test-vertex.glsl")
 
-mkFragmentShader :: FragmentShaderSpec -> IO (GLW.Shader 'GLW.GL_FRAGMENT_SHADER)
-mkFragmentShader BasicFragmentShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/basic-fragment.glsl")
-mkFragmentShader FlatColorFragmentShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/flat-color-fragment.glsl")
-mkFragmentShader SpriteFragmentShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/sprite-fragment.glsl")
-mkFragmentShader StandardFragmentShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/standard-fragment.glsl")
-mkFragmentShader TestFragmentShader =
-    mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) $(embedFile "shader/test-fragment.glsl")
+getEmbeddedFragmentShaderSource :: EmbeddedProgramType -> ByteString
+getEmbeddedFragmentShaderSource BasicProgram = $(embedFile "shader/basic-fragment.glsl")
+getEmbeddedFragmentShaderSource FlatColorProgram = $(embedFile "shader/flat-color-fragment.glsl")
+getEmbeddedFragmentShaderSource SpriteProgram = $(embedFile "shader/sprite-fragment.glsl")
+getEmbeddedFragmentShaderSource StandardProgram = $(embedFile "shader/standard-fragment.glsl")
+getEmbeddedFragmentShaderSource TestProgram = $(embedFile "shader/test-fragment.glsl")
+
+renderOptions :: Options -> ByteString
+renderOptions options = ByteString.intercalate "\n" . catMaybes $
+    [ mappend "#version " . ByteString.pack . show <$> optionsGlslVersion options
+    , if optionsHasNormalMap options
+        then Just "#define HAS_NORMAL_MAP"
+        else Nothing
+    , if optionsHasVertexColor options
+        then Just "#define HAS_VERTEX_COLOR"
+        else Nothing
+    , Just $ "#define MAX_LIGHT_COUNT " `mappend` (ByteString.pack . show . optionsMaxLightCount $ options)
+    , Just ""
+    ]
 
 mkShader :: forall (k :: GLW.ShaderType). GLW.SingShaderType k => Proxy k -> ByteString -> IO (GLW.Shader k)
 mkShader _ source =

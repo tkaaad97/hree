@@ -1,5 +1,3 @@
-#version 450
-
 in vec2 fragmentUv;
 
 out vec4 outColor;

@@ -1,5 +1,3 @@
-#version 450
-
 in vec3 position;
 out vec4 fragmentColor;
 

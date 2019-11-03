@@ -1,5 +1,3 @@
-#version 450
-
 in vec3 positionOffset;
 in vec2 uvOffset;
 in vec3 position;

@@ -103,7 +103,7 @@ data SceneState = SceneState
     , ssTextures       :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
     , ssSamplers       :: !(Map ByteString GLW.Sampler)
     , ssDefaultTexture :: !(Maybe Texture)
-    , ssPrograms       :: !(Map ProgramSpec ProgramInfo)
+    , ssPrograms       :: !(Map ProgramName ProgramInfo)
     } deriving (Show)
 
 data Skin = Skin

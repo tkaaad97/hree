@@ -212,7 +212,7 @@ addMesh scene mesh = do
             bos' = maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
             minfo = MeshInfo meshId mesh bos' program vao
             programs = if programAdded
-                        then Map.insert pspec program (ssPrograms state)
+                        then Map.insert (getProgramName pspec) program (ssPrograms state)
                         else ssPrograms state
             newState = state
                 { ssMeshCounter = meshIdNext
@@ -436,7 +436,8 @@ addSamplerInternal renameOnConflict scene name =
 mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)
 mkProgramIfNotExists scene pspec = do
     programs <- fmap ssPrograms . readIORef . sceneState $ scene
-    let maybeProgram = Map.lookup pspec programs
+    let pname = getProgramName pspec
+        maybeProgram = Map.lookup pname programs
     maybe (flip (,) True <$> mkProgramAndInsert scene pspec) (return . flip (,) False) maybeProgram
 
 mkProgramAndInsert :: Scene -> ProgramSpec -> IO ProgramInfo
@@ -447,7 +448,8 @@ mkProgramAndInsert scene pspec = do
     return program
     where
     insertProgram program state =
-        let programs = Map.insert pspec program (ssPrograms state)
+        let pname = getProgramName pspec
+            programs = Map.insert pname program (ssPrograms state)
             newState = state { ssPrograms = programs }
         in (newState, ())
 
