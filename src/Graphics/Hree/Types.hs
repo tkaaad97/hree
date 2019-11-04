@@ -38,10 +38,13 @@ data Geometry = Geometry
     } deriving (Show)
 
 data Material = Material
-    { materialUniforms         :: !(Map ByteString Uniform)
-    , materialTextures         :: ![Texture]
-    , materialProgramSpecifier :: !ProgramSpec
-    } deriving (Show)
+    { materialUniforms    :: !(Map ByteString Uniform)
+    , materialTextures    :: ![Texture]
+    , materialProgramSpec :: !(Options -> ProgramSpec)
+    }
+
+instance Show Material where
+    show (Material us ts _) = "Material { materialUniforms = " ++ show us ++ ", materialTextures = " ++ show ts ++ ", materialProgramSpec = Function }"
 
 newtype MeshId = MeshId
     { unMeshId :: Int

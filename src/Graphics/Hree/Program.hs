@@ -12,6 +12,7 @@ module Graphics.Hree.Program
     , ProgramName
     , ProgramSpec(..)
     , basicProgramSpec
+    , defaultOptions
     , flatColorProgramSpec
     , getProgramName
     , spriteProgramSpec
@@ -46,6 +47,13 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
 
+data Options = Options
+    { optionsGlslVersion    :: !(Maybe Int)
+    , optionsHasNormalMap   :: !Bool
+    , optionsHasVertexColor :: !Bool
+    , optionsMaxLightCount  :: !Int
+    } deriving (Show, Eq, Generic)
+
 data EmbeddedProgramType =
     BasicProgram |
     FlatColorProgram |
@@ -53,13 +61,6 @@ data EmbeddedProgramType =
     StandardProgram |
     TestProgram
     deriving (Show, Eq, Enum, Generic)
-
-data Options = Options
-    { optionsGlslVersion    :: !(Maybe Int)
-    , optionsHasNormalMap   :: !Bool
-    , optionsHasVertexColor :: !Bool
-    , optionsMaxLightCount  :: !Int
-    } deriving (Show, Eq, Generic)
 
 data ShaderSource = ShaderSource
     { shaderSourceName :: !Text
@@ -88,22 +89,20 @@ defaultOptions = Options
     , optionsMaxLightCount = 10
     }
 
-basicProgramSpec :: ProgramSpec
-basicProgramSpec = EmbeddedProgram BasicProgram defaultOptions
+basicProgramSpec :: Options -> ProgramSpec
+basicProgramSpec = EmbeddedProgram BasicProgram
 
-flatColorProgramSpec :: ProgramSpec
-flatColorProgramSpec = EmbeddedProgram FlatColorProgram defaultOptions
+flatColorProgramSpec :: Options -> ProgramSpec
+flatColorProgramSpec = EmbeddedProgram FlatColorProgram
 
-spriteProgramSpec :: ProgramSpec
-spriteProgramSpec = EmbeddedProgram SpriteProgram defaultOptions
+spriteProgramSpec :: Options -> ProgramSpec
+spriteProgramSpec = EmbeddedProgram SpriteProgram
 
-standardProgramSpec :: ProgramSpec
-standardProgramSpec = EmbeddedProgram StandardProgram defaultOptions
+standardProgramSpec :: Options -> ProgramSpec
+standardProgramSpec = EmbeddedProgram StandardProgram
 
-testProgramSpec :: ProgramSpec
-testProgramSpec = EmbeddedProgram TestProgram options
-    where
-    options = defaultOptions { optionsGlslVersion = Nothing }
+testProgramSpec :: Options -> ProgramSpec
+testProgramSpec options = EmbeddedProgram TestProgram options { optionsGlslVersion = Nothing }
 
 instance Hashable Options where
 
