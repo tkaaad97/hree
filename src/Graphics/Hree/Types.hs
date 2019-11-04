@@ -57,7 +57,7 @@ data MeshInfo = MeshInfo
     { meshInfoId          :: !MeshId
     , meshInfoMesh        :: !Mesh
     , meshInfoBuffers     :: ![GLW.Buffer]
-    , meshInfoProgram     :: !ProgramInfo
+    , meshInfoProgram     :: !(Either ProgramSpec ProgramInfo)
     , meshInfoVertexArray :: !GLW.VertexArray
     } deriving (Show)
 

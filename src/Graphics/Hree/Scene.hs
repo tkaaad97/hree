@@ -38,10 +38,11 @@ import qualified Data.ByteString.Char8 as ByteString (pack)
 import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
 import qualified Data.Component as Component
+import Data.Either (either)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Maybe (catMaybes, fromMaybe, maybe, maybeToList)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
@@ -150,13 +151,14 @@ nodeToRenderInfos scene state =
             inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
         meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
         meshInfo <- MaybeT $ Component.readComponent meshId meshStore
+        program <- either (lift . fmap fst . mkProgramIfNotExists scene) return $ meshInfoProgram meshInfo
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
         let matrix = globalMatrix !*! inverseBindMatrix
-        let renderInfo = toRenderInfo defaultTexture meshInfo matrix
+        let renderInfo = toRenderInfo program defaultTexture meshInfo matrix
         return renderInfo
 
-toRenderInfo :: Maybe Texture -> MeshInfo -> Mat4 -> RenderInfo
-toRenderInfo defaultTexture meshInfo matrix =
+toRenderInfo :: ProgramInfo -> Maybe Texture -> MeshInfo -> Mat4 -> RenderInfo
+toRenderInfo program defaultTexture meshInfo matrix =
     let maybeUniform = toUniformEntry "modelMatrix" (Uniform matrix)
         uniforms = Map.elems $ Map.mapMaybeWithKey toUniformEntry (materialUniforms material)
         uniforms' = maybe uniforms (: uniforms) maybeUniform
@@ -165,7 +167,6 @@ toRenderInfo defaultTexture meshInfo matrix =
     where
     mesh = meshInfoMesh meshInfo
     material = meshMaterial mesh
-    program = meshInfoProgram meshInfo
     vao = meshInfoVertexArray meshInfo
     dm = resolveDrawMethod mesh
     uniformInfos = programInfoUniforms program
@@ -197,28 +198,35 @@ resolveDrawMethod mesh =
 addMesh :: Scene -> Mesh -> IO MeshId
 addMesh scene mesh = do
     (program, programAdded) <- mkProgramIfNotExists scene pspec
+    maybeProgram <- lookupProgramInfo
     GLW.glUseProgram (programInfoProgram program)
     vao <- mkVertexArray (geometryAttribBindings geo) buffers maybeIndexBuffer program
-    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc program programAdded vao)
+    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc maybeProgram vao)
     let meshId = meshInfoId minfo
     Component.addComponent meshId minfo (sceneMeshStore scene)
     return meshId
 
     where
-    addMeshFunc program programAdded vao state =
+    addMeshFunc maybeProgram vao state =
         let meshId = ssMeshCounter state
             meshIdNext = meshId + 1
             bos = map fst . IntMap.elems $ buffers
             bos' = maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
-            minfo = MeshInfo meshId mesh bos' program vao
-            programs = if programAdded
-                        then Map.insert (getProgramName pspec) program (ssPrograms state)
-                        else ssPrograms state
+            programInfo = maybe (Left pspec) Right maybeProgram
+            minfo = MeshInfo meshId mesh bos' programInfo vao
+            programs = maybe
+                        (ssPrograms state)
+                        (\p -> Map.insert (getProgramName pspec) p (ssPrograms state))
+                        maybeProgram
             newState = state
                 { ssMeshCounter = meshIdNext
                 , ssPrograms = programs
                 }
         in (newState, minfo)
+
+    lookupProgramInfo = do
+        programs <- fmap ssPrograms . readIORef . sceneState $ scene
+        return . Map.lookup (getProgramName pspec) $ programs
 
     geo = meshGeometry mesh
     buffers = geometryBuffers geo
