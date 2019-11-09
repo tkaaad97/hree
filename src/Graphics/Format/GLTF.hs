@@ -2,14 +2,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Graphics.Format.GLTF
     ( Accessor(..)
+    , AlphaMode(..)
     , Buffer(..)
     , BufferView(..)
     , ComponentType(..)
     , GLTF(..)
+    , Image(..)
+    , Material(..)
     , Mesh(..)
     , Node(..)
+    , NormalTextureInfo(..)
+    , OcclusionTextureInfo(..)
+    , PbrMetallicRoughness(..)
     , Primitive(..)
+    , Sampler(..)
     , Scene(..)
+    , Texture(..)
+    , TextureInfo(..)
     , ValueType(..)
     , componentByteSize
     , componentTypeToGLenum
@@ -29,7 +38,7 @@ import Control.Exception (throwIO)
 import Control.Monad (unless, void)
 import qualified Data.Aeson as Aeson (FromJSON(..), Object, Value,
                                       eitherDecodeFileStrict', withObject,
-                                      (.!=), (.:), (.:?))
+                                      withText, (.!=), (.:), (.:?))
 import qualified Data.Aeson.Types as Aeson (Parser)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (drop, isPrefixOf, readFile,
@@ -175,6 +184,59 @@ data Texture = Texture
     , textureExtras     :: !(Maybe Aeson.Value)
     } deriving (Show, Eq)
 
+data Material = Material
+    { materialName                 :: !(Maybe Text)
+    , materialExtensions           :: !(Maybe Aeson.Object)
+    , materialExtras               :: !(Maybe Aeson.Value)
+    , materialPbrMetallicRoughness :: !(Maybe PbrMetallicRoughness)
+    , materialNormalTexture        :: !(Maybe NormalTextureInfo)
+    , materialOcclusionTexture     :: !(Maybe OcclusionTextureInfo)
+    , materialEmissiveTexture      :: !(Maybe TextureInfo)
+    , materialEmissiveFactor       :: !(Linear.V3 Float)
+    , materialAlphaMode            :: !AlphaMode
+    , materialAlphaCutoff          :: !Float
+    , materialDoubleSided          :: !Bool
+    } deriving (Show, Eq)
+
+data PbrMetallicRoughness = PbrMetallicRoughness
+    { pbrBaseColorFactor          :: !(Linear.V4 Float)
+    , pbrBaseColorTexture         :: !(Maybe TextureInfo)
+    , pbrMetallicFactor           :: !Float
+    , pbrRoughnessFactor          :: !Float
+    , pbrMetallicRoughnessTexture :: !(Maybe TextureInfo)
+    , pbrExtensions               :: !(Maybe Aeson.Object)
+    , pbrExtras                   :: !(Maybe Aeson.Value)
+    } deriving (Show, Eq)
+
+data TextureInfo = TextureInfo
+    { textureInfoIndex      :: !Int
+    , textureInfoTexCoord   :: !Int
+    , textureInfoExtensions :: !(Maybe Aeson.Object)
+    , textureInfoExtras     :: !(Maybe Aeson.Value)
+    } deriving (Show, Eq)
+
+data NormalTextureInfo = NormalTextureInfo
+    { normalTextureInfoIndex      :: !Int
+    , normalTextureInfoTexCoord   :: !Int
+    , normalTextureInfoScale      :: !Float
+    , normalTextureInfoExtensions :: !(Maybe Aeson.Object)
+    , normalTextureInfoExtras     :: !(Maybe Aeson.Value)
+    } deriving (Show, Eq)
+
+data OcclusionTextureInfo = OcclusionTextureInfo
+    { occlusionTextureInfoIndex      :: !Int
+    , occlusionTextureInfoTexCoord   :: !Int
+    , occlusionTextureInfoStrength   :: !Float
+    , occlusionTextureInfoExtensions :: !(Maybe Aeson.Object)
+    , occlusionTextureInfoExtras     :: !(Maybe Aeson.Value)
+    } deriving (Show, Eq)
+
+data AlphaMode =
+    AlphaModeOpaque |
+    AlphaModeMask |
+    AlphaModeBlend
+    deriving (Show, Eq)
+
 data GLTF = GLTF
     { gltfScenes      :: !(BV.Vector Scene)
     , gltfNodes       :: !(BV.Vector Node)
@@ -185,6 +247,7 @@ data GLTF = GLTF
     , gltfImages      :: !(BV.Vector Image)
     , gltfSamplers    :: !(BV.Vector Sampler)
     , gltfTextures    :: !(BV.Vector Texture)
+    , gltfMaterials   :: !(BV.Vector Material)
     } deriving (Show, Eq)
 
 instance Aeson.FromJSON Buffer where
@@ -281,6 +344,66 @@ instance Aeson.FromJSON Texture where
         extras <- v Aeson..:? "extras"
         return $ Texture sampler source name extensions extras
 
+instance Aeson.FromJSON Material where
+     parseJSON = Aeson.withObject "Material" $ \v -> do
+        name <- v Aeson..:? "name"
+        extensions <- v Aeson..:? "extension"
+        extras <- v Aeson..:? "extras"
+        pbr <- v Aeson..:? "pbrMetallicRoughness"
+        normalTexture <- v Aeson..:? "normalTexture"
+        occlusionTexture <- v Aeson..:? "occlusionTexture"
+        emissiveTexture <- v Aeson..:? "emissiveTexture"
+        emissiveFactor <- maybe (return $ Linear.V3 0 0 0) fromVectorToVec3 =<< v Aeson..:? "emissiveFactor"
+        alphaMode <- v Aeson..:? "alphaMode" Aeson..!= AlphaModeOpaque
+        alphaCutoff <- v Aeson..:? "alphaCutoff" Aeson..!= 0.5
+        doubleSided <- v Aeson..:? "doubleSided" Aeson..!= False
+        return $ Material name extensions extras pbr normalTexture occlusionTexture emissiveTexture emissiveFactor alphaMode alphaCutoff doubleSided
+
+instance Aeson.FromJSON PbrMetallicRoughness where
+    parseJSON = Aeson.withObject "PbrMetallicRoughenss" $ \v -> do
+        baseColorFactor <- maybe (return $ Linear.V4 1 1 1 1) fromVectorToVec4 =<< v Aeson..:? "baseColorFactor"
+        baseColorTexture <- v Aeson..:? "baseColorTexture"
+        metallicFactor <- v Aeson..:? "metallicFactor" Aeson..!= 1
+        roughnessFactor <- v Aeson..:? "roughnessFactor" Aeson..!= 1
+        metallicRoughnessTexture <- v Aeson..:? "metallicRoughnessTexture"
+        extensions <- v Aeson..:? "extension"
+        extras <- v Aeson..:? "extras"
+        return $ PbrMetallicRoughness baseColorFactor baseColorTexture metallicFactor roughnessFactor metallicRoughnessTexture extensions extras
+
+instance Aeson.FromJSON TextureInfo where
+    parseJSON = Aeson.withObject "TextureInfo" $ \v -> do
+        index <- v Aeson..: "index"
+        textureCoord <- v Aeson..:? "texCoord" Aeson..!= 0
+        extensions <- v Aeson..:? "extension"
+        extras <- v Aeson..:? "extras"
+        return $ TextureInfo index textureCoord extensions extras
+
+instance Aeson.FromJSON NormalTextureInfo where
+    parseJSON = Aeson.withObject "NormalTextureInfo" $ \v -> do
+        index <- v Aeson..: "index"
+        textureCoord <- v Aeson..:? "texCoord" Aeson..!= 0
+        scale <- v Aeson..:? "scale" Aeson..!= 1.0
+        extensions <- v Aeson..:? "extension"
+        extras <- v Aeson..:? "extras"
+        return $ NormalTextureInfo index textureCoord scale extensions extras
+
+instance Aeson.FromJSON OcclusionTextureInfo where
+    parseJSON = Aeson.withObject "OcclusionTextureInfo" $ \v -> do
+        index <- v Aeson..: "index"
+        textureCoord <- v Aeson..:? "texCoord" Aeson..!= 0
+        strength <- v Aeson..:? "strength" Aeson..!= 1.0
+        extensions <- v Aeson..:? "extension"
+        extras <- v Aeson..:? "extras"
+        return $ OcclusionTextureInfo index textureCoord strength extensions extras
+
+instance Aeson.FromJSON AlphaMode where
+    parseJSON = Aeson.withText "AlphaMode" f
+        where
+        f "OPAQUE" = return AlphaModeOpaque
+        f "MASK"   = return AlphaModeMask
+        f "BLEND"  = return AlphaModeBlend
+        f other    = fail $ "invalid alphaMode: " ++ Text.unpack other
+
 instance Aeson.FromJSON GLTF where
     parseJSON = Aeson.withObject "GLTF" $ \v -> do
         scenes <- v Aeson..:? "scenes" Aeson..!= BV.empty
@@ -292,7 +415,8 @@ instance Aeson.FromJSON GLTF where
         images <- v Aeson..:? "images" Aeson..!= BV.empty
         samplers <- v Aeson..:? "samplers" Aeson..!= BV.empty
         textures <- v Aeson..:? "textures" Aeson..!= BV.empty
-        return $ GLTF scenes nodes meshes buffers bufferViews accessors images samplers textures
+        materials <- v Aeson..:? "materials" Aeson..!= BV.empty
+        return $ GLTF scenes nodes meshes buffers bufferViews accessors images samplers textures materials
 
 marshalComponentType :: ComponentType -> Int
 marshalComponentType Byte'          = 5120
@@ -364,6 +488,16 @@ fromVectorToVec3 v
             a1 = v UV.! 1
             a2 = v UV.! 2
         in return $ Linear.V3 a0 a1 a2
+    | otherwise = fail "bad array size"
+
+fromVectorToVec4 :: UV.Vector Float -> Aeson.Parser Vec4
+fromVectorToVec4 v
+    | UV.length v == 3 =
+        let a0 = v UV.! 0
+            a1 = v UV.! 1
+            a2 = v UV.! 2
+            a3 = v UV.! 3
+        in return $ Linear.V4 a0 a1 a2 a3
     | otherwise = fail "bad array size"
 
 fromVectorToQuaternion :: UV.Vector Float -> Aeson.Parser Quaternion
