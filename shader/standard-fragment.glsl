@@ -82,6 +82,12 @@ vec3 applyDirectionalLight(vec3 lightDir, vec3 normal, vec3 view, vec3 color, fl
     return calcPointShade(pointToLight, normal, view, color, metallicFactor, roughnessFactor);
 }
 
+vec4 sRGBToLinear(vec4 color)
+{
+    const float gamma = 2.2;
+    return vec4(pow(color.rgb, vec3(gamma)), color.a);
+}
+
 vec3 toneMapping(vec3 color)
 {
     const float invGamma = 1.0 / 2.2;
@@ -95,7 +101,7 @@ void main()
     vec3 view = -(viewMatrix * vec4(fragmentPosition, 1.0)).xyz;
     vec3 normal = (viewMatrix * vec4(fragmentNormal, 0.0)).xyz;
     vec3 light = (viewMatrix * vec4(directionalLight, 0.0)).xyz;
-    vec4 color = texture2D(baseColorTexture, fragmentUv) * baseColorFactor;
+    vec4 color = sRGBToLinear(texture2D(baseColorTexture, fragmentUv)) * baseColorFactor;
 #ifdef HAS_VERTEX_COLOR
     color = color * fragmentColor;
 #endif
