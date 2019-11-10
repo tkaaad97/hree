@@ -54,7 +54,8 @@ import Data.Maybe (fromMaybe, maybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
-import qualified Data.Vector as BV (Vector, empty, imapM_, map, mapM, (!), (!?))
+import qualified Data.Vector as BV (Vector, empty, imapM_, map, mapM, unzip,
+                                    (!), (!?))
 import qualified Data.Vector.Storable as SV (unsafeWith)
 import qualified Data.Vector.Unboxed as UV (Vector, length, (!))
 import Foreign (castPtr)
@@ -65,7 +66,7 @@ import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
 import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
                                                  BindBufferSetting(..),
                                                  BufferSource(..),
-                                                 IndexBuffer(..))
+                                                 IndexBuffer(..), Texture(..))
 import qualified Graphics.Hree.Material as Hree (basicMaterial,
                                                  flatColorMaterial)
 import Graphics.Hree.Math
@@ -76,7 +77,9 @@ import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
                                                         setSamplerParameter)
 import qualified Graphics.Hree.Scene as Hree (addBuffer, addMesh, addNode,
                                               addRootNodes, addSampler,
-                                              addTexture, newNode, updateNode)
+                                              addTexture,
+                                              mkDefaultTextureIfNotExists,
+                                              newNode, updateNode)
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
                                                 TextureSourceData(..))
 import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId,
@@ -545,12 +548,20 @@ loadSceneFromFile path scene = do
     let buffers_ = gltfBuffers gltf
         bufferViews_ = gltfBufferViews gltf
         accessors_ = gltfAccessors gltf
+        images_ = gltfImages gltf
+        samplers_ = gltfSamplers gltf
+        textures_ = gltfTextures gltf
         meshes_ = gltfMeshes gltf
         nodes_ = gltfNodes gltf
         scenes_ = gltfScenes gltf
         rootNodes = maybe mempty sceneNodes $ scenes_ BV.!? 0
         basepath = dropFileName path
-    buffers <- createBuffers basepath scene buffers_
+    defaultTexture <- Hree.mkDefaultTextureIfNotExists scene
+    bufferAndBss <- createBuffers basepath scene buffers_
+    let (buffers, bss) = BV.unzip bufferAndBss
+    sources <- createTextureSources basepath scene bss bufferViews_ images_
+    samplers <- createSamplers scene samplers_
+    let textures = createTextures defaultTexture sources samplers textures_
     meshes <- createGLTFMeshes scene buffers bufferViews_ accessors_ meshes_
     createNodes scene nodes_ rootNodes meshes
     return gltf
@@ -570,12 +581,13 @@ parseUri cd byteLength uri =
     where
     (scheme, remainder) = ByteString.break (== ':') uri
 
-createBuffer :: FilePath -> Hree.Scene -> Buffer -> IO GLW.Buffer
+createBuffer :: FilePath -> Hree.Scene -> Buffer -> IO (GLW.Buffer, ByteString)
 createBuffer cd scene (Buffer byteLength uri) = do
     bs <- parseUri cd byteLength (Text.encodeUtf8 uri)
-    Hree.addBuffer scene (Hree.BufferSourceByteString bs GL.GL_STATIC_READ)
+    buffer <- Hree.addBuffer scene (Hree.BufferSourceByteString bs GL.GL_STATIC_READ)
+    return (buffer, bs)
 
-createBuffers :: FilePath -> Hree.Scene -> BV.Vector Buffer -> IO (BV.Vector GLW.Buffer)
+createBuffers :: FilePath -> Hree.Scene -> BV.Vector Buffer -> IO (BV.Vector (GLW.Buffer, ByteString))
 createBuffers cd scene = BV.mapM (createBuffer cd scene)
 
 createGLTFMeshes :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector Hree.MeshId))
@@ -783,8 +795,8 @@ readImage mimeType path
         image <- either (throwIO . userError) return =<< Picture.readImage path
         return (Picture.convertRGBA8 image)
 
-createTexture :: FilePath -> Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> Image -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D)
-createTexture cd scene buffers bufferViews image = do
+createTextureSource :: FilePath -> Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> Image -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D)
+createTextureSource cd scene buffers bufferViews image = do
     source <- createImage cd buffers bufferViews image
     let name = Text.encodeUtf8 $ fromMaybe "glTF_texture_" (imageName image)
         width = fromIntegral $ Picture.imageWidth source
@@ -794,6 +806,10 @@ createTexture cd scene buffers bufferViews image = do
         let sourceData = Hree.TextureSourceData width height PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (castPtr ptr)
         Hree.addTexture scene name settings sourceData
     return texture
+
+createTextureSources :: FilePath -> Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Image -> IO (BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D))
+createTextureSources cd scene buffers bufferViews =
+    BV.mapM (createTextureSource cd scene buffers bufferViews)
 
 createSampler :: Hree.Scene -> Sampler -> IO GLW.Sampler
 createSampler scene sampler = do
@@ -808,6 +824,20 @@ createSampler scene sampler = do
     whenJust (unmarshalSamplerWrapParameter . samplerWrapT $ sampler) $
         Hree.Sampler.setSamplerParameter a Hree.Sampler.glTextureWrapT
     return a
+
+createSamplers :: Hree.Scene -> BV.Vector Sampler -> IO (BV.Vector GLW.Sampler)
+createSamplers scene = BV.mapM (createSampler scene)
+
+createTexture :: BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D) -> BV.Vector GLW.Sampler -> Texture -> Maybe Hree.Texture
+createTexture sources samplers texture = do
+    sourceIndex <- textureSource texture
+    samplerIndex <- textureSampler texture
+    source <- sources BV.!? sourceIndex
+    sampler <- samplers BV.!? samplerIndex
+    return (Hree.Texture (source, sampler))
+
+createTextures :: Hree.Texture -> BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D) -> BV.Vector GLW.Sampler -> BV.Vector Texture -> BV.Vector Hree.Texture
+createTextures defaultTexture sources samplers = BV.map (fromMaybe defaultTexture . createTexture sources samplers)
 
 unmarshalSamplerFilterParameter :: Int -> Maybe GL.GLint
 unmarshalSamplerFilterParameter a

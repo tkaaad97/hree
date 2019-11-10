@@ -16,6 +16,7 @@ module Graphics.Hree.Scene
     , addTexture
     , applyTransformToNode
     , deleteScene
+    , mkDefaultTextureIfNotExists
     , newNode
     , newScene
     , removeMesh
