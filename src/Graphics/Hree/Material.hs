@@ -5,13 +5,16 @@ module Graphics.Hree.Material
     , Texture(..)
     , basicMaterial
     , flatColorMaterial
+    , setBaseColorFactor
+    , setBaseColorTexture
+    , setDirectionalLight
+    , setMetallicFactor
+    , setMetallicRoughnessTexture
+    , setNormalTexture
+    , setRoughnessFactor
     , spriteMaterial
     , standardMaterial
     , testMaterial
-    , setDirectionalLight
-    , setBaseColorTexture
-    , setNormalTexture
-    , setMetallicRoughnessTexture
     ) where
 
 import Data.ByteString (ByteString)
@@ -38,17 +41,17 @@ standardMaterial :: Float -> Float -> Material
 standardMaterial metalness roughness = Material u mempty standardProgramSpec
     where
     u = Map.fromList
-        [ ("metalness", Uniform metalness)
-        , ("roughness", Uniform roughness)
+        [ ("metallicFactor", Uniform metalness)
+        , ("roughnessFactor", Uniform roughness)
         ]
 
 testMaterial :: Material
 testMaterial = Material mempty mempty testProgramSpec
 
-setDirectionalLight :: Material -> V3 Float -> Material
-setDirectionalLight m dl =
+setUniform :: Material -> ByteString -> Uniform -> Material
+setUniform m key uniform =
     let us = materialUniforms m
-        us' = Map.insert "directionalLight" (Uniform dl) us
+        us' = Map.insert key uniform us
     in m { materialUniforms = us' }
 
 setTexture :: Material -> ByteString -> Texture -> Material
@@ -57,11 +60,23 @@ setTexture m key texture =
         ts' = Map.insert key texture ts
     in m { materialTextures = ts' }
 
+setBaseColorFactor :: Material -> V4 GL.GLfloat -> Material
+setBaseColorFactor m = setUniform m "baseColorFactor" . Uniform
+
+setMetallicFactor :: Material -> GL.GLfloat -> Material
+setMetallicFactor m = setUniform m "metallicFactor" . Uniform
+
+setRoughnessFactor :: Material -> GL.GLfloat -> Material
+setRoughnessFactor m = setUniform m "roughnessFactor" . Uniform
+
+setDirectionalLight :: Material -> V3 Float -> Material
+setDirectionalLight m = setUniform m "directionalLight" . Uniform
+
 setBaseColorTexture :: Material -> Texture -> Material
-setBaseColorTexture m = setTexture m "baseColorTexture"
+setBaseColorTexture = flip setTexture "baseColorTexture"
 
 setNormalTexture :: Material -> Texture -> Material
-setNormalTexture m = setTexture m "normalTexture"
+setNormalTexture = flip setTexture "normalTexture"
 
 setMetallicRoughnessTexture :: Material -> Texture -> Material
-setMetallicRoughnessTexture m = setTexture m "metallicRoughnessTexture"
+setMetallicRoughnessTexture = flip setTexture "metallicRoughnessTexture"

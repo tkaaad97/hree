@@ -47,6 +47,7 @@ import qualified Data.ByteString.Base64 as Base64 (decode)
 import qualified Data.ByteString.Char8 as ByteString (break, drop, dropWhile,
                                                       unpack)
 import Data.Either (either)
+import Data.Function ((&))
 import qualified Data.List as List (groupBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (fromList, mapWithKey, toList)
@@ -67,8 +68,12 @@ import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
                                                  BindBufferSetting(..),
                                                  BufferSource(..),
                                                  IndexBuffer(..), Texture(..))
-import qualified Graphics.Hree.Material as Hree (basicMaterial,
-                                                 flatColorMaterial)
+import qualified Graphics.Hree.Material as Hree (flatColorMaterial,
+                                                 setBaseColorFactor,
+                                                 setBaseColorTexture,
+                                                 setMetallicFactor,
+                                                 setRoughnessFactor,
+                                                 standardMaterial)
 import Graphics.Hree.Math
 import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
                                                         glTextureMinFilter,
@@ -82,8 +87,8 @@ import qualified Graphics.Hree.Scene as Hree (addBuffer, addMesh, addNode,
                                               newNode, updateNode)
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
                                                 TextureSourceData(..))
-import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId,
-                                              Node(..), NodeId, Scene)
+import qualified Graphics.Hree.Types as Hree (Geometry(..), Material, Mesh(..),
+                                              MeshId, Node(..), NodeId, Scene)
 import qualified Linear (Quaternion(..), V3(..), V4(..), zero)
 import System.Directory (canonicalizePath)
 import System.FilePath (dropFileName, (</>))
@@ -551,6 +556,7 @@ loadSceneFromFile path scene = do
         images_ = gltfImages gltf
         samplers_ = gltfSamplers gltf
         textures_ = gltfTextures gltf
+        materials_ = gltfMaterials gltf
         meshes_ = gltfMeshes gltf
         nodes_ = gltfNodes gltf
         scenes_ = gltfScenes gltf
@@ -562,7 +568,8 @@ loadSceneFromFile path scene = do
     sources <- createTextureSources basepath scene bss bufferViews_ images_
     samplers <- createSamplers scene samplers_
     let textures = createTextures defaultTexture sources samplers textures_
-    meshes <- createGLTFMeshes scene buffers bufferViews_ accessors_ meshes_
+        materials = createMaterials textures materials_
+    meshes <- createGLTFMeshes scene buffers bufferViews_ accessors_ materials meshes_
     createNodes scene nodes_ rootNodes meshes
     return gltf
 
@@ -590,16 +597,16 @@ createBuffer cd scene (Buffer byteLength uri) = do
 createBuffers :: FilePath -> Hree.Scene -> BV.Vector Buffer -> IO (BV.Vector (GLW.Buffer, ByteString))
 createBuffers cd scene = BV.mapM (createBuffer cd scene)
 
-createGLTFMeshes :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector Hree.MeshId))
-createGLTFMeshes scene buffers bufferViews accessors =
-    BV.mapM (createMeshes scene buffers bufferViews accessors)
+createGLTFMeshes :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector Hree.MeshId))
+createGLTFMeshes scene buffers bufferViews accessors materials =
+    BV.mapM (createMeshes scene buffers bufferViews accessors materials)
 
-createMeshes :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Mesh -> IO (BV.Vector Hree.MeshId)
-createMeshes scene buffers bufferViews accessors =
-    BV.mapM (createMeshFromPrimitive scene buffers bufferViews accessors) . meshPrimitives
+createMeshes :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> Mesh -> IO (BV.Vector Hree.MeshId)
+createMeshes scene buffers bufferViews accessors materials =
+    BV.mapM (createMeshFromPrimitive scene buffers bufferViews accessors materials) . meshPrimitives
 
-createMeshFromPrimitive :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Primitive -> IO Hree.MeshId
-createMeshFromPrimitive scene buffers bufferViews accessors primitive = do
+createMeshFromPrimitive :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> Primitive -> IO Hree.MeshId
+createMeshFromPrimitive scene buffers bufferViews accessors materials primitive = do
     groups <- either error return $ groupAttributes buffers bufferViews accessors primitive
     let (_, geometry) = foldl addAttribBindings (1, Hree.newGeometry) groups
         verticesCount = minimum . map (accessorCount . snd) . concatMap snd $ groups
@@ -608,7 +615,10 @@ createMeshFromPrimitive scene buffers bufferViews accessors primitive = do
     geometry2 <- flip (maybe (return geometry1)) (primitiveIndices primitive) $
         either error return . setIndexBuffer geometry1 buffers bufferViews accessors
 
-    let material = Hree.flatColorMaterial (Linear.V4 1 0 0 1) -- Hree.basicMaterial Nothing
+    let defaultMaterial = Hree.flatColorMaterial (Linear.V4 0.5 0.5 0.5 1)
+        material = fromMaybe defaultMaterial $ do
+            materialIndex <- primitiveMaterial primitive
+            materials BV.!? materialIndex
         mesh = Hree.Mesh geometry2 material Nothing
     Hree.addMesh scene mesh
 
@@ -838,6 +848,25 @@ createTexture sources samplers texture = do
 
 createTextures :: Hree.Texture -> BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D) -> BV.Vector GLW.Sampler -> BV.Vector Texture -> BV.Vector Hree.Texture
 createTextures defaultTexture sources samplers = BV.map (fromMaybe defaultTexture . createTexture sources samplers)
+
+createMaterial :: BV.Vector Hree.Texture -> Material -> Hree.Material
+createMaterial textures m =
+    Hree.standardMaterial 1 1
+        & setWhenJust setPbrMetallicRoughness (materialPbrMetallicRoughness m)
+    where
+    setWhenJust _ Nothing a  = a
+    setWhenJust f (Just b) a = a `f` b
+    setPbrMetallicRoughness a pbr = a
+        `Hree.setBaseColorFactor` pbrBaseColorFactor pbr
+        `Hree.setMetallicFactor` pbrMetallicFactor pbr
+        `Hree.setRoughnessFactor` pbrRoughnessFactor pbr
+        & setWhenJust setBaseColorTexture (pbrBaseColorTexture pbr)
+    setBaseColorTexture a info = fromMaybe a $ do
+        texture <- textures BV.!? textureInfoIndex info
+        return $ a `Hree.setBaseColorTexture` texture
+
+createMaterials :: BV.Vector Hree.Texture -> BV.Vector Material -> BV.Vector Hree.Material
+createMaterials textures = BV.map (createMaterial textures)
 
 unmarshalSamplerFilterParameter :: Int -> Maybe GL.GLint
 unmarshalSamplerFilterParameter a
