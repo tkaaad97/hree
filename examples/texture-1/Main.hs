@@ -30,12 +30,12 @@ main = do
 
     x = 1
     vs = Vector.fromList
-        [ BasicVertex (V3 x x 0) (V3 0 0 1) (V2 1 1) (V4 0 0 0 255)
-        , BasicVertex (V3 0 x 0) (V3 0 0 1) (V2 0.0 1) (V4 0 0 0 255)
-        , BasicVertex (V3 x 0 0) (V3 0 0 1) (V2 1 0.0) (V4 0 0 0 255)
-        , BasicVertex (V3 0 0 0) (V3 0 0 1) (V2 0.0 0.0) (V4 0 0 0 255)
-        , BasicVertex (V3 x 0 0) (V3 0 0 1) (V2 1 0.0) (V4 0 0 0 255)
-        , BasicVertex (V3 0 x 0) (V3 0 0 1) (V2 0.0 1) (V4 0 0 0 255)
+        [ BasicVertex (V3 x x 0) (V3 0 0 1) (V2 1 1) (V4 255 255 255 255)
+        , BasicVertex (V3 0 x 0) (V3 0 0 1) (V2 0.0 1) (V4 255 255 255 255)
+        , BasicVertex (V3 x 0 0) (V3 0 0 1) (V2 1 0.0) (V4 255 255 255 255)
+        , BasicVertex (V3 0 0 0) (V3 0 0 1) (V2 0.0 0.0) (V4 255 255 255 255)
+        , BasicVertex (V3 x 0 0) (V3 0 0 1) (V2 1 0.0) (V4 255 255 255 255)
+        , BasicVertex (V3 0 x 0) (V3 0 0 1) (V2 0.0 1) (V4 255 255 255 255)
         ]
 
     proj = perspective 90 1.0 0.1 10.0
