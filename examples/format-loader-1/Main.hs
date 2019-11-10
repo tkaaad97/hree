@@ -39,7 +39,7 @@ main = do
     height = 480
     aspect = fromIntegral width / fromIntegral height
 
-    proj = perspective 90 aspect 0.1 1000.0
+    proj = perspective 90 aspect 0.001 1000.0
 
     la = lookAt (V3 0 0 10) (V3 0 0 0) (V3 0 1 0)
 
