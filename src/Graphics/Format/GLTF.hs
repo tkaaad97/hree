@@ -71,6 +71,7 @@ import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
 import qualified Graphics.Hree.Material as Hree (flatColorMaterial,
                                                  setBaseColorFactor,
                                                  setBaseColorTexture,
+                                                 setDirectionalLight,
                                                  setMetallicFactor,
                                                  setRoughnessFactor,
                                                  standardMaterial)
@@ -584,7 +585,10 @@ parseUri cd byteLength uri =
             path <- canonicalizePath $ cd </> ByteString.unpack relativePath
             bs <- ByteString.readFile path
             return $ ByteString.take byteLength bs
-        _ -> throwIO . userError $ "unknown scheme: " ++ ByteString.unpack scheme
+        _ -> do
+            path <- canonicalizePath $ cd </> ByteString.unpack uri
+            bs <- ByteString.readFile path
+            return $ ByteString.take byteLength bs
     where
     (scheme, remainder) = ByteString.break (== ':') uri
 
@@ -805,19 +809,21 @@ readImage mimeType path
         image <- either (throwIO . userError) return =<< Picture.readImage path
         return (Picture.convertRGBA8 image)
 
-createTextureSource :: FilePath -> Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> Image -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D)
+createTextureSource :: FilePath -> Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> Image -> IO (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler)
 createTextureSource cd scene buffers bufferViews image = do
     source <- createImage cd buffers bufferViews image
     let name = Text.encodeUtf8 $ fromMaybe "glTF_texture_" (imageName image)
         width = fromIntegral $ Picture.imageWidth source
         height = fromIntegral $ Picture.imageHeight source
-        settings = Hree.TextureSettings 0 GL.GL_RGBA width height False
+        settings = Hree.TextureSettings 1 GL.GL_RGBA8 width height False
     (_, texture) <- SV.unsafeWith (Picture.imageData source) $ \ptr -> do
         let sourceData = Hree.TextureSourceData width height PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (castPtr ptr)
         Hree.addTexture scene name settings sourceData
-    return texture
+    let samplerName = Text.encodeUtf8 $ fromMaybe "glTF_sourcesampler_" (imageName image)
+    (_, sampler) <- Hree.addSampler scene name
+    return (texture, sampler)
 
-createTextureSources :: FilePath -> Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Image -> IO (BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D))
+createTextureSources :: FilePath -> Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Image -> IO (BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler))
 createTextureSources cd scene buffers bufferViews =
     BV.mapM (createTextureSource cd scene buffers bufferViews)
 
@@ -838,20 +844,20 @@ createSampler scene sampler = do
 createSamplers :: Hree.Scene -> BV.Vector Sampler -> IO (BV.Vector GLW.Sampler)
 createSamplers scene = BV.mapM (createSampler scene)
 
-createTexture :: BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D) -> BV.Vector GLW.Sampler -> Texture -> Maybe Hree.Texture
+createTexture :: BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler) -> BV.Vector GLW.Sampler -> Texture -> Maybe Hree.Texture
 createTexture sources samplers texture = do
     sourceIndex <- textureSource texture
-    samplerIndex <- textureSampler texture
-    source <- sources BV.!? sourceIndex
-    sampler <- samplers BV.!? samplerIndex
+    (source, sourceSampler) <- sources BV.!? sourceIndex
+    let sampler = fromMaybe sourceSampler $ (samplers BV.!?) =<< textureSampler texture
     return (Hree.Texture (source, sampler))
 
-createTextures :: Hree.Texture -> BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D) -> BV.Vector GLW.Sampler -> BV.Vector Texture -> BV.Vector Hree.Texture
+createTextures :: Hree.Texture -> BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler) -> BV.Vector GLW.Sampler -> BV.Vector Texture -> BV.Vector Hree.Texture
 createTextures defaultTexture sources samplers = BV.map (fromMaybe defaultTexture . createTexture sources samplers)
 
 createMaterial :: BV.Vector Hree.Texture -> Material -> Hree.Material
 createMaterial textures m =
     Hree.standardMaterial 1 1
+        `Hree.setDirectionalLight` Linear.V3 0.5 (-1) (-0.5)
         & setWhenJust setPbrMetallicRoughness (materialPbrMetallicRoughness m)
     where
     setWhenJust _ Nothing a  = a
