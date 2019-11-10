@@ -2,6 +2,7 @@
 module Main where
 
 import Control.Exception (throwIO)
+import Control.Monad (void)
 import qualified Data.Vector.Storable as Vector
 import Data.Word (Word8)
 import Example
@@ -9,6 +10,7 @@ import Foreign (Ptr)
 import qualified Foreign (castPtr)
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
+import qualified Graphics.Format.GLTF as GLTF (loadSceneFromFile)
 import qualified Graphics.Format.PLY as PLY (loadGeometryFromFile)
 import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
 import qualified Graphics.GL as GL
@@ -45,7 +47,18 @@ main = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
         scene <- newScene
-        geometry <- case FilePath.takeExtension path of
+        loadScene path scene (FilePath.takeExtension path)
+        camera <- newCamera proj la
+        _ <- setCameraMouseControl w camera
+
+        GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
+        return (scene, camera)
+
+    loadScene path scene ".gltf" =
+        void $ GLTF.loadSceneFromFile path scene
+
+    loadScene path scene extension = do
+        geometry <- case extension of
                         ".stl" -> STL.loadGeometryFromFile path scene
                         ".ply" -> PLY.loadGeometryFromFile path scene
                         _ -> throwIO . userError $ "unknown format. path: " ++ path
@@ -53,12 +66,7 @@ main = do
                 `Material.setDirectionalLight` V3 0.5 (-1) (-0.5)
             mesh = Mesh geometry material Nothing
         meshId <- addMesh scene mesh
-        addNode scene newNode{ nodeMesh = Just meshId } True
-        camera <- newCamera proj la
-        _ <- setCameraMouseControl w camera
-
-        GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
-        return (scene, camera)
+        void $ addNode scene newNode{ nodeMesh = Just meshId } True
 
     onDisplay (s, c) w = do
         render
