@@ -42,7 +42,7 @@ import Data.Either (either)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, maybe, maybeToList)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybe, maybeToList)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
@@ -138,7 +138,6 @@ nodeToRenderInfos :: Scene -> SceneState -> MaybeT IO [RenderInfo]
 nodeToRenderInfos scene state =
     catMaybes <$> foldNodes scene state go () []
     where
-    defaultTexture = ssDefaultTexture state
     meshStore = sceneMeshStore scene
     globalMatrixStore = sceneNodeGlobalTransformMatrixStore scene
 
@@ -153,14 +152,15 @@ nodeToRenderInfos scene state =
         meshInfo <- MaybeT $ Component.readComponent meshId meshStore
         program <- either (lift . fmap fst . mkProgramIfNotExists scene) return $ meshInfoProgram meshInfo
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
+        defaultTexture <- lift $ mkDefaultTextureIfNotExists scene
         let matrix = globalMatrix !*! inverseBindMatrix
         let renderInfo = toRenderInfo program defaultTexture meshInfo matrix
         return renderInfo
 
-toRenderInfo :: ProgramInfo -> Maybe Texture -> MeshInfo -> Mat4 -> RenderInfo
+toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> Mat4 -> RenderInfo
 toRenderInfo program defaultTexture meshInfo matrix =
-    let maybeUniform = toUniformEntry "modelMatrix" (Uniform matrix)
-        uniforms = Map.elems $ Map.mapMaybeWithKey toUniformEntry (materialUniforms material)
+    let maybeUniform = toUniformEntry ("modelMatrix", Uniform matrix)
+        uniforms = mapMaybe toUniformEntry $ Map.toList (materialUniforms material) ++ textureUniforms
         uniforms' = maybe uniforms (: uniforms) maybeUniform
         renderInfo = RenderInfo program dm vao uniforms' textures
     in renderInfo
@@ -170,13 +170,14 @@ toRenderInfo program defaultTexture meshInfo matrix =
     vao = meshInfoVertexArray meshInfo
     dm = resolveDrawMethod mesh
     uniformInfos = programInfoUniforms program
-    toUniformEntry uniformName uniform = do
+    toUniformEntry (uniformName, uniform) = do
         uniformInfo <- Map.lookup uniformName uniformInfos
         return (uniformInfo, uniform)
-    mtextures = materialTextures material
+    mtextures = Map.toList $ materialTextures material
     textures = if null mtextures
-        then maybeToList defaultTexture
-        else mtextures
+        then [defaultTexture]
+        else map snd mtextures
+    textureUniforms = zip (map fst mtextures) (map Uniform ([0..] :: [GL.GLint]))
 
 resolveDrawMethod :: Mesh -> DrawMethod
 resolveDrawMethod mesh =

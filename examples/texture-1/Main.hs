@@ -46,9 +46,10 @@ main = do
         scene <- newScene
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry vs GL.GL_STREAM_DRAW scene
         texture <- mkTexture scene
-        let material = Material.basicMaterial (Just texture)
-            material' = Material.setDirectionalLight material (V3 0 0 (-1))
-            mesh = Mesh geometry material' Nothing
+        let material = Material.basicMaterial
+                `Material.setBaseColorTexture` texture
+                `Material.setDirectionalLight` V3 0 0 (-1)
+            mesh = Mesh geometry material Nothing
         meshId <- addMesh scene mesh
         addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la

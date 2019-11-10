@@ -39,7 +39,7 @@ data Geometry = Geometry
 
 data Material = Material
     { materialUniforms    :: !(Map ByteString Uniform)
-    , materialTextures    :: ![Texture]
+    , materialTextures    :: !(Map ByteString Texture)
     , materialProgramSpec :: !(Options -> ProgramSpec)
     }
 

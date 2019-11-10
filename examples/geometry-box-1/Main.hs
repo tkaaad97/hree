@@ -51,9 +51,10 @@ main = do
         (geometry, _) <- createBoxGeometry 0.5 0.5 0.5 scene
         geometry' <- Geometry.addVerticesToGeometry geometry vs GL.GL_STATIC_READ scene
         texture <- mkTexture scene
-        let material = Material.basicMaterial (Just texture)
-            material' = Material.setDirectionalLight material (V3 0.5 (-1) (-1))
-            mesh = Mesh geometry' material' Nothing
+        let material = Material.basicMaterial
+                `Material.setDirectionalLight` V3 0.5 (-1) (-1)
+                `Material.setBaseColorTexture` texture
+            mesh = Mesh geometry' material Nothing
         meshId <- addMesh scene mesh
         addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la

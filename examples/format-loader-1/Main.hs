@@ -49,9 +49,9 @@ main = do
                         ".stl" -> STL.loadGeometryFromFile path scene
                         ".ply" -> PLY.loadGeometryFromFile path scene
                         _ -> throwIO . userError $ "unknown format. path: " ++ path
-        let material = Material.basicMaterial Nothing
-            material' = Material.setDirectionalLight material (V3 0.5 (-1) (-0.5))
-            mesh = Mesh geometry material' Nothing
+        let material = Material.basicMaterial
+                `Material.setDirectionalLight` V3 0.5 (-1) (-0.5)
+            mesh = Mesh geometry material Nothing
         meshId <- addMesh scene mesh
         addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la

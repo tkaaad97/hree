@@ -13,7 +13,7 @@ uniform vec4 baseColor = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float metalness = 0.5;
 uniform float roughness = 0.5;
 uniform vec3 emissiveness = vec3(0.0, 0.0, 0.0);
-uniform sampler2D texture;
+uniform sampler2D baseColorTexture;
 uniform vec3 directionalLight = vec3(0.0, 0.0, 0.0);
 
 const float pi = 3.141592653589793;
