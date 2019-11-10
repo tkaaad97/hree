@@ -9,9 +9,9 @@ out vec4 outColor;
 
 uniform mat4 viewMatrix = mat4(1.0);
 uniform vec3 viewPosition = vec3(0.0);
-uniform vec4 baseColor = vec4(1.0, 1.0, 1.0, 1.0);
-uniform float metalness = 0.5;
-uniform float roughness = 0.5;
+uniform vec4 baseColorFactor = vec4(1.0, 1.0, 1.0, 1.0);
+uniform float metallicFactor = 1.0;
+uniform float roughnessFactor = 1.0;
 uniform vec3 emissiveness = vec3(0.0, 0.0, 0.0);
 uniform sampler2D baseColorTexture;
 uniform vec3 directionalLight = vec3(0.0, 0.0, 0.0);
@@ -26,9 +26,9 @@ vec3 diffuse(vec3 a)
     return a / pi;
 }
 
-vec3 calcFresnelSchlick(vec3 base, float metalness, float dotVH)
+vec3 calcFresnelSchlick(vec3 base, float metallicFactor, float dotVH)
 {
-    vec3 f0 = mix(dielectricSpecular, base, metalness);
+    vec3 f0 = mix(dielectricSpecular, base, metallicFactor);
     vec3 F = f0 + (1.0 - f0) * pow(clamp(1.0 - dotVH, 0.0, 1.0), 5.0);
     return F;
 }
@@ -51,9 +51,9 @@ float calcMicrofacetDistribution(float alpha2, float dotNH)
     return D;
 }
 
-vec3 calcPointShade(vec3 pointToLight, vec3 normal, vec3 view, vec3 color, float metalness, float roughness)
+vec3 calcPointShade(vec3 pointToLight, vec3 normal, vec3 view, vec3 color, float metallicFactor, float roughnessFactor)
 {
-    float alpha = roughness * roughness;
+    float alpha = roughnessFactor * roughnessFactor;
     float alpha2 = alpha * alpha;
     vec3 n = normalize(normal);
     vec3 v = normalize(view);
@@ -65,7 +65,7 @@ vec3 calcPointShade(vec3 pointToLight, vec3 normal, vec3 view, vec3 color, float
     float dotVH = clamp(dot(v, h), 0.0, 1.0);
 
     if (dotNL > 0.0 || dotNV > 0.0) {
-        vec3 F = calcFresnelSchlick(color, metalness, dotVH);
+        vec3 F = calcFresnelSchlick(color, metallicFactor, dotVH);
         float V = calcVisibilityOcclusion(alpha2, dotNL, dotNV);
         float D = calcMicrofacetDistribution(alpha2, dotNH);
 
@@ -76,10 +76,10 @@ vec3 calcPointShade(vec3 pointToLight, vec3 normal, vec3 view, vec3 color, float
     return vec3(0.0);
 }
 
-vec3 applyDirectionalLight(vec3 lightDir, vec3 normal, vec3 view, vec3 color, float metalness, float roughness)
+vec3 applyDirectionalLight(vec3 lightDir, vec3 normal, vec3 view, vec3 color, float metallicFactor, float roughnessFactor)
 {
     vec3 pointToLight = -lightDir;
-    return calcPointShade(pointToLight, normal, view, color, metalness, roughness);
+    return calcPointShade(pointToLight, normal, view, color, metallicFactor, roughnessFactor);
 }
 
 vec3 toneMapping(vec3 color)
@@ -90,18 +90,18 @@ vec3 toneMapping(vec3 color)
 
 void main()
 {
-    float metalnessClamped = clamp(metalness, 0.0, 1.0);
-    float roughnessClamped = clamp(roughness, 0.0, 1.0);
+    float metallicFactorClamped = clamp(metallicFactor, 0.0, 1.0);
+    float roughnessFactorClamped = clamp(roughnessFactor, 0.0, 1.0);
     vec3 view = -(viewMatrix * vec4(fragmentPosition, 1.0)).xyz;
     vec3 normal = (viewMatrix * vec4(fragmentNormal, 0.0)).xyz;
     vec3 light = (viewMatrix * vec4(directionalLight, 0.0)).xyz;
-    vec4 color = texture2D(baseColorTexture, fragmentUv) * baseColor;
+    vec4 color = texture2D(baseColorTexture, fragmentUv) * baseColorFactor;
 #ifdef HAS_VERTEX_COLOR
     color = color * fragmentColor;
 #endif
-    vec3 diffuseColor = mix(color.rgb * (1.0 - dielectricSpecular.r), black, metalnessClamped);
+    vec3 diffuseColor = mix(color.rgb * (1.0 - dielectricSpecular.r), black, metallicFactorClamped);
 
     vec3 acc = vec3(0.0, 0.0, 0.0);
-    acc += applyDirectionalLight(light, normal, view, diffuseColor, metalnessClamped, roughnessClamped);
+    acc += applyDirectionalLight(light, normal, view, diffuseColor, metallicFactorClamped, roughnessFactorClamped);
     outColor = vec4(toneMapping(acc), 1.0);
 }
