@@ -95,13 +95,13 @@ void main()
     vec3 view = -(viewMatrix * vec4(fragmentPosition, 1.0)).xyz;
     vec3 normal = (viewMatrix * vec4(fragmentNormal, 0.0)).xyz;
     vec3 light = (viewMatrix * vec4(directionalLight, 0.0)).xyz;
-    vec4 color = texture2D(texture, fragmentUv) * baseColor;
+    vec4 color = texture2D(baseColorTexture, fragmentUv) * baseColor;
 #ifdef HAS_VERTEX_COLOR
     color = color * fragmentColor;
 #endif
-    vec3 diffuseColor = mix(a.rgb * (1.0 - dielectricSpecular.r), black, metalnessClamped);
+    vec3 diffuseColor = mix(color.rgb * (1.0 - dielectricSpecular.r), black, metalnessClamped);
 
-    outColor = vec3(0.0, 0.0, 0.0);
-    outColor += applyDirectionalLight(light, normal, view, diffuseColor, metalnessClamped, roughnessClamped);
-    outColor = vec4(toneMapping(outColor), 1.0);
+    vec3 acc = vec3(0.0, 0.0, 0.0);
+    acc += applyDirectionalLight(light, normal, view, diffuseColor, metalnessClamped, roughnessClamped);
+    outColor = vec4(toneMapping(acc), 1.0);
 }
