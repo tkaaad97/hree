@@ -73,6 +73,8 @@ import qualified Graphics.Hree.Material as Hree (flatColorMaterial,
                                                  setBaseColorTexture,
                                                  setDirectionalLight,
                                                  setMetallicFactor,
+                                                 setMetallicRoughnessTexture,
+                                                 setNormalTexture,
                                                  setRoughnessFactor,
                                                  standardMaterial)
 import Graphics.Hree.Math
@@ -859,6 +861,7 @@ createMaterial textures m =
     Hree.standardMaterial 1 1
         `Hree.setDirectionalLight` Linear.V3 0.5 (-1) (-0.5)
         & setWhenJust setPbrMetallicRoughness (materialPbrMetallicRoughness m)
+        & setWhenJust setNormalTexture (materialNormalTexture m)
     where
     setWhenJust _ Nothing a  = a
     setWhenJust f (Just b) a = a `f` b
@@ -867,9 +870,16 @@ createMaterial textures m =
         `Hree.setMetallicFactor` pbrMetallicFactor pbr
         `Hree.setRoughnessFactor` pbrRoughnessFactor pbr
         & setWhenJust setBaseColorTexture (pbrBaseColorTexture pbr)
+        & setWhenJust setMetallicRoughnessTexture (pbrMetallicRoughnessTexture pbr)
     setBaseColorTexture a info = fromMaybe a $ do
         texture <- textures BV.!? textureInfoIndex info
         return $ a `Hree.setBaseColorTexture` texture
+    setNormalTexture a info = fromMaybe a $ do
+        texture <- textures BV.!? normalTextureInfoIndex info
+        return $ a `Hree.setNormalTexture` texture
+    setMetallicRoughnessTexture a info = fromMaybe a $ do
+        texture <- textures BV.!? textureInfoIndex info
+        return $ a `Hree.setMetallicRoughnessTexture` texture
 
 createMaterials :: BV.Vector Hree.Texture -> BV.Vector Material -> BV.Vector Hree.Material
 createMaterials textures = BV.map (createMaterial textures)

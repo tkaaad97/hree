@@ -8,18 +8,23 @@
 {-# LANGUAGE TemplateHaskell            #-}
 module Graphics.Hree.Program
     ( Options(..)
-    , ShaderSource(..)
     , ProgramName
     , ProgramSpec(..)
+    , ShaderSource(..)
     , basicProgramSpec
     , defaultOptions
     , flatColorProgramSpec
     , getProgramName
+    , mkProgram
+    , setGlslVersion
+    , setHasMetallicRoughnessMap
+    , setHasNormalMap
+    , setHasVertexColor
+    , setMaxLightCount
     , spriteProgramSpec
     , standardProgramSpec
     , testProgramSpec
     , unProgramName
-    , mkProgram
     ) where
 
 import Control.Exception (throwIO)
@@ -48,10 +53,11 @@ import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
 
 data Options = Options
-    { optionsGlslVersion    :: !(Maybe Int)
-    , optionsHasNormalMap   :: !Bool
-    , optionsHasVertexColor :: !Bool
-    , optionsMaxLightCount  :: !Int
+    { optionsGlslVersion             :: !(Maybe Int)
+    , optionsHasNormalMap            :: !Bool
+    , optionsHasMetallicRoughnessMap :: !Bool
+    , optionsHasVertexColor          :: !Bool
+    , optionsMaxLightCount           :: !Int
     } deriving (Show, Eq, Generic)
 
 data EmbeddedProgramType =
@@ -85,9 +91,25 @@ defaultOptions :: Options
 defaultOptions = Options
     { optionsGlslVersion = Just 450
     , optionsHasNormalMap = False
-    , optionsHasVertexColor = True
+    , optionsHasMetallicRoughnessMap = False
+    , optionsHasVertexColor = False
     , optionsMaxLightCount = 10
     }
+
+setGlslVersion :: Options -> Maybe Int -> Options
+setGlslVersion options a = options { optionsGlslVersion = a }
+
+setHasNormalMap :: Options -> Bool -> Options
+setHasNormalMap options a = options { optionsHasNormalMap = a }
+
+setHasMetallicRoughnessMap :: Options -> Bool -> Options
+setHasMetallicRoughnessMap options a = options { optionsHasMetallicRoughnessMap = a }
+
+setHasVertexColor :: Options -> Bool -> Options
+setHasVertexColor options a = options { optionsHasVertexColor = a }
+
+setMaxLightCount :: Options -> Int -> Options
+setMaxLightCount options a = options { optionsMaxLightCount = a }
 
 basicProgramSpec :: Options -> ProgramSpec
 basicProgramSpec = EmbeddedProgram BasicProgram
@@ -176,6 +198,9 @@ renderOptions options = ByteString.intercalate "\n" . catMaybes $
     [ mappend "#version " . ByteString.pack . show <$> optionsGlslVersion options
     , if optionsHasNormalMap options
         then Just "#define HAS_NORMAL_MAP"
+        else Nothing
+    , if optionsHasMetallicRoughnessMap options
+        then Just "#define HAS_METALLIC_ROUGHNESS_MAP"
         else Nothing
     , if optionsHasVertexColor options
         then Just "#define HAS_VERTEX_COLOR"
