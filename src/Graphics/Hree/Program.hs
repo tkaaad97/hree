@@ -19,6 +19,8 @@ module Graphics.Hree.Program
     , setGlslVersion
     , setHasMetallicRoughnessMap
     , setHasNormalMap
+    , setHasVertexNormal
+    , setHasVertexTangent
     , setHasVertexColor
     , setMaxLightCount
     , spriteProgramSpec
@@ -56,6 +58,8 @@ data Options = Options
     { optionsGlslVersion             :: !(Maybe Int)
     , optionsHasNormalMap            :: !Bool
     , optionsHasMetallicRoughnessMap :: !Bool
+    , optionsHasVertexNormal         :: !Bool
+    , optionsHasVertexTangent        :: !Bool
     , optionsHasVertexColor          :: !Bool
     , optionsMaxLightCount           :: !Int
     } deriving (Show, Eq, Generic)
@@ -92,6 +96,8 @@ defaultOptions = Options
     { optionsGlslVersion = Just 450
     , optionsHasNormalMap = False
     , optionsHasMetallicRoughnessMap = False
+    , optionsHasVertexNormal = False
+    , optionsHasVertexTangent = False
     , optionsHasVertexColor = False
     , optionsMaxLightCount = 10
     }
@@ -104,6 +110,12 @@ setHasNormalMap options a = options { optionsHasNormalMap = a }
 
 setHasMetallicRoughnessMap :: Options -> Bool -> Options
 setHasMetallicRoughnessMap options a = options { optionsHasMetallicRoughnessMap = a }
+
+setHasVertexNormal :: Options -> Bool -> Options
+setHasVertexNormal options a = options { optionsHasVertexNormal = a }
+
+setHasVertexTangent :: Options -> Bool -> Options
+setHasVertexTangent options a = options { optionsHasVertexTangent = a }
 
 setHasVertexColor :: Options -> Bool -> Options
 setHasVertexColor options a = options { optionsHasVertexColor = a }
@@ -201,6 +213,12 @@ renderOptions options = ByteString.intercalate "\n" . catMaybes $
         else Nothing
     , if optionsHasMetallicRoughnessMap options
         then Just "#define HAS_METALLIC_ROUGHNESS_MAP"
+        else Nothing
+    , if optionsHasVertexNormal options
+        then Just "#define HAS_VERTEX_NORMAL"
+        else Nothing
+    , if optionsHasVertexTangent options
+        then Just "#define HAS_VERTEX_TANGENT"
         else Nothing
     , if optionsHasVertexColor options
         then Just "#define HAS_VERTEX_COLOR"

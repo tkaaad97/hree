@@ -1,5 +1,11 @@
 in vec3 fragmentPosition;
+#ifdef HAS_VERTEX_NORMAL
+#ifdef HAS_VERTEX_TANGENT
+in mat3 fragmentTBN;
+#else
 in vec3 fragmentNormal;
+#endif
+#endif
 in vec2 fragmentUv;
 #ifdef HAS_VERTEX_COLOR
 in vec4 fragmentColor;
@@ -27,15 +33,26 @@ const vec3 black = vec3(0.0, 0.0, 0.0);
 vec3 getNormal()
 {
     vec2 uv = fragmentUv;
-    vec3 ng = normalize(fragmentNormal);
+
+#ifndef HAS_VERTEX_TANGENT
     vec3 pdx = dFdx(fragmentPosition);
     vec3 pdy = dFdy(fragmentPosition);
     vec3 tdx = dFdx(vec3(uv, 0.0));
     vec3 tdy = dFdy(vec3(uv, 0.0));
+
+#ifdef HAS_VERTEX_NORMAL
+    vec3 ng = normalize(fragmentNormal);
+#else
+    vec3 ng = cross(pdx, pdy);
+#endif
+
     vec3 t = (tdy.t * pdx - tdx.t * pdy) / (tdx.s * tdy.t - tdy.s * tdx.t);
     t = normalize(t - ng * dot(ng, t));
     vec3 b = normalize(cross(ng, t));
     mat3 tbn = mat3(t, b, ng);
+#else
+    mat3 tbn = fragmentTBN;
+#endif
 
 #ifdef HAS_NORMAL_MAP
     vec3 n = texture2D(normalTexture, uv).rgb;
