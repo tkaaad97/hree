@@ -37,7 +37,7 @@ import qualified Data.ByteString.Char8 as ByteString (pack, useAsCStringLen)
 import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, maybe)
 import Data.Proxy (Proxy(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (replace)
@@ -253,7 +253,7 @@ getActivePorts ::
     -> IO [a]
 getActivePorts construct getLocation pname f program = do
     len  <- Foreign.alloca $ \p -> GLW.glGetProgramiv program pname p >> Foreign.peek p
-    mapM g [0..(len - 1)]
+    catMaybes <$> mapM g [0..(len - 1)]
 
     where
     maxNameBytes = 128
@@ -267,8 +267,8 @@ getActivePorts construct getLocation pname f program = do
             size <- Foreign.peek sp
             dataType <- Foreign.peek tp
             name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral len)
-            l <- fromMaybe (error "getLocation failed") <$> getLocation program np
-            return $ construct name l (fromIntegral size) dataType
+            maybeLocation <- getLocation program np
+            return . flip (maybe Nothing) maybeLocation $ \l -> Just $ construct name l (fromIntegral size) dataType
 
 throwIfProgramErrorStatus
     :: GLW.Program
