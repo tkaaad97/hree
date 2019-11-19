@@ -44,119 +44,121 @@ dependencies:
 library:
   source-dirs: src
 
-internal-libraries:
-  examples-common:
-    source-dirs: examples-common
-    dependencies:
-    - hree
-    - GLFW-b
-
 executables:
   flat-color-1:
     main:                Main.hs
-    source-dirs:         examples/flat-color-1
+    source-dirs:
+    - examples/flat-color-1
+    - examples-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - examples-common
     - hree
     - GLFW-b
 
   texture-1:
     main:                Main.hs
-    source-dirs:         examples/texture-1
+    source-dirs:
+    - examples/texture-1
+    - examples-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - examples-common
     - hree
     - GLFW-b
 
   geometry-box-1:
     main:                Main.hs
-    source-dirs:         examples/geometry-box-1
+    source-dirs:
+    - examples/geometry-box-1
+    - examples-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - examples-common
     - hree
     - GLFW-b
 
   transform-rotate-1:
     main:                Main.hs
-    source-dirs:         examples/transform-rotate-1
+    source-dirs:
+    - examples/transform-rotate-1
+    - examples-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - examples-common
     - hree
     - GLFW-b
 
   sprite-instanced-1:
     main:                Main.hs
-    source-dirs:         examples/sprite-instanced-1
+    source-dirs:
+    - examples/sprite-instanced-1
+    - examples-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - examples-common
     - hree
     - GLFW-b
 
   format-loader-1:
     main:                Main.hs
-    source-dirs:         examples/format-loader-1
+    source-dirs:
+    - examples/format-loader-1
+    - examples-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - examples-common
     - hree
     - GLFW-b
 
   gltf-minimal-1:
     main:                Main.hs
-    source-dirs:         examples/gltf-minimal-1
+    source-dirs:
+    - examples/gltf-minimal-1
+    - examples-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - examples-common
     - hree
     - GLFW-b
 
   child-node-1:
     main:                Main.hs
-    source-dirs:         examples/child-node-1
+    source-dirs:
+    - examples/child-node-1
+    - examples-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - examples-common
     - hree
     - GLFW-b
 
   standard-material-1:
     main:                Main.hs
-    source-dirs:         examples/standard-material-1
+    source-dirs:
+    - examples/standard-material-1
+    - examples-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - examples-common
     - hree
     - GLFW-b
 
