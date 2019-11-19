@@ -2,10 +2,8 @@ module Main where
 
 import qualified Data.Vector.Storable as Vector
 import Example
-import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
-import Graphics.Hree.CameraControl.SphericalControl
 import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.GL.Vertex
 import qualified Graphics.Hree.Material as Material
@@ -13,9 +11,10 @@ import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
+import Prelude hiding (init)
 
 main :: IO ()
-main = do
+main =
     withWindow width height "canvas-sample" init onDisplay
 
     where
@@ -44,7 +43,7 @@ main = do
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry vs GL.GL_STREAM_DRAW scene
         let mesh = Mesh geometry material Nothing
         meshId <- addMesh scene mesh
-        addNode scene newNode{ nodeMesh = Just meshId } True
+        _ <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
         return (scene, camera)

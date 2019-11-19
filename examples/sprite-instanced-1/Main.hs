@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import qualified Data.Map.Strict as Map
 import qualified Data.Vector.Storable as Vector
 import Data.Word (Word8)
 import Example
@@ -12,7 +11,6 @@ import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import qualified Graphics.Hree.Geometry as Geometry
-import Graphics.Hree.Geometry.Box
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
 import qualified Graphics.Hree.Material as Material
@@ -21,25 +19,26 @@ import qualified Graphics.Hree.Texture as Texture
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
+import Prelude hiding (init)
 
 main :: IO ()
-main = do
+main =
     withWindow width height "sprite-instanced-1" init onDisplay
 
     where
     width  = 640
     height = 480
-    aspect = fromIntegral width / fromIntegral height
+    defaultAspect = fromIntegral width / fromIntegral height
 
     delta :: Float
     delta = 0.2
 
     spriteVertices = Vector.fromList
-        $  map (\x -> SpriteVertex (V3 (fromIntegral x * delta) 0 0) (V3 delta delta 0) 0 (V2 0 0) (V2 1 1)) [0..9]
-        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) delta 0) (V3 (delta * 2) delta 0) 0 (V2 0 0) (V2 1 1)) [0..4]
-        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) (delta * 2) 0) (V3 (delta * 2) delta 0) (pi * 0.2) (V2 0 0) (V2 1 1)) [0..4]
+        $  map (\x -> SpriteVertex (V3 (fromIntegral x * delta) 0 0) (V3 delta delta 0) 0 (V2 0 0) (V2 1 1)) ([0..9] :: [Int])
+        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) delta 0) (V3 (delta * 2) delta 0) 0 (V2 0 0) (V2 1 1)) ([0..4] :: [Int])
+        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) (delta * 2) 0) (V3 (delta * 2) delta 0) (pi * 0.2) (V2 0 0) (V2 1 1)) ([0..4] :: [Int])
 
-    proj = perspective 90 aspect 0.1 10.0
+    proj = perspective 90 defaultAspect 0.1 10.0
 
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
@@ -54,7 +53,7 @@ main = do
         let material = Material.spriteMaterial texture
             mesh = Mesh geo' material (Just . Vector.length $ spriteVertices)
         meshId <- addMesh scene mesh
-        addNode scene newNode{ nodeMesh = Just meshId } True
+        _ <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
@@ -71,15 +70,15 @@ main = do
             renderScene s c
             GLFW.swapBuffers w
 
-    resizeWindow' camera win w h = do
+    resizeWindow' camera _ w h = do
         GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
         projection <- getCameraProjection camera
         let aspect = fromIntegral w / fromIntegral h
             projection' = updateProjectionAspectRatio projection aspect
         updateProjection camera projection'
 
-    updateProjectionAspectRatio p @ Perspective {} aspect =
-        p { perspectiveAspect = aspect }
+    updateProjectionAspectRatio (Perspective fov _ near far) aspect =
+        Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
 
     mkTexture :: Scene -> IO Texture

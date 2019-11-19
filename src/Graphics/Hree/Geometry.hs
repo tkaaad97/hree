@@ -15,7 +15,6 @@ import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy(..))
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
-import Foreign (Storable(..))
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
@@ -35,7 +34,7 @@ addAttribBindings geo bindingIndex xs b = geo'
     buffers = IntMap.insert bindingIndex b (geometryBuffers geo)
     geo' = geo { geometryAttribBindings = attribBindings, geometryBuffers = buffers }
 
-addVerticesToGeometry :: forall a. (Storable a, Vertex a) => Geometry -> Vector a -> GL.GLenum -> Scene -> IO Geometry
+addVerticesToGeometry :: forall a. (Vertex a) => Geometry -> Vector a -> GL.GLenum -> Scene -> IO Geometry
 addVerticesToGeometry geometry storage usage scene = do
     buffer <- addBuffer scene (BufferSourceVector storage usage)
     let buffers' = IntMap.insert bindingIndex (buffer, bbs) buffers

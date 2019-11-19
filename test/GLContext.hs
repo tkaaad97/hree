@@ -1,18 +1,31 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE PatternSynonyms          #-}
+{-# LANGUAGE RankNTypes               #-}
 module GLContext
     ( runOnOSMesaContext
+    , pattern OSMESA_WIDTH
+    , pattern OSMESA_HEIGHT
+    , pattern OSMESA_FORMAT
+    , pattern OSMESA_TYPE
+    , pattern OSMESA_MAX_WIDTH
+    , pattern OSMESA_MAX_HEIGHT
+    , pattern OSMESA_DEPTH_BITS
+    , pattern OSMESA_STENCIL_BITS
+    , pattern OSMESA_ACCUM_BITS
+    , pattern OSMESA_PROFILE
+    , pattern OSMESA_CORE_PROFILE
+    , pattern OSMESA_COMPAT_PROFILE
+    , pattern OSMESA_CONTEXT_MAJOR_VERSION
+    , pattern OSMESA_CONTEXT_MINOR_VERSION
     ) where
 
 import Control.Exception (bracket)
 import Control.Monad (unless)
-import Foreign (Ptr, castPtr, nullPtr, pokeByteOff, withArray)
+import Foreign (Ptr, castPtr, nullPtr, withArray)
 import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr,
                            mallocForeignPtrBytes, withForeignPtr)
 import qualified Graphics.GL as GL
-
-foreign import ccall "OSMesaCreateContextExt" ffiOSMesaCreateContextExt
-    :: GL.GLenum -> GL.GLint -> GL.GLint -> GL.GLint -> Ptr () -> IO (Ptr ())
+import Prelude hiding (last)
 
 foreign import ccall "OSMesaCreateContextAttribs" ffiOSMesaCreateContextAttribs
     :: Ptr GL.GLint -> Ptr () -> IO (Ptr ())
@@ -54,10 +67,9 @@ runOnOSMesaContext width height action =
         finalizeForeignPtr buffer
 
 createContext :: GL.GLint -> GL.GLint -> IO (Ptr ())
-createContext width height =
+createContext _ _ =
     withArray attribList $ flip ffiOSMesaCreateContextAttribs nullPtr
     where
-    writeAttrib p (i, a) = pokeByteOff p i a
     attribList =
         [ OSMESA_FORMAT, GL.GL_RGBA
         , OSMESA_DEPTH_BITS, depthBits
@@ -66,6 +78,7 @@ createContext width height =
         , 0
         ]
 
+pattern OSMESA_WIDTH, OSMESA_HEIGHT, OSMESA_FORMAT, OSMESA_TYPE, OSMESA_MAX_WIDTH, OSMESA_MAX_HEIGHT, OSMESA_DEPTH_BITS, OSMESA_STENCIL_BITS, OSMESA_ACCUM_BITS, OSMESA_PROFILE, OSMESA_CORE_PROFILE, OSMESA_COMPAT_PROFILE, OSMESA_CONTEXT_MAJOR_VERSION, OSMESA_CONTEXT_MINOR_VERSION :: forall a. (Eq a, Num a) => a
 pattern OSMESA_WIDTH                 = 0x20
 pattern OSMESA_HEIGHT                = 0x21
 pattern OSMESA_FORMAT                = 0x22

@@ -19,7 +19,6 @@ module Graphics.Hree.Material
 
 import Data.ByteString (ByteString)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (maybeToList)
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Program

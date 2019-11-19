@@ -43,7 +43,7 @@ import Data.Either (either)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybe, maybeToList)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
@@ -199,7 +199,7 @@ resolveDrawMethod mesh =
 
 addMesh :: Scene -> Mesh -> IO MeshId
 addMesh scene mesh = do
-    (program, programAdded) <- mkProgramIfNotExists scene pspec
+    (program, _) <- mkProgramIfNotExists scene pspec
     maybeProgram <- lookupProgramInfo
     GLW.glUseProgram (programInfoProgram program)
     vao <- mkVertexArray (geometryAttribBindings geo) buffers maybeIndexBuffer program

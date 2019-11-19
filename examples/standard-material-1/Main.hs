@@ -11,8 +11,8 @@ import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..))
+import Prelude hiding (init)
 import System.Environment (getArgs)
-import qualified System.FilePath as FilePath (takeExtension)
 
 main :: IO ()
 main = do
@@ -29,9 +29,9 @@ main = do
     where
     width  = 640
     height = 480
-    aspect = fromIntegral width / fromIntegral height
+    defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = perspective 90 aspect 0.1 1000.0
+    proj = perspective 90 defaultAspect 0.1 1000.0
 
     la = lookAt (V3 0 0 10) (V3 0 0 0) (V3 0 1 0)
 
@@ -44,7 +44,7 @@ main = do
                 `Material.setDirectionalLight` V3 (-1) 0 (-5)
             mesh = Mesh geometry material Nothing
         meshId <- addMesh scene mesh
-        addNode scene newNode{ nodeMesh = Just meshId } True
+        _ <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
@@ -61,13 +61,14 @@ main = do
             renderScene s c
             GLFW.swapBuffers w
 
-    resizeWindow' camera win w h = do
+    resizeWindow' camera _ w h = do
         GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
         projection <- getCameraProjection camera
         let aspect = fromIntegral w / fromIntegral h
             projection' = updateProjectionAspectRatio projection aspect
         updateProjection camera projection'
 
-    updateProjectionAspectRatio p @ Perspective {} aspect =
-        p { perspectiveAspect = aspect }
+    updateProjectionAspectRatio (Perspective fov _ near far) aspect =
+        Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
+

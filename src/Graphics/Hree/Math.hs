@@ -13,7 +13,7 @@ module Graphics.Hree.Math
 import Data.Word (Word8)
 import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
-import Linear ((!*!), (^*))
+import Linear ((!*!))
 import qualified Linear (M44, Quaternion(..), V2, V3(..), V4(..),
                          fromQuaternion, mkTransformationMat)
 

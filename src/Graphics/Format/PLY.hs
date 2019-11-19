@@ -10,7 +10,7 @@ module Graphics.Format.PLY
     ) where
 
 import Control.Exception (throwIO)
-import Control.Monad (unless, when)
+import Control.Monad (when)
 import Control.Monad.ST (ST, runST)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict (StateT(..), evalStateT)
@@ -21,16 +21,13 @@ import qualified Data.Attoparsec.ByteString.Char8 as Attoparsec (IResult(..),
                                                                  double, parse,
                                                                  rational)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS (breakSubstring, drop, empty, isPrefixOf,
-                                        length, readFile, stripPrefix)
-import qualified Data.ByteString.Char8 as BS (break, dropWhile, readInt, split,
-                                              unpack)
+import qualified Data.ByteString as BS (breakSubstring, empty, isPrefixOf,
+                                        readFile, stripPrefix)
+import qualified Data.ByteString.Char8 as BS (dropWhile, readInt, split, unpack)
 import qualified Data.Char as Char (isSpace)
-import Data.Foldable (foldlM)
 import Data.Int
 import qualified Data.List as List (filter, span)
 import Data.Maybe (fromMaybe, isJust, maybe)
-import Data.Proxy (Proxy(..))
 import qualified Data.Serialize as Serialize
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (concatMap, find, findIndex, foldM',
@@ -41,8 +38,6 @@ import qualified Data.Vector.Storable as SV (Vector, freeze, generate,
 import qualified Data.Vector.Storable.Mutable as MSV (STVector, new, write)
 import qualified Data.Vector.Unboxed as UV (generate, mapM_)
 import Data.Word
-import Debug.Trace (traceShowId)
-import Foreign (sizeOf)
 import qualified Graphics.GL as GL
 import Graphics.Hree.Geometry (addVerticesToGeometry, newGeometry,
                                setIndexBuffer)
@@ -51,7 +46,6 @@ import Graphics.Hree.Scene (addIndexBufferUInt)
 import Graphics.Hree.Types (Geometry, Scene)
 import Linear (Additive(..), V2(..), V3(..), V4(..))
 import qualified Linear (cross, normalize)
-import Text.Read (readEither)
 
 type Parser = StateT ByteString (Either String)
 
@@ -182,7 +176,7 @@ convertParser a = do
     return r
     where
     handleResult (Attoparsec.Done bs r)    = lift . return $ (r, bs)
-    handleResult (Attoparsec.Fail i _ err) = lift . Left $ err
+    handleResult (Attoparsec.Fail _ _ err) = lift . Left $ err
     handleResult _                         = lift . Left $ "parse error"
 
 binaryParser :: Serialize.Get a -> Parser a
@@ -227,19 +221,6 @@ instance FromScalar Double where
     fromScalar (ScalarDouble a) = Right a
     fromScalar _                = Left "fromScalar failed"
 
-fromScalarVector :: (FromScalar a) => Vector Scalar -> Either String (Vector a)
-fromScalarVector = Vector.mapM fromScalar
-
-castScalarToFrac :: (Num a, Fractional a) => Scalar -> a
-castScalarToFrac (ScalarChar a)   = fromIntegral a
-castScalarToFrac (ScalarUChar a)  = fromIntegral a
-castScalarToFrac (ScalarShort a)  = fromIntegral a
-castScalarToFrac (ScalarUShort a) = fromIntegral a
-castScalarToFrac (ScalarInt a)    = fromIntegral a
-castScalarToFrac (ScalarUInt a)   = fromIntegral a
-castScalarToFrac (ScalarFloat a)  = realToFrac a
-castScalarToFrac (ScalarDouble a) = realToFrac a
-
 castScalarFromIntegral :: (Integral a) => Scalar -> Either String a
 castScalarFromIntegral (ScalarChar a)   = Right $ fromIntegral a
 castScalarFromIntegral (ScalarUChar a)  = Right $ fromIntegral a
@@ -247,8 +228,8 @@ castScalarFromIntegral (ScalarShort a)  = Right $ fromIntegral a
 castScalarFromIntegral (ScalarUShort a) = Right $ fromIntegral a
 castScalarFromIntegral (ScalarInt a)    = Right $ fromIntegral a
 castScalarFromIntegral (ScalarUInt a)   = Right $ fromIntegral a
-castScalarFromIntegral (ScalarFloat a)  = Left "castScalarToInt failed"
-castScalarFromIntegral (ScalarDouble a) = Left "castScalarToInt failed"
+castScalarFromIntegral (ScalarFloat _)  = Left "castScalarToInt failed"
+castScalarFromIntegral (ScalarDouble _) = Left "castScalarToInt failed"
 
 headerParser :: Parser PLYHeader
 headerParser = do
@@ -257,11 +238,9 @@ headerParser = do
     when (rest == BS.empty) $
         lift (Left "\"end_header\" not found")
 
-    let lines = removeComments . BS.split '\n' $ hbs
-
-    lines <-lift $ parseStart lines
-    (format, lines) <- lift $ parseFormat lines
-    ehs <- lift $ parseElementHeaders lines
+    xs <-lift . parseStart . removeComments . BS.split '\n' $ hbs
+    (format, xs') <- lift $ parseFormat xs
+    ehs <- lift $ parseElementHeaders xs'
 
     State.put $ fromMaybe rest (BS.stripPrefix headerEnd rest)
 
@@ -287,19 +266,19 @@ headerParser = do
             _ -> Left ("error at format line. content: \"" ++ show line ++ "\"")
 
     parseElementHeader [] = Left "no element"
-    parseElementHeader (line : lines) = do
+    parseElementHeader (line : xs) = do
         let ws = BS.split ' ' line
-        when (length ws /= 3) $
-            Left ("element parse error. content: \"" ++ BS.unpack line ++ "\"")
 
-        let h : name : num' : _ = ws
+        (h, num') <- case ws of
+                h : _ : num' : _  -> return (h, num')
+                _ -> Left ("element parse error. content: \"" ++ BS.unpack line ++ "\"")
 
         when (h /= "element") $
             Left "element part should be starts with \"element\""
 
         (num, _) <- maybe (Left "parse failed on element num") return $ BS.readInt num'
 
-        let (propertyLines, rest) = List.span (BS.isPrefixOf "property") lines
+        let (propertyLines, rest) = List.span (BS.isPrefixOf "property") xs
         properties <- mapM parseProperty propertyLines
 
         let name = ws !! 1
@@ -307,8 +286,8 @@ headerParser = do
         return (eh, rest)
 
     parseElementHeaders [] = return []
-    parseElementHeaders lines = do
-        (eh, rest) <- parseElementHeader lines
+    parseElementHeaders xs = do
+        (eh, rest) <- parseElementHeader xs
         (eh :) <$> parseElementHeaders rest
 
     parseProperty line = parseProperty' (BS.split ' ' line)
@@ -416,58 +395,58 @@ toBasicVertex properties vs =
     in Vector.foldM' handleVertexProperty vertex (Vector.zip properties vs)
 
 handleVertexProperty :: BasicVertex -> (ElementProperty, Value) -> Either String BasicVertex
-handleVertexProperty v (EPScalar (ScalarProperty "x" dataType), ValueS a) = do
-    p0 <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "x" _), ValueS x) = do
+    p0 <- fromScalar x
     let V3 _ p1 p2 = bvPosition v
         v' = v { bvPosition = V3 p0 p1 p2 }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "y" dataType), ValueS a) = do
-    p1 <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "y" _), ValueS x) = do
+    p1 <- fromScalar x
     let V3 p0 _ p2 = bvPosition v
         v' = v { bvPosition = V3 p0 p1 p2 }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "z" dataType), ValueS a) = do
-    p2 <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "z" _), ValueS x) = do
+    p2 <- fromScalar x
     let V3 p0 p1 _ = bvPosition v
         v' = v { bvPosition = V3 p0 p1 p2 }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "nx" dataType), ValueS a) = do
-    n0 <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "nx" _), ValueS x) = do
+    n0 <- fromScalar x
     let V3 _ n1 n2 = bvNormal v
         v' = v { bvNormal = V3 n0 n1 n2 }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "ny" dataType), ValueS a) = do
-    n1 <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "ny" _), ValueS x) = do
+    n1 <- fromScalar x
     let V3 n0 _ n2 = bvNormal v
         v' = v { bvNormal = V3 n0 n1 n2 }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "nz" dataType), ValueS a) = do
-    n2 <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "nz" _), ValueS x) = do
+    n2 <- fromScalar x
     let V3 n0 n1 _ = bvNormal v
         v' = v { bvNormal = V3 n0 n1 n2 }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "s" dataType), ValueS a) = do
-    s <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "s" _), ValueS x) = do
+    s <- fromScalar x
     let V2 _ t = bvUv v
         v' = v { bvUv = V2 s t }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "t" dataType), ValueS a) = do
-    t <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "t" _), ValueS x) = do
+    t <- fromScalar x
     let V2 s _ = bvUv v
         v' = v { bvUv = V2 s t }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "red" dataType), ValueS a) = do
-    r <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "red" _), ValueS x) = do
+    r <- fromScalar x
     let V4 _ g b a = bvColor v
         v' = v { bvColor = V4 r g b a }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "green" dataType), ValueS a) = do
-    g <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "green" _), ValueS x) = do
+    g <- fromScalar x
     let V4 r _ b a = bvColor v
         v' = v { bvColor = V4 r g b a }
     return v'
-handleVertexProperty v (EPScalar (ScalarProperty "blue" dataType), ValueS a) = do
-    b <- fromScalar a
+handleVertexProperty v (EPScalar (ScalarProperty "blue" _), ValueS x) = do
+    b <- fromScalar x
     let V4 r g _ a = bvColor v
         v' = v { bvColor = V4 r g b a }
     return v'

@@ -6,7 +6,6 @@ import Data.Word (Word8)
 import Example
 import Foreign (Ptr)
 import qualified Foreign (castPtr)
-import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
@@ -19,9 +18,10 @@ import qualified Graphics.Hree.Texture as Texture
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
+import Prelude hiding (init)
 
 main :: IO ()
-main = do
+main =
     withWindow width height "texture-1" init onDisplay
 
     where
@@ -51,7 +51,7 @@ main = do
                 `Material.setDirectionalLight` V3 0 0 (-1)
             mesh = Mesh geometry material Nothing
         meshId <- addMesh scene mesh
-        addNode scene newNode{ nodeMesh = Just meshId } True
+        _ <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
         return (scene, camera)

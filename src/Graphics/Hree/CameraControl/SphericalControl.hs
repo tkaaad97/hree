@@ -1,5 +1,5 @@
 module Graphics.Hree.CameraControl.SphericalControl
-    ( SphericalControl
+    ( SphericalControl(..)
     , SphericalControlMode(..)
     , SphericalControlSettings(..)
     , defaultSphericalControlSettings

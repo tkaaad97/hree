@@ -5,15 +5,13 @@ module Graphics.Format.STL
     , loadGeometryFromFile
     ) where
 
-import Data.Binary (Binary(..), Get(..))
+import Data.Binary (Binary(..))
 import qualified Data.Binary as Binary (decode)
 import qualified Data.Binary.Get as Binary (getFloatle, getWord16le,
                                             getWord32le)
 import qualified Data.Binary.Put as Binary (putFloatle, putWord16le,
                                             putWord32le)
-import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString (readFile)
-import Data.Int (Int32)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Storable as SV
@@ -100,7 +98,7 @@ createGeometryFromSTL stl scene = do
             position = case m of
                     0 -> triangleVertex1 triangle
                     1 -> triangleVertex2 triangle
-                    2 -> triangleVertex3 triangle
+                    _ -> triangleVertex3 triangle
             normal = triangleNormal triangle
         in BasicVertex position normal (V2 0 0) (V4 255 255 255 255)
 

@@ -37,7 +37,7 @@ import qualified Data.ByteString.Char8 as ByteString (pack, useAsCStringLen)
 import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, maybe)
+import Data.Maybe (catMaybes, maybe)
 import Data.Proxy (Proxy(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (replace)
@@ -79,13 +79,13 @@ data ShaderSource = ShaderSource
 
 data ProgramSpec =
     EmbeddedProgram
-    { embeddedProgramType    :: !EmbeddedProgramType
-    , embeddedProgramOptions :: !Options
-    } |
+        !EmbeddedProgramType
+        !Options
+    |
     UserProgram
-    { vertexShaderSource   :: !ShaderSource
-    , fragmentShaderSource :: !ShaderSource
-    } deriving (Show, Eq)
+        !ShaderSource -- vertexShaderSource
+        !ShaderSource -- fragmentShaderSource
+    deriving (Show, Eq)
 
 newtype ProgramName = ProgramName
     { unProgramName :: Text

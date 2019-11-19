@@ -14,7 +14,7 @@ module Graphics.Hree.Camera
     ) where
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
-import Linear (M44, V3, (!*!))
+import Linear (M44, V3)
 import qualified Linear (identity, lookAt, normalize, ortho, perspective)
 
 newtype Camera = Camera (IORef CameraState)
@@ -36,19 +36,19 @@ data LookAt = LookAt
 
 data Projection =
     Perspective
-    { perspectiveFov    :: !Float
-    , perspectiveAspect :: !Float
-    , perspectiveNear   :: !Float
-    , perspectiveFar    :: !Float
-    } |
+        !Float -- perspectiveFov
+        !Float -- perspectiveAspect
+        !Float -- perspectiveNear
+        !Float -- perspectiveFar
+    |
     Orthographic
-    { orthographicLeft   :: !Float
-    , orthographicRight  :: !Float
-    , orthographicBottom :: !Float
-    , orthographicTop    :: !Float
-    , orthographicNear   :: !Float
-    , orthographicFar    :: !Float
-    } deriving (Show, Eq)
+        !Float -- orthographicLeft
+        !Float -- orthographicRight
+        !Float -- orthographicBottom
+        !Float -- orthographicTop
+        !Float -- orthographicNear
+        !Float -- orthographicFar
+    deriving (Show, Eq)
 
 perspective :: Float -> Float -> Float -> Float -> Projection
 perspective = Perspective

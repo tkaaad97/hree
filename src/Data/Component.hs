@@ -22,7 +22,6 @@ import qualified Data.HashTable.IO as HT
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef, writeIORef)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Generic.Mutable as MV
-import Foreign (Storable(..))
 
 newtype ComponentStore v e a = ComponentStore
     { unComponentStore :: IORef (ComponentStoreState v e a)
@@ -37,7 +36,7 @@ data ComponentStoreState v e a = ComponentStoreState
     , componentStoreEntityMap :: !(HashTable e Int)
     }
 
-newComponentStore :: (MV.MVector v a, MV.MVector v e, Hashable e, Storable e) => Int -> Proxy (v RealWorld a) -> IO (ComponentStore v e a)
+newComponentStore :: (MV.MVector v a, MV.MVector v e) => Int -> Proxy (v RealWorld a) -> IO (ComponentStore v e a)
 newComponentStore preserve _ = do
     v <- MV.new preserve
     ev <- MV.new preserve
@@ -49,7 +48,7 @@ componentSize :: ComponentStore v e a -> IO Int
 componentSize =
     fmap componentStoreSize . readIORef . unComponentStore
 
-addComponent :: (MV.MVector v a, MV.MVector v e, Eq e, Hashable e, Storable e) => e -> a -> ComponentStore v e a -> IO ()
+addComponent :: (MV.MVector v a, MV.MVector v e, Eq e, Hashable e) => e -> a -> ComponentStore v e a -> IO ()
 addComponent e a store = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
@@ -80,7 +79,7 @@ addComponent e a store = do
     decideSize :: Int -> IO Int
     decideSize current = do
         let limit = maxBound :: Int
-        when (current >= fromIntegral limit)
+        when (current >= limit)
             (throwIO . userError $ "max bound")
         return $ if current > limit `div` 2
             then limit
@@ -146,7 +145,7 @@ getComponentSlice store = do
     s <- readIORef (unComponentStore store)
     return $ MV.slice 0 (componentStoreSize s) (componentStoreVec s)
 
-cleanComponentStore :: (MV.MVector v a, MV.MVector v e, Hashable e, Storable e) => ComponentStore v e a -> Int -> IO ()
+cleanComponentStore :: (MV.MVector v a, MV.MVector v e) => ComponentStore v e a -> Int -> IO ()
 cleanComponentStore store preserve = do
     v <- MV.new preserve
     ev <- MV.new preserve

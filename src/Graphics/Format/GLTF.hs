@@ -33,7 +33,6 @@ module Graphics.Format.GLTF
     ) where
 
 import qualified Codec.Picture as Picture
-import qualified Codec.Picture.Types as Picture
 import Control.Exception (throwIO)
 import Control.Monad (unless, void)
 import qualified Data.Aeson as Aeson (FromJSON(..), Object, Value,
@@ -44,13 +43,12 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (drop, isPrefixOf, readFile,
                                                 stripPrefix, take)
 import qualified Data.ByteString.Base64 as Base64 (decode)
-import qualified Data.ByteString.Char8 as ByteString (break, drop, dropWhile,
-                                                      unpack)
+import qualified Data.ByteString.Char8 as ByteString (break, dropWhile, unpack)
 import Data.Either (either)
 import Data.Function ((&))
 import qualified Data.List as List (groupBy)
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map (fromList, mapWithKey, toList)
+import qualified Data.Map.Strict as Map (fromList, toList)
 import Data.Maybe (fromMaybe, maybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
@@ -783,9 +781,9 @@ createImageFromBuffer buffers bufferViews bvid mimeType = decodeImage mimeType =
         bufferView <- maybe (throwIO . userError $ "invalid bufferView identifier: " ++ show bvid) return $ bufferViews BV.!? bvid
         let bid = bufferViewBuffer bufferView
             offset = bufferViewByteOffset bufferView
-            length = bufferViewByteLength bufferView
+            len = bufferViewByteLength bufferView
         buffer <- maybe (throwIO . userError $ "invalid buffer identifier: " ++ show bid) return $ buffers BV.!? bid
-        return . ByteString.take length . ByteString.drop offset $ buffer
+        return . ByteString.take len . ByteString.drop offset $ buffer
 
 decodeImage :: Maybe Text -> ByteString -> IO (Picture.Image Picture.PixelRGBA8)
 decodeImage mimeType bs
@@ -821,8 +819,8 @@ createTextureSource cd scene buffers bufferViews image = do
     (_, texture) <- SV.unsafeWith (Picture.imageData source) $ \ptr -> do
         let sourceData = Hree.TextureSourceData width height PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (castPtr ptr)
         Hree.addTexture scene name settings sourceData
-    let samplerName = Text.encodeUtf8 $ fromMaybe "glTF_sourcesampler_" (imageName image)
-    (_, sampler) <- Hree.addSampler scene name
+    let sname = Text.encodeUtf8 $ fromMaybe "glTF_sourcesampler_" (imageName image)
+    (_, sampler) <- Hree.addSampler scene sname
     return (texture, sampler)
 
 createTextureSources :: FilePath -> Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Image -> IO (BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler))

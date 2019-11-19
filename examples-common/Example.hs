@@ -7,7 +7,7 @@ module Example
     , withWindow
     ) where
 
-import Control.Monad (forever, unless, when)
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
@@ -17,7 +17,7 @@ import Graphics.Hree.Camera
 import Graphics.Hree.CameraControl.SphericalControl
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V4(..))
-import System.Exit (ExitCode(..), exitSuccess)
+import System.Exit (exitSuccess)
 
 withWindow :: Int -> Int -> String -> (GLFW.Window -> IO a) -> (a -> GLFW.Window -> IO ()) -> IO ()
 withWindow width height title constructor f = do
@@ -52,7 +52,7 @@ shutdown win = do
     return ()
 
 resizeWindow :: GLFW.WindowSizeCallback
-resizeWindow win w h =
+resizeWindow _ w h =
     GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
 
 setCameraMouseControl :: GLFW.Window -> Camera -> IO SphericalControl
@@ -64,7 +64,7 @@ setCameraMouseControl w camera = do
     return control
 
     where
-    setMouseButtonEventCallback w onPress onRelease =
+    setMouseButtonEventCallback _ onPress onRelease =
         let callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Pressed _ = go w' (onPress SphericalControlModeOrbit)
             callback w' GLFW.MouseButton'2 GLFW.MouseButtonState'Pressed _ = go w' (onPress SphericalControlModeZoom)
             callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Released _ = go w' onRelease
@@ -76,7 +76,7 @@ setCameraMouseControl w camera = do
                 f (calcControlPosition width height x y)
         in GLFW.setMouseButtonCallback w (Just callback)
 
-    setEnterOrLeaveEventCallback w onEnter onLeave =
+    setEnterOrLeaveEventCallback _ onEnter onLeave =
         let callback w' GLFW.CursorState'InWindow    = go w' onEnter
             callback w' GLFW.CursorState'NotInWindow = go w' onLeave
             go w' f = do
@@ -85,7 +85,7 @@ setCameraMouseControl w camera = do
                 f (calcControlPosition width height x y)
         in GLFW.setCursorEnterCallback w (Just callback)
 
-    setCursorMoveEventCallback w onMove =
+    setCursorMoveEventCallback _ onMove =
         let callback w' x y = do
                 (width, height) <- GLFW.getWindowSize w'
                 onMove (calcControlPosition width height x y)

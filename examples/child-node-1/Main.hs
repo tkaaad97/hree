@@ -6,25 +6,24 @@ import Example
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
-import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.Geometry.Box
-import Graphics.Hree.GL.Types
 import qualified Graphics.Hree.Material as Material
 import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
-import Linear (V2(..), V3(..), V4(..), inv44)
+import Linear (V3(..), V4(..), inv44)
+import Prelude hiding (init)
 
 main :: IO ()
-main = do
+main =
     withWindow width height "child-node-1" init onDisplay
 
     where
     width  = 640
     height = 480
-    aspect = fromIntegral width / fromIntegral height
+    defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = orthographic (-aspect) aspect (-1.0) 1.0 0.01 10.0
+    proj = orthographic (-defaultAspect) defaultAspect (-1.0) 1.0 0.01 10.0
 
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
@@ -78,13 +77,13 @@ main = do
             renderScene s c
             GLFW.swapBuffers w
 
-    resizeWindow' camera win w h = do
+    resizeWindow' camera _ w h = do
         GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
         projection <- getCameraProjection camera
         let aspect = fromIntegral w / fromIntegral h
             projection' = updateProjectionAspectRatio projection aspect
         updateProjection camera projection'
 
-    updateProjectionAspectRatio p @ Perspective {} aspect =
-        p { perspectiveAspect = aspect }
+    updateProjectionAspectRatio (Perspective fov _ near far) aspect =
+        Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
