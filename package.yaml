@@ -41,6 +41,16 @@ dependencies:
 - transformers
 - vector
 
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wpartial-fields
+- -Wredundant-constraints
+- -Wtabs
+
 library:
   source-dirs: src
 
