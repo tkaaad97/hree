@@ -4,7 +4,6 @@ module SceneSpec
     ) where
 
 import qualified Data.Component as Component
-import qualified Data.IntMap as IntMap
 import Data.IORef (readIORef)
 import qualified Data.Map.Strict as Map
 import qualified Data.Vector.Storable as Vector
@@ -12,7 +11,6 @@ import Data.Word (Word8)
 import Foreign (Ptr)
 import qualified Foreign (castPtr, withArray)
 import GLContext
-import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
@@ -61,11 +59,9 @@ spec = do
             geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material Nothing
             meshId <- Hree.addMesh scene mesh
-            buffers <- getSceneProp scene Hree.ssBuffers
-            buffers `shouldBe` [GLW.Buffer 1]
+            (`shouldBe` [GLW.Buffer 1]) =<< getSceneProp scene Hree.ssBuffers
             Hree.removeMesh scene meshId
-            buffers <- getSceneProp scene Hree.ssBuffers
-            buffers `shouldBe` [GLW.Buffer 1]
+            (`shouldBe` [GLW.Buffer 1]) =<< getSceneProp scene Hree.ssBuffers
 
     describe "addTexture" $ do
         it "change scene state" . runOnOSMesaContext width height . Foreign.withArray [0, 0, 0, 0] $ \p -> do
@@ -93,28 +89,24 @@ spec = do
             geometry2 <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
             let mesh1 = Hree.Mesh geometry1 material Nothing
                 mesh2 = Hree.Mesh geometry2 material Nothing
-            meshId1 <- Hree.addMesh scene mesh1
-            meshId2 <- Hree.addMesh scene mesh2
+            _ <- Hree.addMesh scene mesh1
+            _ <- Hree.addMesh scene mesh2
             meshSize <- Component.componentSize $ Hree.sceneMeshStore scene
             meshSize `shouldBe` 2
-            buffers <- getSceneProp scene Hree.ssBuffers
-            buffers `shouldBe` [GLW.Buffer 2, GLW.Buffer 1]
+            (`shouldBe` [GLW.Buffer 2, GLW.Buffer 1]) =<< getSceneProp scene Hree.ssBuffers
             Hree.deleteScene scene
             meshSizeAfter <- Component.componentSize $ Hree.sceneMeshStore scene
             meshSizeAfter `shouldBe` 0
-            buffers <- getSceneProp scene Hree.ssBuffers
-            buffers `shouldBe` []
+            (`shouldBe` []) =<< getSceneProp scene Hree.ssBuffers
 
         it "delete textures" . runOnOSMesaContext width height . Foreign.withArray [0, 0, 0, 0] $ \p -> do
             scene <- Hree.newScene
             let textureSettings = Hree.TextureSettings 0 GL.GL_RGBA8 1 1 False
                 source = Hree.TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
             r <- Hree.addTexture scene "texture1" textureSettings source
-            textures <- getSceneProp scene Hree.ssTextures
-            textures `shouldBe` Map.fromList [r]
+            (`shouldBe` Map.fromList [r]) =<< getSceneProp scene Hree.ssTextures
             Hree.deleteScene scene
-            textures <- getSceneProp scene Hree.ssTextures
-            textures `shouldBe` Map.empty
+            (`shouldBe` Map.empty) =<< getSceneProp scene Hree.ssTextures
 
     where
     width = 1

@@ -4,10 +4,6 @@ module GLTFSpec
     ) where
 
 import qualified Codec.Picture as Picture
-import qualified Codec.Picture.Types as Picture
-import Control.Exception (catch)
-import Control.Monad (void)
-import Data.Either (isRight)
 import qualified Data.Map.Strict as Map
 import qualified Data.Vector as BV
 import qualified Graphics.Format.GLTF as GLTF
