@@ -13,21 +13,14 @@ module Graphics.Hree.Math
 import Data.Word (Word8)
 import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
+import Graphics.Hree.GL.Types (Mat4, Vec2, Vec3, Vec4)
 import Linear ((!*!))
-import qualified Linear (M44, Quaternion(..), V2, V3(..), V4(..),
-                         fromQuaternion, mkTransformationMat)
-
-type Vec2 = Linear.V2 Float
-
-type Vec3 = Linear.V3 Float
-
-type Vec4 = Linear.V4 Float
+import qualified Linear (Quaternion(..), V3(..), V4(..), fromQuaternion,
+                         mkTransformationMat)
 
 type ColorW8 = Linear.V4 Word8
 
 type Quaternion = Linear.Quaternion Float
-
-type Mat4 = Linear.M44 Float
 
 data Transform = Transform
     { transformTranslation :: !Vec3
