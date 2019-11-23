@@ -33,7 +33,9 @@ import Control.Exception (throwIO)
 import Control.Monad (unless)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (intercalate)
-import qualified Data.ByteString.Char8 as ByteString (pack, useAsCString, useAsCStringLen)
+import qualified Data.ByteString.Char8 as ByteString (pack, packCStringLen,
+                                                      useAsCString,
+                                                      useAsCStringLen)
 import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
 import qualified Data.Map.Strict as Map
@@ -45,8 +47,9 @@ import qualified Data.Text.Lazy as Text (toStrict)
 import qualified Data.Text.Lazy.Builder as Text.Builder (fromText, singleton,
                                                          toLazyText)
 import qualified Data.Text.Lazy.Builder.Int as Text.Builder (decimal)
-import qualified Data.Vector as BV (Vector, generateM, map, mapM, mapMaybe, toList, zip, zipWith)
-import qualified Foreign (alloca, allocaArray, peek, poke, with)
+import qualified Data.Vector as BV (Vector, fromList, generateM, map, mapM,
+                                    mapMaybe, toList, zip, zipWith, (!))
+import qualified Foreign (alloca, allocaArray, peek, peekArray, poke, with)
 import qualified Foreign.C.String as Foreign (peekCStringLen)
 import GHC.Generics (Generic)
 import qualified GLW
@@ -193,7 +196,10 @@ mkProgram' vsource fsource = do
     uniformLocations <- BV.mapM (getUniformLocation program) uniformNames
     let uniformLocationMap = Map.fromList . BV.toList . BV.mapMaybe id $ BV.zipWith (fmap . (,)) uniformNames uniformLocations
 
-    return $ ProgramInfo program attribMap uniformMap uniformLocationMap
+    uniformBlocks <- getActiveUniformBlockInfos program uniforms
+    let uniformBlockMap = Map.fromList . BV.toList $ BV.zip (BV.map ubiUniformBlockName uniformBlocks) uniformBlocks
+
+    return $ ProgramInfo program attribMap uniformMap uniformLocationMap uniformBlockMap
 
 getEmbeddedVertexShaderSource :: EmbeddedProgramType -> ByteString
 getEmbeddedVertexShaderSource BasicProgram = $(embedFile "shader/basic-vertex.glsl")
@@ -260,7 +266,7 @@ getActiveAttribs program =
         len <- Foreign.peek lp
         size <- Foreign.peek sp
         dataType <- Foreign.peek tp
-        name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral len)
+        name <- ByteString.packCStringLen (np, fromIntegral len)
         maybeLocation <- GLW.glGetAttribLocation program np
         return $ maybeLocation >>= \l -> return $ AttribInfo name l (fromIntegral size) dataType
 
@@ -285,7 +291,7 @@ getActiveUniformInfos program =
         nameLen <- Foreign.peek lp
         size <- Foreign.peek sp
         dataType <- Foreign.peek tp
-        name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral nameLen)
+        name <- ByteString.packCStringLen (np, fromIntegral nameLen)
 
         Foreign.poke ip (fromIntegral index)
         GLW.glGetActiveUniformsiv program 1 ip GL.GL_UNIFORM_OFFSET op
@@ -307,6 +313,41 @@ getActiveUniformInfos program =
 getUniformLocation :: GLW.Program -> ByteString -> IO (Maybe GLW.UniformLocation)
 getUniformLocation program =
     flip ByteString.useAsCString $ GLW.glGetUniformLocation program
+
+getActiveUniformBlockInfos :: GLW.Program -> BV.Vector UniformInfo -> IO (BV.Vector UniformBlockInfo)
+getActiveUniformBlockInfos program uniformInfos =
+    Foreign.alloca $ \p ->
+    Foreign.alloca $ \lp ->
+    Foreign.allocaArray maxNameBytes $ \np ->
+    Foreign.alloca $ \op -> do
+        GLW.glGetProgramiv program GL.GL_ACTIVE_UNIFORM_BLOCKS p
+        len <- Foreign.peek p
+        BV.generateM (fromIntegral len) (getUniformBlockInfo lp np op)
+
+    where
+    maxNameBytes = 128
+
+    getUniformBlockInfo lp np op index = do
+        GLW.glGetActiveUniformBlockName program (fromIntegral index) (fromIntegral maxNameBytes) lp np
+        nameLen <- Foreign.peek lp
+        name <- ByteString.packCStringLen (np, fromIntegral nameLen)
+
+        GLW.glGetActiveUniformBlockiv program (fromIntegral index) GL.GL_UNIFORM_BLOCK_DATA_SIZE op
+        dataSize <- Foreign.peek op
+
+        GLW.glGetActiveUniformBlockiv program (fromIntegral index) GL.GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS op
+        num <- Foreign.peek op
+
+        indices <- Foreign.allocaArray (fromIntegral num) $ \ids -> do
+            GLW.glGetActiveUniformBlockiv program (fromIntegral index) GL.GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES ids
+            BV.fromList <$> Foreign.peekArray (fromIntegral num) ids
+
+        let uniforms = BV.map ((uniformInfos BV.!) . fromIntegral) indices
+            uniformBlockInfo = UniformBlockInfo name (fromIntegral index) dataSize uniforms
+
+        return uniformBlockInfo
+
+
 
 throwIfProgramErrorStatus
     :: GLW.Program

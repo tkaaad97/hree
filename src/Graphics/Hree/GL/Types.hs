@@ -68,6 +68,7 @@ data ProgramInfo = ProgramInfo
     , programInfoAttribs          :: !(Map ByteString AttribInfo)
     , programInfoUniforms         :: !(Map ByteString UniformInfo)
     , programInfoUniformLocations :: !(Map ByteString GLW.UniformLocation)
+    , programInfoUniformBlocks    :: !(Map ByteString UniformBlockInfo)
     } deriving (Show)
 
 data RenderInfo = RenderInfo
