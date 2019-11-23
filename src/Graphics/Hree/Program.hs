@@ -33,11 +33,11 @@ import Control.Exception (throwIO)
 import Control.Monad (unless)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (intercalate)
-import qualified Data.ByteString.Char8 as ByteString (pack, useAsCStringLen)
+import qualified Data.ByteString.Char8 as ByteString (pack, useAsCString, useAsCStringLen)
 import Data.FileEmbed (embedFile)
 import Data.Hashable (Hashable(..))
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, maybe)
+import Data.Maybe (catMaybes)
 import Data.Proxy (Proxy(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (replace)
@@ -45,8 +45,8 @@ import qualified Data.Text.Lazy as Text (toStrict)
 import qualified Data.Text.Lazy.Builder as Text.Builder (fromText, singleton,
                                                          toLazyText)
 import qualified Data.Text.Lazy.Builder.Int as Text.Builder (decimal)
-import Foreign (Ptr)
-import qualified Foreign (alloca, allocaArray, peek, with)
+import qualified Data.Vector as BV (Vector, generateM, map, mapM, mapMaybe, toList, zip, zipWith)
+import qualified Foreign (alloca, allocaArray, peek, poke, with)
 import qualified Foreign.C.String as Foreign (peekCStringLen)
 import GHC.Generics (Generic)
 import qualified GLW
@@ -184,12 +184,16 @@ mkProgram' vsource fsource = do
     GLW.deleteObject fshader
 
     attribs <- getActiveAttribs program
-    uniforms <- getActiveUniforms program
+    uniforms <- getActiveUniformInfos program
 
-    let attribMap = Map.fromList $ zip (map aiAttribName attribs) attribs
-        uniformMap = Map.fromList $ zip (map uiUniformName uniforms) uniforms
+    let uniformNames = BV.map uiUniformName uniforms
+        attribMap = Map.fromList . BV.toList $ BV.zip (BV.map aiAttribName attribs) attribs
+        uniformMap = Map.fromList . BV.toList $ BV.zip uniformNames uniforms
 
-    return $ ProgramInfo program attribMap uniformMap
+    uniformLocations <- BV.mapM (getUniformLocation program) uniformNames
+    let uniformLocationMap = Map.fromList . BV.toList . BV.mapMaybe id $ BV.zipWith (fmap . (,)) uniformNames uniformLocations
+
+    return $ ProgramInfo program attribMap uniformMap uniformLocationMap
 
 getEmbeddedVertexShaderSource :: EmbeddedProgramType -> ByteString
 getEmbeddedVertexShaderSource BasicProgram = $(embedFile "shader/basic-vertex.glsl")
@@ -238,37 +242,71 @@ mkShader _ source =
         throwIfShaderErrorStatus shader GL.GL_COMPILE_STATUS "shader compile error"
         return shader
 
-getActiveAttribs :: GLW.Program -> IO [AttribInfo]
-getActiveAttribs = getActivePorts AttribInfo GLW.glGetAttribLocation GL.GL_ACTIVE_ATTRIBUTES GLW.glGetActiveAttrib
-
-getActiveUniforms :: GLW.Program -> IO [UniformInfo]
-getActiveUniforms = getActivePorts UniformInfo GLW.glGetUniformLocation GL.GL_ACTIVE_UNIFORMS GLW.glGetActiveUniform
-
-getActivePorts ::
-    (ByteString -> location -> GL.GLuint -> GL.GLuint -> a)
-    -> (GLW.Program -> Ptr GL.GLchar -> IO (Maybe location))
-    -> GL.GLenum
-    -> (GLW.Program -> GL.GLuint -> GL.GLsizei -> Ptr GL.GLsizei -> Ptr GL.GLint -> Ptr GL.GLenum -> Ptr GL.GLchar -> IO ())
-    -> GLW.Program
-    -> IO [a]
-getActivePorts construct getLocation pname f program = do
-    len  <- Foreign.alloca $ \p -> GLW.glGetProgramiv program pname p >> Foreign.peek p
-    catMaybes <$> mapM g [0..(len - 1)]
+getActiveAttribs :: GLW.Program -> IO (BV.Vector AttribInfo)
+getActiveAttribs program =
+    Foreign.alloca $ \p ->
+    Foreign.alloca $ \lp ->
+    Foreign.alloca $ \sp ->
+    Foreign.alloca $ \tp ->
+    Foreign.allocaArray maxNameBytes $ \np -> do
+        GLW.glGetProgramiv program GL.GL_ACTIVE_ATTRIBUTES p
+        len <- Foreign.peek p
+        BV.mapMaybe id <$> BV.generateM (fromIntegral len) (getActiveAttrib lp sp tp np)
 
     where
     maxNameBytes = 128
-    g i =
-        Foreign.alloca $ \lp ->
-        Foreign.alloca $ \sp ->
-        Foreign.alloca $ \tp ->
-        Foreign.allocaArray maxNameBytes $ \np -> do
-            f program (fromIntegral i) (fromIntegral maxNameBytes) lp sp tp np
-            len <- Foreign.peek lp
-            size <- Foreign.peek sp
-            dataType <- Foreign.peek tp
-            name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral len)
-            maybeLocation <- getLocation program np
-            return . flip (maybe Nothing) maybeLocation $ \l -> Just $ construct name l (fromIntegral size) dataType
+    getActiveAttrib lp sp tp np index = do
+        GLW.glGetActiveAttrib program (fromIntegral index) (fromIntegral maxNameBytes) lp sp tp np
+        len <- Foreign.peek lp
+        size <- Foreign.peek sp
+        dataType <- Foreign.peek tp
+        name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral len)
+        maybeLocation <- GLW.glGetAttribLocation program np
+        return $ maybeLocation >>= \l -> return $ AttribInfo name l (fromIntegral size) dataType
+
+getActiveUniformInfos :: GLW.Program -> IO (BV.Vector UniformInfo)
+getActiveUniformInfos program =
+    Foreign.alloca $ \p ->
+    Foreign.alloca $ \lp ->
+    Foreign.alloca $ \sp ->
+    Foreign.alloca $ \tp ->
+    Foreign.allocaArray maxNameBytes $ \np ->
+    Foreign.alloca $ \ip ->
+    Foreign.alloca $ \op -> do
+        GLW.glGetProgramiv program GL.GL_ACTIVE_UNIFORMS p
+        len <- Foreign.peek p
+        BV.generateM (fromIntegral len) (getUniformInfo lp sp tp np ip op)
+
+    where
+    maxNameBytes = 128
+
+    getUniformInfo lp sp tp np ip op index = do
+        GLW.glGetActiveUniform program (fromIntegral index) (fromIntegral maxNameBytes) lp sp tp np
+        nameLen <- Foreign.peek lp
+        size <- Foreign.peek sp
+        dataType <- Foreign.peek tp
+        name <- ByteString.pack <$> Foreign.peekCStringLen (np, fromIntegral nameLen)
+
+        Foreign.poke ip (fromIntegral index)
+        GLW.glGetActiveUniformsiv program 1 ip GL.GL_UNIFORM_OFFSET op
+        offset <- Foreign.peek op
+
+        GLW.glGetActiveUniformsiv program 1 ip GL.GL_UNIFORM_ARRAY_STRIDE op
+        astride <- Foreign.peek op
+
+        GLW.glGetActiveUniformsiv program 1 ip GL.GL_UNIFORM_MATRIX_STRIDE op
+        mstride <- Foreign.peek op
+
+        GLW.glGetActiveUniformsiv program 1 ip GL.GL_UNIFORM_IS_ROW_MAJOR op
+        isRowMajor <- Foreign.peek op
+
+        let uniformInfo = UniformInfo name dataType (fromIntegral size) offset astride mstride (isRowMajor /= 0)
+
+        return uniformInfo
+
+getUniformLocation :: GLW.Program -> ByteString -> IO (Maybe GLW.UniformLocation)
+getUniformLocation program =
+    flip ByteString.useAsCString $ GLW.glGetUniformLocation program
 
 throwIfProgramErrorStatus
     :: GLW.Program

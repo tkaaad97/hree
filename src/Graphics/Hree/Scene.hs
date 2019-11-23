@@ -170,10 +170,10 @@ toRenderInfo program defaultTexture meshInfo matrix =
     material = meshMaterial mesh
     vao = meshInfoVertexArray meshInfo
     dm = resolveDrawMethod mesh
-    uniformInfos = programInfoUniforms program
+    uniformLocations = programInfoUniformLocations program
     toUniformEntry (uniformName, uniform) = do
-        uniformInfo <- Map.lookup uniformName uniformInfos
-        return (uniformInfo, uniform)
+        uniformLocation <- Map.lookup uniformName uniformLocations
+        return (uniformLocation, uniform)
     mtextures = Map.toList $ materialTextures material
     textures = if null mtextures
         then [defaultTexture]

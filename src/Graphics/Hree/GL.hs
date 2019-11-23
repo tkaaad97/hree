@@ -34,7 +34,7 @@ render commons a cur = do
     return . Just $ program
     where
     program = programInfoProgram . riProgram $ a
-    uniformInfos = programInfoUniforms . riProgram $ a
+    uniformLocations = programInfoUniformLocations . riProgram $ a
     method = riDrawMethod a
     uniforms = riUniforms a
     textures = riTextures a
@@ -43,13 +43,13 @@ render commons a cur = do
         bindUniforms . mapMaybe toUniformPair $ commons
         GLW.glUseProgram p
     toUniformPair (k, u) =
-        (,) <$> Map.lookup k uniformInfos <*> Just u
+        (,) <$> Map.lookup k uniformLocations <*> Just u
 
-bindUniforms :: [(UniformInfo, Uniform)] -> IO ()
+bindUniforms :: [(GLW.UniformLocation, Uniform)] -> IO ()
 bindUniforms = mapM_ bindUniform
     where
-    bindUniform (ui, Uniform a) =
-        GLW.uniform (uiUniformLocation ui) a
+    bindUniform (uniformLocation, Uniform a) =
+        GLW.uniform uniformLocation a
 
 bindTextures :: [Texture] -> IO ()
 bindTextures textures = mapM_ bindTexture $ zip [0..(length textures - 1)] textures

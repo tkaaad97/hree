@@ -16,12 +16,14 @@ module Graphics.Hree.GL.Types
     , RenderInfo(..)
     , Uniform(..)
     , UniformInfo(..)
+    , UniformBlockInfo(..)
     , Texture(..)
     ) where
 
 import Data.ByteString (ByteString)
 import Data.Map.Strict (Map)
-import Data.Vector.Storable (Vector)
+import qualified Data.Vector as BV (Vector)
+import qualified Data.Vector.Storable as SV (Vector)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable)
 import qualified GLW
@@ -31,12 +33,21 @@ data Uniform = forall a. (GLW.Uniform a, Show a) => Uniform !a
 deriving instance Show Uniform
 
 data UniformInfo = UniformInfo
-    { uiUniformName     :: !ByteString
-    , uiUniformLocation :: !GLW.UniformLocation
-    , uiUniformSize     :: !GL.GLuint
-    , uiUniformDataType :: !GL.GLuint
-    }
-    deriving (Show)
+    { uiUniformName         :: !ByteString
+    , uiUniformDataType     :: !GL.GLuint
+    , uiUniformSize         :: !GL.GLuint
+    , uiUniformOffset       :: !GL.GLint
+    , uiUniformArrayStride  :: !GL.GLint
+    , uiUniformMatrixStride :: !GL.GLint
+    , uiUniformIsRowMajor   :: !Bool
+    } deriving (Show, Eq)
+
+data UniformBlockInfo = UniformBlockInfo
+    { ubiUniformBlockName     :: !ByteString
+    , ubiUniformBlockIndex    :: !GL.GLuint
+    , ubiUniformBlockDataSize :: !GL.GLsizei
+    , ubiUniformBlockUniforms :: !(BV.Vector UniformInfo)
+    } deriving (Show, Eq)
 
 data AttribFormat = AttribFormat
     { attribFormatSize           :: !Int
@@ -53,16 +64,17 @@ data AttribInfo = AttribInfo
     } deriving (Show, Eq)
 
 data ProgramInfo = ProgramInfo
-    { programInfoProgram  :: !GLW.Program
-    , programInfoAttribs  :: !(Map ByteString AttribInfo)
-    , programInfoUniforms :: !(Map ByteString UniformInfo)
+    { programInfoProgram          :: !GLW.Program
+    , programInfoAttribs          :: !(Map ByteString AttribInfo)
+    , programInfoUniforms         :: !(Map ByteString UniformInfo)
+    , programInfoUniformLocations :: !(Map ByteString GLW.UniformLocation)
     } deriving (Show)
 
 data RenderInfo = RenderInfo
     { riProgram     :: !ProgramInfo
     , riDrawMethod  :: !DrawMethod
     , riVertexArray :: !GLW.VertexArray
-    , riUniforms    :: ![(UniformInfo, Uniform)]
+    , riUniforms    :: ![(GLW.UniformLocation, Uniform)]
     , riTextures    :: ![Texture]
     }
 
@@ -74,7 +86,7 @@ data DrawMethod =
     deriving (Show, Eq)
 
 data BufferSource =
-    forall a. Storable a => BufferSourceVector !(Vector a) !GL.GLenum |
+    forall a. Storable a => BufferSourceVector !(SV.Vector a) !GL.GLenum |
     BufferSourceByteString !ByteString !GL.GLenum
 
 type BindingIndex = Int
