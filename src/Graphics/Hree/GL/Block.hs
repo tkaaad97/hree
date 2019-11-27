@@ -1,13 +1,18 @@
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module Graphics.Hree.GL.Block
     ( Block(..)
     ) where
 
 import Data.Int (Int32)
+import Data.Proxy (Proxy(..), asProxyTypeOf)
+import qualified Data.Vector.Storable.Sized as SV (Vector, generateM, imapM_,
+                                                   length)
 import Data.Word (Word32)
 import Foreign (Ptr)
 import qualified Foreign (Storable(..), plusPtr)
+import GHC.TypeNats (KnownNat)
 import Graphics.Hree.GL.Types (BVec2, BVec3, BVec4, DMat2, DMat2x3, DMat2x4,
                                DMat3, DMat3x2, DMat3x4, DMat4, DMat4x2, DMat4x3,
                                DVec2, DVec3, DVec4, IVec2, IVec3, IVec4, Mat2,
@@ -35,6 +40,19 @@ class Block a where
     peekByteOffStd140 ptr off = peekStd140 (ptr `Foreign.plusPtr` off)
     pokeByteOffStd140 ptr off = pokeStd140 (ptr `Foreign.plusPtr` off)
 
+class Block a => Element a where
+    elemAlignmentStd140 :: p a -> Int
+    elemStrideStd140 :: p a -> Int
+
+newtype Elem a = Elem { unElem :: a }
+    deriving (Show, Eq)
+
+instance Element a => Foreign.Storable (Elem a) where
+    sizeOf _ = elemStrideStd140 (Proxy :: Proxy a)
+    alignment _ = elemAlignmentStd140 (Proxy :: Proxy a)
+    peekByteOff ptr off = Elem <$> peekByteOffStd140 ptr off
+    pokeByteOff ptr off = pokeByteOffStd140 ptr off . unElem
+
 toBool :: Int32 -> Bool
 toBool 0 = False
 toBool _ = True
@@ -49,11 +67,19 @@ instance Block Bool where
     peekByteOffStd140 ptr off = toBool <$> Foreign.peekByteOff ptr off
     pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fromBool
 
+instance Element Bool where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
+
 instance Block Float where
     alignmentStd140 _ = 4
     sizeOfStd140 _ = 4
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
+
+instance Element Float where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
 
 instance Block Int32 where
     alignmentStd140 _ = 4
@@ -61,11 +87,19 @@ instance Block Int32 where
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
 
+instance Element Int32 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
+
 instance Block Word32 where
     alignmentStd140 _ = 4
     sizeOfStd140 _ = 4
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
+
+instance Element Word32 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
 
 instance Block Double where
     alignmentStd140 _ = 8
@@ -73,11 +107,19 @@ instance Block Double where
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
 
+instance Element Double where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
+
 instance Block BVec2 where
     alignmentStd140 _ = 8
     sizeOfStd140 _ = 8
     peekByteOffStd140 ptr off = fmap toBool <$> Foreign.peekByteOff ptr off
     pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fmap fromBool
+
+instance Element BVec2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
 
 instance Block BVec3 where
     alignmentStd140 _ = 16
@@ -85,11 +127,19 @@ instance Block BVec3 where
     peekByteOffStd140 ptr off = fmap toBool <$> Foreign.peekByteOff ptr off
     pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fmap fromBool
 
+instance Element BVec3 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
+
 instance Block BVec4 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 16
     peekByteOffStd140 ptr off = fmap toBool <$> Foreign.peekByteOff ptr off
     pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fmap fromBool
+
+instance Element BVec4 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
 
 instance Block Vec2 where
     alignmentStd140 _ = 8
@@ -97,11 +147,19 @@ instance Block Vec2 where
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
 
+instance Element Vec2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
+
 instance Block Vec3 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 12
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
+
+instance Element Vec3 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
 
 instance Block Vec4 where
     alignmentStd140 _ = 16
@@ -109,11 +167,19 @@ instance Block Vec4 where
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
 
+instance Element Vec4 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
+
 instance Block IVec2 where
     alignmentStd140 _ = 8
     sizeOfStd140 _ = 8
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
+
+instance Element IVec2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
 
 instance Block IVec3 where
     alignmentStd140 _ = 16
@@ -121,11 +187,19 @@ instance Block IVec3 where
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
 
+instance Element IVec3 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
+
 instance Block IVec4 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 16
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
+
+instance Element IVec4 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
 
 instance Block UVec2 where
     alignmentStd140 _ = 8
@@ -133,11 +207,19 @@ instance Block UVec2 where
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
 
+instance Element UVec2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
+
 instance Block UVec3 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 12
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
+
+instance Element UVec3 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
 
 instance Block UVec4 where
     alignmentStd140 _ = 16
@@ -145,11 +227,19 @@ instance Block UVec4 where
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
 
+instance Element UVec4 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
+
 instance Block DVec2 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 16
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
+
+instance Element DVec2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 16
 
 instance Block DVec3 where
     alignmentStd140 _ = 32
@@ -157,11 +247,19 @@ instance Block DVec3 where
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
 
+instance Element DVec3 where
+    elemAlignmentStd140 _ = 32
+    elemStrideStd140 _ = 32
+
 instance Block DVec4 where
     alignmentStd140 _ = 32
     sizeOfStd140 _ = 32
     peekByteOffStd140 = Foreign.peekByteOff
     pokeByteOffStd140 = Foreign.pokeByteOff
+
+instance Element DVec4 where
+    elemAlignmentStd140 _ = 32
+    elemStrideStd140 _ = 32
 
 instance Block Mat2 where
     alignmentStd140 _ = 16
@@ -176,9 +274,13 @@ instance Block Mat2 where
         Foreign.pokeByteOff ptr off (V2 e00 e10)
         Foreign.pokeByteOff ptr (off + 16) (V2 e01 e11)
 
+instance Element Mat2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 32
+
 instance Block Mat2x3 where
     alignmentStd140 _ = 16
-    sizeOfStd140 _ = 48
+    sizeOfStd140 _ = 32
     peekByteOffStd140 ptr off = do
         V3 e00 e10 e20 <- Foreign.peekByteOff ptr off
         V3 e01 e11 e21 <- Foreign.peekByteOff ptr (off + 16)
@@ -190,9 +292,13 @@ instance Block Mat2x3 where
         Foreign.pokeByteOff ptr off (V3 e00 e10 e20)
         Foreign.pokeByteOff ptr (off + 16) (V3 e01 e11 e21)
 
+instance Element Mat2x3 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 32
+
 instance Block Mat2x4 where
     alignmentStd140 _ = 16
-    sizeOfStd140 _ = 64
+    sizeOfStd140 _ = 32
     peekByteOffStd140 ptr off = do
         V4 e00 e10 e20 e30 <- Foreign.peekByteOff ptr off
         V4 e01 e11 e21 e31 <- Foreign.peekByteOff ptr (off + 16)
@@ -204,6 +310,10 @@ instance Block Mat2x4 where
     pokeByteOffStd140 ptr off (V4 (V2 e00 e01) (V2 e10 e11) (V2 e20 e21) (V2 e30 e31)) = do
         Foreign.pokeByteOff ptr off (V4 e00 e10 e20 e30)
         Foreign.pokeByteOff ptr (off + 16) (V4 e01 e11 e21 e31)
+
+instance Element Mat2x4 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 32
 
 instance Block Mat3 where
     alignmentStd140 _ = 16
@@ -221,6 +331,10 @@ instance Block Mat3 where
         Foreign.pokeByteOff ptr (off + 16) (V3 e01 e11 e21)
         Foreign.pokeByteOff ptr (off + 32) (V3 e02 e12 e22)
 
+instance Element Mat3 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 48
+
 instance Block Mat3x2 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 48
@@ -235,6 +349,10 @@ instance Block Mat3x2 where
         Foreign.pokeByteOff ptr off (V2 e00 e10)
         Foreign.pokeByteOff ptr (off + 16) (V2 e01 e11)
         Foreign.pokeByteOff ptr (off + 32) (V2 e02 e12)
+
+instance Element Mat3x2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 48
 
 instance Block Mat3x4 where
     alignmentStd140 _ = 16
@@ -252,6 +370,10 @@ instance Block Mat3x4 where
         Foreign.pokeByteOff ptr off (V4 e00 e10 e20 e30)
         Foreign.pokeByteOff ptr (off + 16) (V4 e01 e11 e21 e31)
         Foreign.pokeByteOff ptr (off + 32) (V4 e02 e12 e22 e32)
+
+instance Element Mat3x4 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 48
 
 instance Block Mat4 where
     alignmentStd140 _ = 16
@@ -272,6 +394,10 @@ instance Block Mat4 where
         Foreign.pokeByteOff ptr (off + 32) (V4 e02 e12 e22 e32)
         Foreign.pokeByteOff ptr (off + 48) (V4 e03 e13 e23 e33)
 
+instance Element Mat4 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 64
+
 instance Block Mat4x2 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 64
@@ -288,6 +414,10 @@ instance Block Mat4x2 where
         Foreign.pokeByteOff ptr (off + 16) (V2 e01 e11)
         Foreign.pokeByteOff ptr (off + 32) (V2 e02 e12)
         Foreign.pokeByteOff ptr (off + 48) (V2 e03 e13)
+
+instance Element Mat4x2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 64
 
 instance Block Mat4x3 where
     alignmentStd140 _ = 16
@@ -307,6 +437,10 @@ instance Block Mat4x3 where
         Foreign.pokeByteOff ptr (off + 32) (V3 e02 e12 e22)
         Foreign.pokeByteOff ptr (off + 48) (V3 e03 e13 e23)
 
+instance Element Mat4x3 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 64
+
 instance Block DMat2 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 32
@@ -319,6 +453,10 @@ instance Block DMat2 where
     pokeByteOffStd140 ptr off (V2 (V2 e00 e01) (V2 e10 e11)) = do
         Foreign.pokeByteOff ptr off (V2 e00 e10)
         Foreign.pokeByteOff ptr (off + 16) (V2 e01 e11)
+
+instance Element DMat2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 32
 
 instance Block DMat2x3 where
     alignmentStd140 _ = 32
@@ -334,6 +472,10 @@ instance Block DMat2x3 where
         Foreign.pokeByteOff ptr off (V3 e00 e10 e20)
         Foreign.pokeByteOff ptr (off + 32) (V3 e01 e11 e21)
 
+instance Element DMat2x3 where
+    elemAlignmentStd140 _ = 32
+    elemStrideStd140 _ = 64
+
 instance Block DMat2x4 where
     alignmentStd140 _ = 32
     sizeOfStd140 _ = 64
@@ -348,6 +490,10 @@ instance Block DMat2x4 where
     pokeByteOffStd140 ptr off (V4 (V2 e00 e01) (V2 e10 e11) (V2 e20 e21) (V2 e30 e31)) = do
         Foreign.pokeByteOff ptr off (V4 e00 e10 e20 e30)
         Foreign.pokeByteOff ptr (off + 32) (V4 e01 e11 e21 e31)
+
+instance Element DMat2x4 where
+    elemAlignmentStd140 _ = 32
+    elemStrideStd140 _ = 64
 
 instance Block DMat3 where
     alignmentStd140 _ = 32
@@ -365,9 +511,13 @@ instance Block DMat3 where
         Foreign.pokeByteOff ptr (off + 32) (V3 e01 e11 e21)
         Foreign.pokeByteOff ptr (off + 64) (V3 e02 e12 e22)
 
+instance Element DMat3 where
+    elemAlignmentStd140 _ = 32
+    elemStrideStd140 _ = 96
+
 instance Block DMat3x2 where
     alignmentStd140 _ = 16
-    sizeOfStd140 _ = 96
+    sizeOfStd140 _ = 48
     peekByteOffStd140 ptr off = do
         V2 e00 e10 <- Foreign.peekByteOff ptr off
         V2 e01 e11 <- Foreign.peekByteOff ptr (off + 16)
@@ -379,6 +529,10 @@ instance Block DMat3x2 where
         Foreign.pokeByteOff ptr off (V2 e00 e10)
         Foreign.pokeByteOff ptr (off + 16) (V2 e01 e11)
         Foreign.pokeByteOff ptr (off + 32) (V2 e02 e12)
+
+instance Element DMat3x2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 48
 
 instance Block DMat3x4 where
     alignmentStd140 _ = 32
@@ -396,6 +550,10 @@ instance Block DMat3x4 where
         Foreign.pokeByteOff ptr off (V4 e00 e10 e20 e30)
         Foreign.pokeByteOff ptr (off + 32) (V4 e01 e11 e21 e31)
         Foreign.pokeByteOff ptr (off + 64) (V4 e02 e12 e22 e32)
+
+instance Element DMat3x4 where
+    elemAlignmentStd140 _ = 32
+    elemStrideStd140 _ = 96
 
 instance Block DMat4 where
     alignmentStd140 _ = 32
@@ -416,6 +574,10 @@ instance Block DMat4 where
         Foreign.pokeByteOff ptr (off + 64) (V4 e02 e12 e22 e32)
         Foreign.pokeByteOff ptr (off + 96) (V4 e03 e13 e23 e33)
 
+instance Element DMat4 where
+    elemAlignmentStd140 _ = 32
+    elemStrideStd140 _ = 128
+
 instance Block DMat4x2 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 64
@@ -432,6 +594,10 @@ instance Block DMat4x2 where
         Foreign.pokeByteOff ptr (off + 16) (V2 e01 e11)
         Foreign.pokeByteOff ptr (off + 32) (V2 e02 e12)
         Foreign.pokeByteOff ptr (off + 48) (V2 e03 e13)
+
+instance Element DMat4x2 where
+    elemAlignmentStd140 _ = 16
+    elemStrideStd140 _ = 64
 
 instance Block DMat4x3 where
     alignmentStd140 _ = 32
@@ -450,3 +616,17 @@ instance Block DMat4x3 where
         Foreign.pokeByteOff ptr (off + 32) (V3 e01 e11 e21)
         Foreign.pokeByteOff ptr (off + 64) (V3 e02 e12 e22)
         Foreign.pokeByteOff ptr (off + 96) (V3 e03 e13 e23)
+
+instance Element DMat4x3 where
+    elemAlignmentStd140 _ = 32
+    elemStrideStd140 _ = 128
+
+instance (Element a, KnownNat n) => Block (SV.Vector n (Elem a)) where
+    alignmentStd140 _ = elemAlignmentStd140 (Proxy :: Proxy a)
+    sizeOfStd140 v = SV.length (asProxyTypeOf undefined v) * elemStrideStd140 (Proxy :: Proxy a)
+    peekByteOffStd140 ptr off =
+        let stride = elemStrideStd140 (Proxy :: Proxy a)
+        in SV.generateM $ \i -> Elem <$> peekByteOffStd140 ptr (off + stride * fromIntegral i)
+    pokeByteOffStd140 ptr off v =
+        let stride = elemStrideStd140 (Proxy :: Proxy a)
+        in SV.imapM_ (\i -> pokeByteOffStd140 ptr (off + stride * fromIntegral i) . unElem) v
