@@ -3,6 +3,9 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Graphics.Hree.GL.Block
     ( Block(..)
+    , Element(..)
+    , Elem(..)
+    , Std140(..)
     ) where
 
 import Data.Int (Int32)
@@ -52,6 +55,15 @@ instance Element a => Foreign.Storable (Elem a) where
     alignment _ = elemAlignmentStd140 (Proxy :: Proxy a)
     peekByteOff ptr off = Elem <$> peekByteOffStd140 ptr off
     pokeByteOff ptr off = pokeByteOffStd140 ptr off . unElem
+
+newtype Std140 a = Std140 { unStd140 :: a }
+    deriving (Show, Eq)
+
+instance Block a => Foreign.Storable (Std140 a) where
+    sizeOf _ = sizeOfStd140 (Proxy :: Proxy a)
+    alignment _ = alignmentStd140 (Proxy :: Proxy a)
+    peekByteOff ptr off = Std140 <$> peekByteOffStd140 ptr off
+    pokeByteOff ptr off = pokeByteOffStd140 ptr off . unStd140
 
 toBool :: Int32 -> Bool
 toBool 0 = False
