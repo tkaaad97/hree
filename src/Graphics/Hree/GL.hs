@@ -43,9 +43,9 @@ render commons a cur = do
     setCurrentProgram _ p = do
         bindUniformBlocks p . BV.mapMaybe toUniformBlockPair $ commons
         GLW.glUseProgram p
-    toUniformBlockPair (k, u) = do
+    toUniformBlockPair (k, bindingIndex) = do
         blockInfo <- Map.lookup k uniformBlocks
-        return (ubiUniformBlockIndex blockInfo, u)
+        return (bindingIndex, ubiUniformBlockIndex blockInfo)
 
 bindUniforms :: BV.Vector (GLW.UniformLocation, Uniform) -> IO ()
 bindUniforms = mapM_ bindUniform

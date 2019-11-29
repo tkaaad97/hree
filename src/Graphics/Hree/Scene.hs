@@ -84,7 +84,7 @@ renderScene scene camera = do
         state
     where
     cameraBlockBindingIndex = 1
-    ubbs = BV.singleton ("camera", cameraBlockBindingIndex)
+    ubbs = BV.singleton ("CameraBlock", cameraBlockBindingIndex)
     bindCamera maybeBinder = do
         cameraBlock <- updateCameraBlock camera
         ubb <- maybe (mkCameraBlockBinder scene cameraBlock) return maybeBinder
@@ -496,7 +496,12 @@ mkCameraBlockBinder :: Scene -> CameraBlock -> IO (UniformBlockBinder CameraBloc
 mkCameraBlockBinder scene block = do
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     addBufferResource scene buffer
-    newUniformBlockBinder buffer block
+    ubb <- newUniformBlockBinder buffer block
+    atomicModifyIORef' (sceneState scene) (setCameraBlockBinder ubb)
+    return ubb
+    where
+    setCameraBlockBinder ubb s =
+        (s { ssCameraBlockBinder = Just ubb }, ())
 
 newScene :: IO Scene
 newScene = do
