@@ -81,8 +81,8 @@ main =
             projection' = updateProjectionAspectRatio projection aspect
         updateProjection camera projection'
 
-    updateProjectionAspectRatio (Perspective fov _ near far) aspect =
-        Perspective fov aspect near far
+    updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
+        PerspectiveProjection $ Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
 
     mkTexture :: Scene -> IO Texture

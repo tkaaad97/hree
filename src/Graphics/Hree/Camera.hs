@@ -1,6 +1,8 @@
 module Graphics.Hree.Camera
     ( Camera
     , LookAt(..)
+    , Orthographic(..)
+    , Perspective(..)
     , Projection(..)
     , lookAt
     , newCamera
@@ -34,27 +36,32 @@ data LookAt = LookAt
     , lookAtUp     :: !(V3 Float)
     } deriving (Show, Eq)
 
+data Perspective = Perspective
+    { perspectiveFov    :: !Float
+    , perspectiveAspect :: !Float
+    , perspectiveNear   :: !Float
+    , perspectiveFar    :: !Float
+    } deriving (Show, Eq)
+
+data Orthographic = Orthographic
+    { orthographicLeft   :: !Float
+    , orthographicRight  :: !Float
+    , orthographicBottom :: !Float
+    , orthographicTop    :: !Float
+    , orthographicNear   :: !Float
+    , orthographicFar    :: !Float
+    } deriving (Show, Eq)
+
 data Projection =
-    Perspective
-        !Float -- perspectiveFov
-        !Float -- perspectiveAspect
-        !Float -- perspectiveNear
-        !Float -- perspectiveFar
-    |
-    Orthographic
-        !Float -- orthographicLeft
-        !Float -- orthographicRight
-        !Float -- orthographicBottom
-        !Float -- orthographicTop
-        !Float -- orthographicNear
-        !Float -- orthographicFar
+    PerspectiveProjection !Perspective |
+    OrthographicProjection !Orthographic
     deriving (Show, Eq)
 
 perspective :: Float -> Float -> Float -> Float -> Projection
-perspective = Perspective
+perspective fov aspect near far = PerspectiveProjection $ Perspective fov aspect near far
 
 orthographic :: Float -> Float -> Float -> Float -> Float -> Float -> Projection
-orthographic = Orthographic
+orthographic left right bottom top near far = OrthographicProjection $ Orthographic left right bottom top near far
 
 lookAt :: V3 Float -> V3 Float -> V3 Float -> LookAt
 lookAt eye center up = LookAt eye center (Linear.normalize up)
@@ -73,8 +80,8 @@ getCameraMatrices (Camera cameraRef) =
     f a @ (CameraState _ _ pm vm False) = (a, (pm, vm))
 
 projectionMatrix :: Projection -> M44 Float
-projectionMatrix (Perspective fov aspect near far) = Linear.perspective fov aspect near far
-projectionMatrix (Orthographic left right bottom top near far) = Linear.ortho left right bottom top near far
+projectionMatrix (PerspectiveProjection (Perspective fov aspect near far)) = Linear.perspective fov aspect near far
+projectionMatrix (OrthographicProjection (Orthographic left right bottom top near far)) = Linear.ortho left right bottom top near far
 
 lookAtMatrix :: LookAt -> M44 Float
 lookAtMatrix (LookAt eye center up) = Linear.lookAt eye center up
