@@ -15,16 +15,17 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (mapMaybe)
-import Data.Proxy (Proxy(..))
-import qualified Data.Vector.Storable as V
+import Data.Proxy (Proxy(..), asProxyTypeOf)
+import qualified Data.Vector as BV (Vector, generate, mapMaybe, zip)
+import qualified Data.Vector.Storable as SV
 import qualified Foreign (Storable(..), castPtr)
 import qualified GLW
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
+import qualified Graphics.GL as GL (GLuint)
 import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
 
-render :: [(ByteString, Uniform)] -> RenderInfo -> Maybe GLW.Program -> IO (Maybe GLW.Program)
+render :: BV.Vector (ByteString, GL.GLuint) -> RenderInfo -> Maybe GLW.Program -> IO (Maybe GLW.Program)
 render commons a cur = do
     setCurrentProgram cur program
     GLW.glBindVertexArray (riVertexArray a)
@@ -34,31 +35,38 @@ render commons a cur = do
     return . Just $ program
     where
     program = programInfoProgram . riProgram $ a
-    uniformLocations = programInfoUniformLocations . riProgram $ a
+    uniformBlocks = programInfoUniformBlocks . riProgram $ a
     method = riDrawMethod a
     uniforms = riUniforms a
     textures = riTextures a
     setCurrentProgram (Just p0) p1 | p0 == p1 = return ()
     setCurrentProgram _ p = do
-        bindUniforms . mapMaybe toUniformPair $ commons
+        bindUniformBlocks p . BV.mapMaybe toUniformBlockPair $ commons
         GLW.glUseProgram p
-    toUniformPair (k, u) =
-        (,) <$> Map.lookup k uniformLocations <*> Just u
+    toUniformBlockPair (k, u) = do
+        blockInfo <- Map.lookup k uniformBlocks
+        return (ubiUniformBlockIndex blockInfo, u)
 
-bindUniforms :: [(GLW.UniformLocation, Uniform)] -> IO ()
+bindUniforms :: BV.Vector (GLW.UniformLocation, Uniform) -> IO ()
 bindUniforms = mapM_ bindUniform
     where
     bindUniform (uniformLocation, Uniform a) =
         GLW.uniform uniformLocation a
 
-bindTextures :: [Texture] -> IO ()
-bindTextures textures = mapM_ bindTexture $ zip [0..(length textures - 1)] textures
+bindUniformBlocks :: GLW.Program -> BV.Vector (GL.GLuint, GL.GLuint) -> IO ()
+bindUniformBlocks program = mapM_ bindUniformBlockBinding
+    where
+    bindUniformBlockBinding (bindingIndex, blockIndex) =
+        GLW.glUniformBlockBinding program blockIndex bindingIndex
+
+bindTextures :: BV.Vector Texture -> IO ()
+bindTextures textures = mapM_ bindTexture $ BV.zip (BV.generate (length textures) id) textures
     where
     bindTexture (index, Texture (texture, sampler)) = do
         GLW.glBindTextureUnit (fromIntegral index) texture
         GLW.glBindSampler (fromIntegral index) sampler
 
-renderMany :: Foldable t => [(ByteString, Uniform)] -> t RenderInfo -> IO ()
+renderMany :: Foldable t => BV.Vector (ByteString, GL.GLuint) -> t RenderInfo -> IO ()
 renderMany common = void . foldrM (render common) Nothing
 
 drawWith :: DrawMethod -> IO ()
@@ -68,11 +76,16 @@ drawWith (DrawArraysInstanced mode index num inum) = GLW.glDrawArraysInstanced m
 drawWith (DrawElementsInstanced mode num dataType indices inum) = GLW.glDrawElementsInstanced mode num dataType indices inum
 
 mkBuffer :: BufferSource -> IO GLW.Buffer
-mkBuffer (BufferSourceVector vec usage) = do
-    let n = V.length vec
-        size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
+mkBuffer (BufferSourcePtr ptr usage) = do
+    let size = fromIntegral $ Foreign.sizeOf (asProxyTypeOf undefined ptr)
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
-    V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
+    GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
+    return buffer
+mkBuffer (BufferSourceVector vec usage) = do
+    let n = SV.length vec
+        size = fromIntegral $ n * Foreign.sizeOf (SV.head vec)
+    buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
+    SV.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
     return buffer
 mkBuffer (BufferSourceByteString bs usage) = do
     let size = fromIntegral $ ByteString.length bs
@@ -81,10 +94,13 @@ mkBuffer (BufferSourceByteString bs usage) = do
     return buffer
 
 updateBuffer :: GLW.Buffer -> BufferSource -> IO ()
+updateBuffer buffer (BufferSourcePtr ptr usage) = do
+    let size = fromIntegral . Foreign.sizeOf $ asProxyTypeOf undefined ptr
+    GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
 updateBuffer buffer (BufferSourceVector vec usage) = do
-    let n = V.length vec
-        size = fromIntegral $ n * Foreign.sizeOf (V.head vec)
-    V.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
+    let n = SV.length vec
+        size = fromIntegral $ n * Foreign.sizeOf (SV.head vec)
+    SV.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
 updateBuffer buffer (BufferSourceByteString bs usage) = do
     let size = fromIntegral $ ByteString.length bs
     ByteString.unsafeUseAsCString bs $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage

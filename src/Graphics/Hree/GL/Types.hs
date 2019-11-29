@@ -7,7 +7,6 @@ module Graphics.Hree.GL.Types
     ( AttribBinding(..)
     , AttribFormat(..)
     , AttribInfo(..)
-    , BindingIndex
     , BufferSource(..)
     , BindBufferSetting(..)
     , DrawMethod(..)
@@ -59,8 +58,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Vector as BV (Vector)
 import qualified Data.Vector.Storable as SV (Vector)
 import Data.Word (Word32)
-import Foreign.Ptr (Ptr)
-import Foreign.Storable (Storable)
+import Foreign (Ptr, Storable)
 import qualified GLW
 import qualified Graphics.GL as GL
 import Linear (M22, M23, M24, M32, M33, M34, M42, M43, M44, V2, V3, V4)
@@ -111,8 +109,8 @@ data RenderInfo = RenderInfo
     { riProgram     :: !ProgramInfo
     , riDrawMethod  :: !DrawMethod
     , riVertexArray :: !GLW.VertexArray
-    , riUniforms    :: ![(GLW.UniformLocation, Uniform)]
-    , riTextures    :: ![Texture]
+    , riUniforms    :: !(BV.Vector (GLW.UniformLocation, Uniform))
+    , riTextures    :: !(BV.Vector Texture)
     }
 
 data DrawMethod =
@@ -123,10 +121,9 @@ data DrawMethod =
     deriving (Show, Eq)
 
 data BufferSource =
+    forall a. Storable a => BufferSourcePtr !(Ptr a) !GL.GLenum |
     forall a. Storable a => BufferSourceVector !(SV.Vector a) !GL.GLenum |
     BufferSourceByteString !ByteString !GL.GLenum
-
-type BindingIndex = Int
 
 data BindBufferSetting = BindBufferSetting
     { bindBufferSettingOffset  :: !Int

@@ -43,7 +43,7 @@ import Data.Either (either)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybe)
+import Data.Maybe (catMaybes, fromMaybe, maybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
@@ -61,6 +61,7 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.GL
 import Graphics.Hree.GL.Types
+import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
@@ -73,23 +74,26 @@ import qualified System.Random.MWC as Random (asGenIO, uniformR,
 
 renderScene :: Scene -> Camera -> IO ()
 renderScene scene camera = do
-    (projectionMatrix, viewMatrix) <- getCameraMatrices camera
-    LookAt eye _ _ <- getCameraLookAt camera
     GLW.glClearColor 1 1 1 1
     GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
     state <- readIORef . sceneState $ scene
+    bindCamera (ssCameraBlockBinder state)
     renderNodes
-        [ ("projectionMatrix", Uniform projectionMatrix)
-        , ("viewMatrix", Uniform viewMatrix)
-        , ("viewPosition", Uniform eye)
-        ]
+        ubbs
         scene
         state
+    where
+    cameraBlockBindingIndex = 1
+    ubbs = BV.singleton ("camera", cameraBlockBindingIndex)
+    bindCamera maybeBinder = do
+        cameraBlock <- updateCameraBlock camera
+        ubb <- maybe (mkCameraBlockBinder scene cameraBlock) return maybeBinder
+        updateAndBindUniformBuffer ubb cameraBlock cameraBlockBindingIndex
 
-renderNodes :: [(ByteString, Uniform)] -> Scene -> SceneState -> IO ()
-renderNodes uniforms scene state = do
+renderNodes :: BV.Vector (ByteString, GL.GLuint) -> Scene -> SceneState -> IO ()
+renderNodes ubbs scene state = do
     _ <- runMaybeT $ updateNodeMatrices scene state
-    maybe (return ()) (renderMany uniforms) =<< runMaybeT (nodeToRenderInfos scene state)
+    maybe (return ()) (renderMany ubbs) =<< runMaybeT (nodeToRenderInfos scene state)
     return ()
 
 foldNodes :: Scene -> SceneState -> (NodeInfo -> a -> b -> MaybeT IO (a, b)) -> a -> b -> MaybeT IO b
@@ -161,8 +165,8 @@ nodeToRenderInfos scene state =
 toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> Mat4 -> RenderInfo
 toRenderInfo program defaultTexture meshInfo matrix =
     let maybeUniform = toUniformEntry ("modelMatrix", Uniform matrix)
-        uniforms = mapMaybe toUniformEntry $ Map.toList (materialUniforms material) ++ textureUniforms
-        uniforms' = maybe uniforms (: uniforms) maybeUniform
+        uniforms = BV.mapMaybe toUniformEntry $ (BV.fromList . Map.toList $ materialUniforms material) `mappend` textureUniforms
+        uniforms' = maybe uniforms (BV.snoc uniforms) maybeUniform
         renderInfo = RenderInfo program dm vao uniforms' textures
     in renderInfo
     where
@@ -174,11 +178,11 @@ toRenderInfo program defaultTexture meshInfo matrix =
     toUniformEntry (uniformName, uniform) = do
         uniformLocation <- Map.lookup uniformName uniformLocations
         return (uniformLocation, uniform)
-    mtextures = Map.toList $ materialTextures material
+    mtextures = BV.fromList . Map.toList $ materialTextures material
     textures = if null mtextures
-        then [defaultTexture]
-        else map snd mtextures
-    textureUniforms = zip (map fst mtextures) (map Uniform ([0..] :: [GL.GLint]))
+        then BV.singleton defaultTexture
+        else BV.map snd mtextures
+    textureUniforms = BV.zip (BV.map fst mtextures) (BV.generate (BV.length textures) (Uniform . (fromIntegral :: Int -> GL.GLuint)))
 
 resolveDrawMethod :: Mesh -> DrawMethod
 resolveDrawMethod mesh =
@@ -323,11 +327,16 @@ updateMeshInstanceCount scene meshId c =
 addBuffer :: Scene -> BufferSource -> IO GLW.Buffer
 addBuffer scene bufferSource = do
     buffer <- mkBuffer bufferSource
-    atomicModifyIORef' (sceneState scene) (addBufferFunc buffer)
+    addBufferResource scene buffer
+    return buffer
+
+addBufferResource :: Scene -> GLW.Buffer -> IO ()
+addBufferResource scene buffer =
+    atomicModifyIORef' (sceneState scene) addBufferFunc
     where
-    addBufferFunc buffer state =
+    addBufferFunc state =
         let buffers = buffer : ssBuffers state
-        in (state { ssBuffers = buffers }, buffer)
+        in (state { ssBuffers = buffers }, ())
 
 addIndexBufferUByte :: Scene -> SV.Vector Word8 -> IO IndexBuffer
 addIndexBufferUByte scene v = do
@@ -483,6 +492,12 @@ mkDefaultTexture scene = Foreign.withArray [255, 255, 255, 255] $ \p -> do
     setDefaultTexture a s =
         (s { ssDefaultTexture = Just a }, ())
 
+mkCameraBlockBinder :: Scene -> CameraBlock -> IO (UniformBlockBinder CameraBlock)
+mkCameraBlockBinder scene block = do
+    buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
+    addBufferResource scene buffer
+    newUniformBlockBinder buffer block
+
 newScene :: IO Scene
 newScene = do
     ref <- newIORef initialSceneState
@@ -506,8 +521,9 @@ initialSceneState =
         textures = mempty
         samplers = mempty
         defaultTexture = Nothing
+        cameraBlockBuffer = Nothing
         programs = mempty
-    in SceneState meshCounter nodeCounter rootNodes buffers textures samplers defaultTexture programs
+    in SceneState meshCounter nodeCounter rootNodes buffers textures samplers defaultTexture cameraBlockBuffer programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do

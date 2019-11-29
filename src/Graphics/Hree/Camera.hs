@@ -1,5 +1,6 @@
 module Graphics.Hree.Camera
     ( Camera
+    , CameraBlock
     , LookAt(..)
     , Orthographic(..)
     , Perspective(..)
@@ -9,20 +10,18 @@ module Graphics.Hree.Camera
     , orthographic
     , perspective
     , getCameraLookAt
-    , getCameraMatrices
     , getCameraProjection
+    , updateCameraBlock
     , updateProjection
     , updateLookAt
     ) where
 
-import Control.Monad (when)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
-import qualified Foreign (ForeignPtr, mallocForeignPtr, poke, withForeignPtr)
-import Graphics.Hree.GL.Block (Block(..), Std140(..))
+import Graphics.Hree.GL.Block (Block(..))
 import Graphics.Hree.GL.Types (Mat4, Vec3)
 import qualified Linear (identity, lookAt, normalize, ortho, perspective)
 
-data Camera = Camera !(IORef CameraState) !(Foreign.ForeignPtr (Std140 CameraBlock))
+newtype Camera = Camera (IORef CameraState)
 
 data CameraState = CameraState
     { cameraProjection            :: !Projection
@@ -92,36 +91,22 @@ lookAt eye center up = LookAt eye center (Linear.normalize up)
 newCamera :: Projection -> LookAt -> IO Camera
 newCamera p l = do
     state <- newIORef (CameraState p l Linear.identity Linear.identity True)
-    ptr <- Foreign.mallocForeignPtr
-    let camera = Camera state ptr
+    let camera = Camera state
     _ <- updateCameraBlock camera
     return camera
 
-getCameraMatrices :: Camera -> IO (Mat4, Mat4)
-getCameraMatrices (Camera cameraRef _) =
+updateCameraBlock :: Camera -> IO CameraBlock
+updateCameraBlock (Camera cameraRef) =
     atomicModifyIORef' cameraRef f
     where
     f (CameraState p l _ _ True) =
         let pm = projectionMatrix p
             vm = lookAtMatrix l
-        in (CameraState p l pm vm False, (pm, vm))
-    f a @ (CameraState _ _ pm vm False) = (a, (pm, vm))
-
-updateCameraBlock :: Camera -> IO CameraBlock
-updateCameraBlock (Camera cameraRef ptr) = do
-    (updated, block) <- atomicModifyIORef' cameraRef f
-    when updated $
-        Foreign.withForeignPtr ptr (`Foreign.poke` Std140 block)
-    return block
-    where
-    f (CameraState p l _ _ True) =
-        let pm = projectionMatrix p
-            vm = lookAtMatrix l
-            LookAt eye _ _ = l
-        in (CameraState p l pm vm False, (True, CameraBlock pm vm eye))
+            block = CameraBlock pm vm (lookAtEye l)
+        in (CameraState p l pm vm False, block)
     f a @ (CameraState _ l pm vm False) =
-        let LookAt eye _ _ = l
-        in (a, (False, CameraBlock pm vm eye))
+        let block = CameraBlock pm vm (lookAtEye l)
+        in (a, block)
 
 projectionMatrix :: Projection -> Mat4
 projectionMatrix (PerspectiveProjection (Perspective fov aspect near far)) = Linear.perspective fov aspect near far
@@ -131,19 +116,19 @@ lookAtMatrix :: LookAt -> Mat4
 lookAtMatrix (LookAt eye center up) = Linear.lookAt eye center up
 
 updateProjection :: Camera -> Projection -> IO ()
-updateProjection (Camera cameraRef _) p =
+updateProjection (Camera cameraRef) p =
     atomicModifyIORef' cameraRef f
     where
     f (CameraState _ l pm vm _) = (CameraState p l pm vm True, ())
 
 updateLookAt :: Camera -> LookAt -> IO ()
-updateLookAt (Camera cameraRef _) l =
+updateLookAt (Camera cameraRef) l =
     atomicModifyIORef' cameraRef f
     where
     f (CameraState p _ pm vm _) = (CameraState p l pm vm True, ())
 
 getCameraLookAt :: Camera -> IO LookAt
-getCameraLookAt (Camera cameraRef _) = cameraLookAt <$> readIORef cameraRef
+getCameraLookAt (Camera cameraRef) = cameraLookAt <$> readIORef cameraRef
 
 getCameraProjection :: Camera -> IO Projection
-getCameraProjection (Camera cameraRef _) = cameraProjection <$> readIORef cameraRef
+getCameraProjection (Camera cameraRef) = cameraProjection <$> readIORef cameraRef

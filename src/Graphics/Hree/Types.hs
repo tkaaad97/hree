@@ -26,7 +26,9 @@ import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import Foreign (Storable)
 import qualified GLW
+import Graphics.Hree.Camera
 import Graphics.Hree.GL.Types
+import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Math
 import Graphics.Hree.Program
 
@@ -99,14 +101,15 @@ data Scene = Scene
     }
 
 data SceneState = SceneState
-    { ssMeshCounter    :: !MeshId
-    , ssNodeCounter    :: !NodeId
-    , ssRootNodes      :: !(BV.Vector NodeId)
-    , ssBuffers        :: ![GLW.Buffer]
-    , ssTextures       :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
-    , ssSamplers       :: !(Map ByteString GLW.Sampler)
-    , ssDefaultTexture :: !(Maybe Texture)
-    , ssPrograms       :: !(Map ProgramName ProgramInfo)
+    { ssMeshCounter       :: !MeshId
+    , ssNodeCounter       :: !NodeId
+    , ssRootNodes         :: !(BV.Vector NodeId)
+    , ssBuffers           :: ![GLW.Buffer]
+    , ssTextures          :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
+    , ssSamplers          :: !(Map ByteString GLW.Sampler)
+    , ssDefaultTexture    :: !(Maybe Texture)
+    , ssCameraBlockBinder :: !(Maybe (UniformBlockBinder CameraBlock))
+    , ssPrograms          :: !(Map ProgramName ProgramInfo)
     } deriving (Show)
 
 data Skin = Skin

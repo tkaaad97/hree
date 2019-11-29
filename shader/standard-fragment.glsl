@@ -13,8 +13,12 @@ in vec4 fragmentColor;
 
 out vec4 outColor;
 
-uniform mat4 viewMatrix = mat4(1.0);
-uniform vec3 viewPosition = vec3(0.0);
+layout(std140) uniform CameraBlock {
+    mat4 projectionMatrix;
+    mat4 viewMatrix;
+    vec3 viewPosition;
+} camera;
+
 uniform vec4 baseColorFactor = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float metallicFactor = 1.0;
 uniform float roughnessFactor = 1.0;
@@ -140,7 +144,7 @@ void main()
 {
     float metallic = clamp(metallicFactor, 0.0, 1.0);
     float roughness = clamp(roughnessFactor, 0.0, 1.0);
-    vec3 view = viewPosition - fragmentPosition;
+    vec3 view = camera.viewPosition - fragmentPosition;
     vec3 normal = getNormal();
     vec3 light = directionalLight;
     vec4 color = sRGBToLinear(texture2D(baseColorTexture, fragmentUv)) * baseColorFactor;
