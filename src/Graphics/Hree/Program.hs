@@ -36,7 +36,7 @@ import qualified Data.ByteString as ByteString (intercalate)
 import qualified Data.ByteString.Char8 as ByteString (pack, packCStringLen,
                                                       useAsCString,
                                                       useAsCStringLen)
-import Data.FileEmbed (embedFile)
+import Data.FilePreprocess (preprocessFile)
 import Data.Hashable (Hashable(..))
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
@@ -202,18 +202,18 @@ mkProgram' vsource fsource = do
     return $ ProgramInfo program attribMap uniformMap uniformLocationMap uniformBlockMap
 
 getEmbeddedVertexShaderSource :: EmbeddedProgramType -> ByteString
-getEmbeddedVertexShaderSource BasicProgram = $(embedFile "shader/basic-vertex.glsl")
-getEmbeddedVertexShaderSource FlatColorProgram = $(embedFile "shader/flat-color-vertex.glsl")
-getEmbeddedVertexShaderSource SpriteProgram = $(embedFile "shader/sprite-vertex.glsl")
-getEmbeddedVertexShaderSource StandardProgram = $(embedFile "shader/standard-vertex.glsl")
-getEmbeddedVertexShaderSource TestProgram = $(embedFile "shader/test-vertex.glsl")
+getEmbeddedVertexShaderSource BasicProgram = $(preprocessFile "shader/basic-vertex.glsl" "shader/lib")
+getEmbeddedVertexShaderSource FlatColorProgram = $(preprocessFile "shader/flat-color-vertex.glsl" "shader/lib")
+getEmbeddedVertexShaderSource SpriteProgram = $(preprocessFile "shader/sprite-vertex.glsl" "shader/lib")
+getEmbeddedVertexShaderSource StandardProgram = $(preprocessFile "shader/standard-vertex.glsl" "shader/lib")
+getEmbeddedVertexShaderSource TestProgram = $(preprocessFile "shader/test-vertex.glsl" "shader/lib")
 
 getEmbeddedFragmentShaderSource :: EmbeddedProgramType -> ByteString
-getEmbeddedFragmentShaderSource BasicProgram = $(embedFile "shader/basic-fragment.glsl")
-getEmbeddedFragmentShaderSource FlatColorProgram = $(embedFile "shader/flat-color-fragment.glsl")
-getEmbeddedFragmentShaderSource SpriteProgram = $(embedFile "shader/sprite-fragment.glsl")
-getEmbeddedFragmentShaderSource StandardProgram = $(embedFile "shader/standard-fragment.glsl")
-getEmbeddedFragmentShaderSource TestProgram = $(embedFile "shader/test-fragment.glsl")
+getEmbeddedFragmentShaderSource BasicProgram = $(preprocessFile "shader/basic-fragment.glsl" "shader/lib")
+getEmbeddedFragmentShaderSource FlatColorProgram = $(preprocessFile "shader/flat-color-fragment.glsl" "shader/lib")
+getEmbeddedFragmentShaderSource SpriteProgram = $(preprocessFile "shader/sprite-fragment.glsl" "shader/lib")
+getEmbeddedFragmentShaderSource StandardProgram = $(preprocessFile "shader/standard-fragment.glsl" "shader/lib")
+getEmbeddedFragmentShaderSource TestProgram = $(preprocessFile "shader/test-fragment.glsl" "shader/lib")
 
 renderOptions :: Options -> ByteString
 renderOptions options = ByteString.intercalate "\n" . catMaybes $

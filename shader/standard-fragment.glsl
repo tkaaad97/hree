@@ -13,11 +13,7 @@ in vec4 fragmentColor;
 
 out vec4 outColor;
 
-layout(std140) uniform CameraBlock {
-    mat4 projectionMatrix;
-    mat4 viewMatrix;
-    vec3 viewPosition;
-} camera;
+#include <camerablock.glsl>
 
 uniform vec4 baseColorFactor = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float metallicFactor = 1.0;

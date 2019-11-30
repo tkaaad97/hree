@@ -8,11 +8,7 @@ in vec2 uvSize;
 
 out vec2 fragmentUv;
 
-layout(std140) uniform CameraBlock {
-    mat4 projectionMatrix;
-    mat4 viewMatrix;
-    vec3 viewPosition;
-} camera;
+#include <camerablock.glsl>
 
 uniform mat4 modelMatrix = mat4(1.0);
 uniform vec3 rotateAxis = vec3(0.0, 0.0, 1.0);

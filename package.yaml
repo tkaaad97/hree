@@ -7,7 +7,7 @@ maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
 
 extra-source-files:
-- README.md
+- shader/**/*.glsl
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -37,6 +37,7 @@ dependencies:
 - hashtables
 - linear
 - mwc-random
+- template-haskell
 - text
 - transformers
 - vector

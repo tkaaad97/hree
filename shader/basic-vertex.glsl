@@ -9,11 +9,7 @@ out vec2 fragmentUv;
 out vec4 fragmentColor;
 #endif
 
-layout(std140) uniform CameraBlock {
-    mat4 projectionMatrix;
-    mat4 viewMatrix;
-    vec3 viewPosition;
-} camera;
+#include <camerablock.glsl>
 
 uniform mat4 modelMatrix = mat4(1.0);
 
