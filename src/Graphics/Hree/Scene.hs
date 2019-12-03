@@ -9,6 +9,7 @@ module Graphics.Hree.Scene
     , addIndexBufferUByte
     , addIndexBufferUInt
     , addIndexBufferUShort
+    , addLight
     , addMesh
     , addNode
     , addRootNodes
@@ -19,11 +20,13 @@ module Graphics.Hree.Scene
     , mkDefaultTextureIfNotExists
     , newNode
     , newScene
+    , removeLight
     , removeMesh
     , removeNode
     , renderScene
     , rotateNode
     , translateNode
+    , updateLight
     , updateMeshInstanceCount
     , updateNode
     ) where
@@ -60,6 +63,7 @@ import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.GL
+import Graphics.Hree.GL.Block (Elem(..))
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
@@ -451,6 +455,29 @@ addSamplerInternal renameOnConflict scene name =
             r <- atomicModifyIORef' (sceneState scene) (addSamplerFunc name' sampler)
             maybe (tryAddSampler prefix sampler (count - 1)) return r
 
+addLight :: Scene -> Light -> IO LightId
+addLight scene light = do
+    lightId <- atomicModifyIORef' (sceneState scene) addLightFunc
+    let lightElem = Elem . marshalLight $ light
+    Component.addComponent lightId lightElem (sceneLightStore scene)
+    return lightId
+    where
+    addLightFunc state =
+        let lightId = ssLightCounter state
+            lightIdNext = lightId + 1
+            newState = state { ssLightCounter = lightIdNext }
+        in (newState, lightId)
+
+removeLight :: Scene -> LightId -> IO ()
+removeLight scene lightId =
+    void $ Component.removeComponent lightId (sceneLightStore scene)
+
+updateLight :: Scene -> LightId -> (Light -> Light) -> IO Bool
+updateLight scene lightId f =
+    Component.modifyComponent lightId g (sceneLightStore scene)
+    where
+    g = Elem . marshalLight . f . unmarshalLight . unElem
+
 --setBackground
 
 mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)
@@ -523,6 +550,7 @@ initialSceneState :: SceneState
 initialSceneState =
     let meshCounter = MeshId 1
         nodeCounter = NodeId 1
+        lightCounter = LightId 1
         rootNodes = BV.empty
         buffers = mempty
         textures = mempty
@@ -531,7 +559,7 @@ initialSceneState =
         cameraBlockBinder = Nothing
         lightBlockBinder = Nothing
         programs = mempty
-    in SceneState meshCounter nodeCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder programs
+    in SceneState meshCounter nodeCounter lightCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do

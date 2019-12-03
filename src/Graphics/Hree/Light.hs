@@ -26,9 +26,10 @@ import Graphics.Hree.GL.Types (Vec2, Vec3)
 import Linear (Additive(zero))
 
 data Light =
-    DirectionalLight' DirectionalLight |
-    PointLight' PointLight |
-    SpotLight' SpotLight
+    DirectionalLight' !DirectionalLight |
+    PointLight' !PointLight |
+    SpotLight' !SpotLight |
+    UnknownLight !LightStruct
     deriving (Show, Eq)
 
 data DirectionalLight = DirectionalLight
@@ -85,13 +86,14 @@ marshalLight (PointLight' (PointLight position range color intensity)) =
     LightStruct Linear.zero range color intensity position 0 0 pointLightType Linear.zero
 marshalLight (SpotLight' (SpotLight position direction range inner outer color intensity)) =
     LightStruct direction range color intensity position inner outer spotLightType Linear.zero
+marshalLight (UnknownLight a) = a
 
-unmarshalLight :: LightStruct -> Maybe Light
+unmarshalLight :: LightStruct -> Light
 unmarshalLight a
-    | lightType a == directionalLightType = Just . DirectionalLight' $ DirectionalLight (lightDirection a) (lightColor a) (lightIntensity a)
-    | lightType a == pointLightType = Just . PointLight' $ PointLight (lightPosition a) (lightRange a) (lightColor a) (lightIntensity a)
-    | lightType a == spotLightType = Just . SpotLight' $ SpotLight (lightPosition a) (lightDirection a) (lightRange a) (lightInnerConeAngle a) (lightOuterConeAngle a) (lightColor a) (lightIntensity a)
-    | otherwise = Nothing
+    | lightType a == directionalLightType = DirectionalLight' $ DirectionalLight (lightDirection a) (lightColor a) (lightIntensity a)
+    | lightType a == pointLightType = PointLight' $ PointLight (lightPosition a) (lightRange a) (lightColor a) (lightIntensity a)
+    | lightType a == spotLightType = SpotLight' $ SpotLight (lightPosition a) (lightDirection a) (lightRange a) (lightInnerConeAngle a) (lightOuterConeAngle a) (lightColor a) (lightIntensity a)
+    | otherwise = UnknownLight a
 
 instance Block LightStruct where
     alignmentStd140 _ = 16

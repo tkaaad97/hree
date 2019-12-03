@@ -111,6 +111,7 @@ data Scene = Scene
 data SceneState = SceneState
     { ssMeshCounter       :: !MeshId
     , ssNodeCounter       :: !NodeId
+    , ssLightCounter      :: !LightId
     , ssRootNodes         :: !(BV.Vector NodeId)
     , ssBuffers           :: ![GLW.Buffer]
     , ssTextures          :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
