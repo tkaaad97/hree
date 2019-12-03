@@ -14,6 +14,7 @@ in vec4 fragmentColor;
 out vec4 outColor;
 
 #include <camerablock.glsl>
+#include <lightblock.glsl>
 
 uniform vec4 baseColorFactor = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float metallicFactor = 1.0;
