@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Graphics.Hree.Types
     ( Geometry(..)
+    , LightId(..)
     , Material(..)
     , Mesh(..)
     , MeshId(..)
@@ -27,8 +28,10 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import Foreign (Storable)
 import qualified GLW
 import Graphics.Hree.Camera
+import Graphics.Hree.GL.Block (Elem)
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
+import Graphics.Hree.Light
 import Graphics.Hree.Math
 import Graphics.Hree.Program
 
@@ -47,6 +50,10 @@ data Material = Material
 
 instance Show Material where
     show (Material us ts _) = "Material { materialUniforms = " ++ show us ++ ", materialTextures = " ++ show ts ++ ", materialProgramSpec = Function }"
+
+newtype LightId = LightId
+    { unLightId :: Int
+    } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
 
 newtype MeshId = MeshId
     { unMeshId :: Int
@@ -97,6 +104,7 @@ data Scene = Scene
     , sceneNodeTransformStore             :: !(Component.ComponentStore MSV.MVector NodeId Transform)
     , sceneNodeTransformMatrixStore       :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
     , sceneNodeGlobalTransformMatrixStore :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
+    , sceneLightStore                     :: !(Component.ComponentStore MSV.MVector LightId (Elem LightStruct))
     , sceneSkinStore                      :: !(Component.ComponentStore MBV.MVector SkinId Skin)
     }
 
@@ -109,6 +117,7 @@ data SceneState = SceneState
     , ssSamplers          :: !(Map ByteString GLW.Sampler)
     , ssDefaultTexture    :: !(Maybe Texture)
     , ssCameraBlockBinder :: !(Maybe (UniformBlockBinder CameraBlock))
+    , ssLightBlockBinder  :: !(Maybe (UniformBlockBinder LightBlock))
     , ssPrograms          :: !(Map ProgramName ProgramInfo)
     } deriving (Show)
 

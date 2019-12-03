@@ -62,6 +62,7 @@ import Graphics.Hree.Camera
 import Graphics.Hree.GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
+import Graphics.Hree.Light
 import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
@@ -511,8 +512,9 @@ newScene = do
     transforms <- Component.newComponentStore defaultPreserveSize Proxy
     matrices <- Component.newComponentStore defaultPreserveSize Proxy
     globalMatrices <- Component.newComponentStore defaultPreserveSize Proxy
+    lights <- Component.newComponentStore maxLightCount Proxy
     skins <- Component.newComponentStore defaultPreserveSize Proxy
-    return $ Scene ref meshes nodes transforms matrices globalMatrices skins
+    return $ Scene ref meshes nodes transforms matrices globalMatrices lights skins
 
 defaultPreserveSize :: Int
 defaultPreserveSize = 10
@@ -526,9 +528,10 @@ initialSceneState =
         textures = mempty
         samplers = mempty
         defaultTexture = Nothing
-        cameraBlockBuffer = Nothing
+        cameraBlockBinder = Nothing
+        lightBlockBinder = Nothing
         programs = mempty
-    in SceneState meshCounter nodeCounter rootNodes buffers textures samplers defaultTexture cameraBlockBuffer programs
+    in SceneState meshCounter nodeCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
@@ -539,13 +542,21 @@ deleteScene scene = do
     GLW.deleteObjects buffers
     GLW.deleteObjects textures
     Component.cleanComponentStore meshStore defaultPreserveSize
+    Component.cleanComponentStore nodeStore defaultPreserveSize
     Component.cleanComponentStore transformStore defaultPreserveSize
     Component.cleanComponentStore matrixStore defaultPreserveSize
+    Component.cleanComponentStore globalMatrixStore defaultPreserveSize
+    Component.cleanComponentStore lightStore maxLightCount
+    Component.cleanComponentStore skinStore defaultPreserveSize
 
     where
     meshStore = sceneMeshStore scene
+    nodeStore = sceneNodeStore scene
     transformStore = sceneNodeTransformStore scene
-    matrixStore = sceneNodeTransformStore scene
+    matrixStore = sceneNodeTransformMatrixStore scene
+    globalMatrixStore = sceneNodeGlobalTransformMatrixStore scene
+    lightStore = sceneLightStore scene
+    skinStore = sceneSkinStore scene
     deleteSceneFunc state =
         let buffers = ssBuffers state
             textures = Map.elems . ssTextures $ state

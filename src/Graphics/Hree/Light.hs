@@ -2,17 +2,19 @@
 {-# LANGUAGE KindSignatures #-}
 module Graphics.Hree.Light
     ( Light(..)
+    , LightBlock(..)
+    , LightStruct(..)
+    , MaxLightCount
     , DirectionalLight(..)
     , PointLight(..)
     , SpotLight(..)
-    , LightBlock(..)
-    , MaxLightCount
     , directionalLightType
+    , lightsByteSize
+    , marshalLight
+    , maxLightCount
     , pointLightType
     , spotLightType
-    , marshalLight
     , unmarshalLight
-    , lightsByteSize
     ) where
 
 import Data.Int (Int32)
@@ -135,5 +137,8 @@ instance Block LightBlock where
         pokeByteOffStd140 ptr off lights
         pokeByteOffStd140 ptr (off + lightsByteSize) count
 
+maxLightCount :: Int
+maxLightCount = fromIntegral . natVal $ (Proxy :: Proxy MaxLightCount)
+
 lightsByteSize :: Int
-lightsByteSize = sizeOfStd140 (Proxy :: Proxy LightStruct) * (fromIntegral . natVal $ (Proxy :: Proxy MaxLightCount))
+lightsByteSize = sizeOfStd140 (Proxy :: Proxy LightStruct) * maxLightCount
