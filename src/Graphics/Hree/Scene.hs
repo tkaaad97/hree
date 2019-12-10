@@ -50,6 +50,7 @@ import Data.Maybe (catMaybes, fromMaybe, maybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
+import qualified Data.Vector.Storable.Sized as Sized
 import Data.Word (Word16, Word32, Word8)
 import Foreign (Ptr)
 import qualified Foreign (castPtr, copyArray, nullPtr, plusPtr, withArray)
@@ -63,7 +64,7 @@ import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.GL
-import Graphics.Hree.GL.Block (Elem(..))
+import Graphics.Hree.GL.Block (Block(..), Elem(..))
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
@@ -83,17 +84,26 @@ renderScene scene camera = do
     GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
     state <- readIORef . sceneState $ scene
     bindCamera (ssCameraBlockBinder state)
+    bindLight (ssLightBlockBinder state)
     renderNodes
         ubbs
         scene
         state
     where
     cameraBlockBindingIndex = 1
-    ubbs = BV.singleton ("CameraBlock", cameraBlockBindingIndex)
+    lightBlockBindingIndex = 2
+    ubbs = BV.fromList
+        [ ("CameraBlock", cameraBlockBindingIndex)
+        , ("LightBlock", lightBlockBindingIndex)
+        ]
     bindCamera maybeBinder = do
         cameraBlock <- updateCameraBlock camera
         ubb <- maybe (mkCameraBlockBinder scene cameraBlock) return maybeBinder
         updateAndBindUniformBuffer ubb cameraBlock cameraBlockBindingIndex
+    bindLight maybeBinder = do
+        lightBlock <- getLightBlock (sceneLightStore scene)
+        ubb <- maybe (mkLightBlockBinder scene lightBlock) return maybeBinder
+        updateAndBindUniformBuffer ubb lightBlock lightBlockBindingIndex
 
 renderNodes :: BV.Vector (ByteString, GL.GLuint) -> Scene -> SceneState -> IO ()
 renderNodes ubbs scene state = do
@@ -478,7 +488,13 @@ updateLight scene lightId f =
     where
     g = Elem . marshalLight . f . unmarshalLight . unElem
 
---setBackground
+getLightBlock :: LightStore -> IO LightBlock
+getLightBlock store = do
+    (v, c) <- Component.unsafeGetComponentVector store
+    let sized = fromMaybe (Sized.generate . const . Elem $ emptyLight) . Sized.toSized $ v
+        emptyLight = marshalLight $ DirectionalLight' (DirectionalLight (Linear.V3 0 (-1) 0) (Linear.V3 1 1 1) 0)
+        block = LightBlock sized (fromIntegral c)
+    return block
 
 mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)
 mkProgramIfNotExists scene pspec = do
@@ -520,16 +536,29 @@ mkDefaultTexture scene = Foreign.withArray [255, 255, 255, 255] $ \p -> do
     setDefaultTexture a s =
         (s { ssDefaultTexture = Just a }, ())
 
-mkCameraBlockBinder :: Scene -> CameraBlock -> IO (UniformBlockBinder CameraBlock)
-mkCameraBlockBinder scene block = do
+mkBlockBinder :: Block a => Scene -> a -> IO (UniformBlockBinder a)
+mkBlockBinder scene block = do
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     addBufferResource scene buffer
-    ubb <- newUniformBlockBinder buffer block
+    newUniformBlockBinder buffer block
+
+mkCameraBlockBinder :: Scene -> CameraBlock -> IO (UniformBlockBinder CameraBlock)
+mkCameraBlockBinder scene block = do
+    ubb <- mkBlockBinder scene block
     atomicModifyIORef' (sceneState scene) (setCameraBlockBinder ubb)
     return ubb
     where
     setCameraBlockBinder ubb s =
         (s { ssCameraBlockBinder = Just ubb }, ())
+
+mkLightBlockBinder :: Scene -> LightBlock -> IO (UniformBlockBinder LightBlock)
+mkLightBlockBinder scene block = do
+    ubb <- mkBlockBinder scene block
+    atomicModifyIORef' (sceneState scene) (setLightBlockBinder ubb)
+    return ubb
+    where
+    setLightBlockBinder ubb s =
+        (s { ssLightBlockBinder = Just ubb }, ())
 
 newScene :: IO Scene
 newScene = do

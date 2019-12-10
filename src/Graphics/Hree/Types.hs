@@ -3,6 +3,7 @@
 module Graphics.Hree.Types
     ( Geometry(..)
     , LightId(..)
+    , LightStore
     , Material(..)
     , Mesh(..)
     , MeshId(..)
@@ -104,7 +105,7 @@ data Scene = Scene
     , sceneNodeTransformStore             :: !(Component.ComponentStore MSV.MVector NodeId Transform)
     , sceneNodeTransformMatrixStore       :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
     , sceneNodeGlobalTransformMatrixStore :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
-    , sceneLightStore                     :: !(Component.ComponentStore MSV.MVector LightId (Elem LightStruct))
+    , sceneLightStore                     :: !LightStore
     , sceneSkinStore                      :: !(Component.ComponentStore MBV.MVector SkinId Skin)
     }
 
@@ -126,3 +127,5 @@ data Skin = Skin
     { skinInverseBindMatrices :: !(SV.Vector Mat4)
     , skinJoints              :: !(SV.Vector NodeId)
     } deriving (Show, Eq)
+
+type LightStore = Component.ComponentStore MSV.MVector LightId (Elem LightStruct)

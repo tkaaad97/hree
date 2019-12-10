@@ -12,6 +12,7 @@ module Data.Component
     , getComponentSlice
     , cleanComponentStore
     , extendComponentStore
+    , unsafeGetComponentVector
     ) where
 
 import Control.Exception (throwIO)
@@ -21,6 +22,7 @@ import Data.Hashable (Hashable(..))
 import qualified Data.HashTable.IO as HT
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef, writeIORef)
 import Data.Proxy (Proxy(..))
+import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
 
 newtype ComponentStore v e a = ComponentStore
@@ -144,6 +146,12 @@ getComponentSlice :: (MV.MVector v a) => ComponentStore v e a -> IO (v RealWorld
 getComponentSlice store = do
     s <- readIORef (unComponentStore store)
     return $ MV.slice 0 (componentStoreSize s) (componentStoreVec s)
+
+unsafeGetComponentVector :: (V.Vector v a) => ComponentStore (V.Mutable v) e a -> IO (v a, Int)
+unsafeGetComponentVector store = do
+    s <- readIORef (unComponentStore store)
+    v <- V.unsafeFreeze (componentStoreVec s)
+    return (v, componentStoreSize s)
 
 cleanComponentStore :: (MV.MVector v a, MV.MVector v e) => ComponentStore v e a -> Int -> IO ()
 cleanComponentStore store preserve = do

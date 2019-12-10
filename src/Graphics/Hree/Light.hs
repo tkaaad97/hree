@@ -19,7 +19,8 @@ module Graphics.Hree.Light
 
 import Data.Int (Int32)
 import Data.Proxy (Proxy(..))
-import qualified Data.Vector.Storable.Sized as SV (Vector)
+import qualified Data.Vector.Storable as SV (slice)
+import qualified Data.Vector.Storable.Sized as Sized (Vector, fromSized)
 import GHC.TypeNats (Nat, natVal)
 import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..))
 import Graphics.Hree.GL.Types (Vec2, Vec3)
@@ -70,9 +71,9 @@ data LightStruct = LightStruct
 type MaxLightCount = (16 :: Nat)
 
 data LightBlock = LightBlock
-    { lightBlockLights :: !(SV.Vector MaxLightCount (Elem LightStruct))
-    , lightBlockCount  :: !Int32
-    } deriving (Show, Eq)
+    { lightBlockLights     :: !(Sized.Vector MaxLightCount (Elem LightStruct))
+    , lightBlockLightCount :: !Int32
+    } deriving (Show)
 
 directionalLightType, pointLightType, spotLightType :: Int32
 directionalLightType = 0
@@ -139,6 +140,13 @@ instance Block LightBlock where
         pokeByteOffStd140 ptr off lights
         pokeByteOffStd140 ptr (off + lightsByteSize) count
 
+instance Eq LightBlock where
+    a == b =
+        let counta = fromIntegral . lightBlockLightCount $ a
+            countb = fromIntegral . lightBlockLightCount $ b
+            slicea = SV.slice 0 counta . Sized.fromSized . lightBlockLights $ a
+            sliceb = SV.slice 0 countb . Sized.fromSized . lightBlockLights $ b
+        in counta == countb && slicea == sliceb
 maxLightCount :: Int
 maxLightCount = fromIntegral . natVal $ (Proxy :: Proxy MaxLightCount)
 
