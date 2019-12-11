@@ -30,7 +30,7 @@ uniform mat4 modelMatrix = mat4(1.0);
 void main()
 {
     vec4 modelPosition = modelMatrix * vec4(position, 1.0);
-    gl_Position = camera.projectionMatrix * camera.viewMatrix * modelPosition;
+    gl_Position = cameraBlock.projectionMatrix * cameraBlock.viewMatrix * modelPosition;
     fragmentPosition = modelPosition.xyz;
     fragmentUv = uv;
 #ifdef HAS_VERTEX_NORMAL

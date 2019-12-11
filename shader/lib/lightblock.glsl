@@ -14,8 +14,12 @@ struct Light {
 };
 
 layout(std140) uniform LightBlock {
-    Light[MAX_LIGHT_COUNT] items;
+    Light items[MAX_LIGHT_COUNT];
     int count;
-} light;
+} lightBlock;
+
+const int LightTypeDirectional = 0;
+const int LightTypePoint = 1;
+const int LightTypeSpot = 2;
 
 #endif

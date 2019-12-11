@@ -34,6 +34,6 @@ mat3 rotateMatrix(vec3 axis, float angle)
 void main()
 {
     vec3 offset = position + rotateMatrix(rotateAxis, angle) * vec3(size.x * positionOffset.x, size.y * positionOffset.y, size.z * positionOffset.z);
-    gl_Position = camera.projectionMatrix * camera.viewMatrix * modelMatrix * vec4(offset, 1.0);
+    gl_Position = cameraBlock.projectionMatrix * cameraBlock.viewMatrix * modelMatrix * vec4(offset, 1.0);
     fragmentUv = uv + vec2(uvOffset.x * uvSize.x, uvOffset.y * uvSize.y);
 }

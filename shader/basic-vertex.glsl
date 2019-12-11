@@ -15,7 +15,7 @@ uniform mat4 modelMatrix = mat4(1.0);
 
 void main()
 {
-    gl_Position = camera.projectionMatrix * camera.viewMatrix * modelMatrix * vec4(position, 1.0);
+    gl_Position = cameraBlock.projectionMatrix * cameraBlock.viewMatrix * modelMatrix * vec4(position, 1.0);
     fragmentNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
     fragmentUv = uv;
 #ifdef HAS_VERTEX_COLOR

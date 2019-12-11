@@ -16,6 +16,22 @@ out vec4 outColor;
 #include <camerablock.glsl>
 #include <lightblock.glsl>
 
+struct AngularInfo {
+    float dotNL;
+    float dotNV;
+    float dotNH;
+    float dotVH;
+};
+
+struct MaterialInfo {
+    vec3 color;
+    float roughness;
+    float metallic;
+    float alpha;
+    float alpha2;
+    float padding;
+};
+
 uniform vec4 baseColorFactor = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float metallicFactor = 1.0;
 uniform float roughnessFactor = 1.0;
@@ -31,8 +47,7 @@ const float epsilon = 1.19209e-07;
 const vec3 dielectricSpecular = vec3(0.04, 0.04, 0.04);
 const vec3 black = vec3(0.0, 0.0, 0.0);
 
-vec3 getNormal()
-{
+vec3 getNormal() {
     vec2 uv = fragmentUv;
 
 #ifndef HAS_VERTEX_TANGENT
@@ -64,20 +79,17 @@ vec3 getNormal()
     return n;
 }
 
-vec3 diffuse(vec3 a)
-{
+vec3 diffuse(vec3 a) {
     return a / pi;
 }
 
-vec3 calcFresnelSchlick(vec3 base, float metallicFactor, float dotVH)
-{
+vec3 calcFresnelSchlick(vec3 base, float metallicFactor, float dotVH) {
     vec3 f0 = mix(dielectricSpecular, base, metallicFactor);
     vec3 F = f0 + (1.0 - f0) * pow(clamp(1.0 - dotVH, 0.0, 1.0), 5.0);
     return F;
 }
 
-float calcVisibilityOcclusion(float alpha2, float dotNL, float dotNV)
-{
+float calcVisibilityOcclusion(float alpha2, float dotNL, float dotNV) {
     float GGXV = dotNL * sqrt(dotNV * dotNV * (1.0 - alpha2) + alpha2);
     float GGXL = dotNV * sqrt(dotNL * dotNL * (1.0 - alpha2) + alpha2);
     float GGX = GGXV + GGXL;
@@ -87,61 +99,70 @@ float calcVisibilityOcclusion(float alpha2, float dotNL, float dotNV)
     return 0.0;
 }
 
-float calcMicrofacetDistribution(float alpha2, float dotNH)
-{
+float calcMicrofacetDistribution(float alpha2, float dotNH) {
     float f = dotNH * (dotNH * alpha2 - dotNH) + 1.0;
     float D = alpha2 / max(pi * f * f, epsilon);
     return D;
 }
 
-vec3 calcPointShade(vec3 pointToLight, vec3 normal, vec3 view, vec3 color, float metallic, float roughness)
-{
-    float alpha = roughness * roughness;
-    float alpha2 = alpha * alpha;
-    vec3 n = normalize(normal);
-    vec3 v = normalize(view);
-    vec3 l = normalize(pointToLight);
-    vec3 h = normalize(l + v);
-    float dotNL = clamp(dot(n, l), 0.0, 1.0);
-    float dotNV = clamp(dot(n, v), 0.0, 1.0);
-    float dotNH = clamp(dot(n, h), 0.0, 1.0);
-    float dotVH = clamp(dot(v, h), 0.0, 1.0);
+vec3 calcPointShade(vec3 pointToLight, AngularInfo angular, MaterialInfo material) {
+    if (angular.dotNL > 0.0 || angular.dotNV > 0.0) {
+        vec3 F = calcFresnelSchlick(material.color, material.metallic, angular.dotVH);
+        float V = calcVisibilityOcclusion(material.alpha2, angular.dotNL, angular.dotNV);
+        float D = calcMicrofacetDistribution(material.alpha2, angular.dotNH);
 
-    if (dotNL > 0.0 || dotNV > 0.0) {
-        vec3 F = calcFresnelSchlick(color, metallic, dotVH);
-        float V = calcVisibilityOcclusion(alpha2, dotNL, dotNV);
-        float D = calcMicrofacetDistribution(alpha2, dotNH);
-
-        vec3 diffuseOut = (1.0 - F) * diffuse(color);
+        vec3 diffuseOut = (1.0 - F) * diffuse(material.color);
         vec3 specularOut = F * V * D;
-        return dotNL * (diffuseOut + specularOut);
+        return angular.dotNL * (diffuseOut + specularOut);
     }
     return vec3(0.0);
 }
 
-vec3 applyDirectionalLight(vec3 lightDir, vec3 normal, vec3 view, vec3 color, float metallic, float roughness)
-{
-    vec3 pointToLight = -lightDir;
-    return calcPointShade(pointToLight, normal, view, color, metallic, roughness);
+vec3 applyDirectionalLight(Light light, AngularInfo angular, MaterialInfo material) {
+    vec3 pointToLight = -light.direction;
+    return light.intensity * light.color * calcPointShade(pointToLight, angular, material);
 }
 
-vec4 sRGBToLinear(vec4 color)
-{
+vec3 applyLights(vec3 normal, vec3 view, vec3 color, float metallic, float roughness) {
+    vec3 acc = vec3(0.0);
+    float alpha = roughness * roughness;
+    float alpha2 = alpha * alpha;
+    vec3 n = normalize(normal);
+    vec3 v = normalize(view);
+    float dotNV = clamp(dot(n, v), 0.0, 1.0);
+    MaterialInfo material = MaterialInfo(color, metallic, roughness, alpha, alpha2, 0.0);
+
+    for (int i = 0; i < MAX_LIGHT_COUNT; i++) {
+        if (i < lightBlock.count) {
+            Light light = lightBlock.items[i];
+            if (light.type == LightTypeDirectional) {
+                vec3 l = normalize(- light.direction);
+                vec3 h = normalize(l + v);
+                float dotNL = clamp(dot(n, l), 0.0, 1.0);
+                float dotNH = clamp(dot(n, h), 0.0, 1.0);
+                float dotVH = clamp(dot(v, h), 0.0, 1.0);
+                AngularInfo angular = AngularInfo(dotNL, dotNV, dotNH, dotVH);
+                acc += applyDirectionalLight(light, angular, material);
+            }
+        }
+    }
+    return acc;
+}
+
+vec4 sRGBToLinear(vec4 color) {
     const float gamma = 2.2;
     return vec4(pow(color.rgb, vec3(gamma)), color.a);
 }
 
-vec3 toneMapping(vec3 color)
-{
+vec3 toneMapping(vec3 color) {
     const float invGamma = 1.0 / 2.2;
     return pow(color, vec3(invGamma));
 }
 
-void main()
-{
+void main() {
     float metallic = clamp(metallicFactor, 0.0, 1.0);
     float roughness = clamp(roughnessFactor, 0.0, 1.0);
-    vec3 view = camera.viewPosition - fragmentPosition;
+    vec3 view = cameraBlock.viewPosition - fragmentPosition;
     vec3 normal = getNormal();
     vec3 light = directionalLight;
     vec4 color = sRGBToLinear(texture2D(baseColorTexture, fragmentUv)) * baseColorFactor;
@@ -159,6 +180,6 @@ void main()
     vec3 diffuseColor = mix(color.rgb * (1.0 - dielectricSpecular.r), black, metallic);
 
     vec3 acc = vec3(0.0, 0.0, 0.0);
-    acc += applyDirectionalLight(light, normal, view, diffuseColor, metallic, roughness);
+    acc += applyLights(normal, view, diffuseColor, metallic, roughness);
     outColor = vec4(toneMapping(acc), 1.0);
 }
