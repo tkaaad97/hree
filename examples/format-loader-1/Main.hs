@@ -10,6 +10,7 @@ import qualified Graphics.Format.PLY as PLY (loadGeometryFromFile)
 import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
+import Graphics.Hree.Light (directionalLight)
 import qualified Graphics.Hree.Material as Material
 import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
@@ -45,8 +46,11 @@ main = do
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
         return (scene, camera)
 
-    loadScene path scene ".gltf" =
-        void $ GLTF.loadSceneFromFile path scene
+    loadScene path scene ".gltf" = do
+        _ <- GLTF.loadSceneFromFile path scene
+        let light = directionalLight (V3 0.5 (-1) (-0.5)) (V3 1 1 1) 1
+        _ <- addLight scene light
+        return ()
 
     loadScene path scene extension = do
         geometry <- case extension of

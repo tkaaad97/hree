@@ -69,7 +69,6 @@ import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
 import qualified Graphics.Hree.Material as Hree (flatColorMaterial,
                                                  setBaseColorFactor,
                                                  setBaseColorTexture,
-                                                 setDirectionalLight,
                                                  setMetallicFactor,
                                                  setMetallicRoughnessTexture,
                                                  setNormalTexture,
@@ -857,7 +856,6 @@ createTextures defaultTexture sources samplers = BV.map (fromMaybe defaultTextur
 createMaterial :: BV.Vector Hree.Texture -> Material -> Hree.Material
 createMaterial textures m =
     Hree.standardMaterial 1 1
-        `Hree.setDirectionalLight` Linear.V3 0.5 (-1) (-0.5)
         & setWhenJust setPbrMetallicRoughness (materialPbrMetallicRoughness m)
         & setWhenJust setNormalTexture (materialNormalTexture m)
     where

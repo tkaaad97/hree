@@ -40,7 +40,6 @@ uniform float normalScale = 1.0;
 uniform sampler2D baseColorTexture;
 uniform sampler2D normalTexture;
 uniform sampler2D metallicRoughnessTexture;
-uniform vec3 directionalLight = vec3(0.0, 0.0, 0.0);
 
 const float pi = 3.141592653589793;
 const float epsilon = 1.19209e-07;
@@ -134,7 +133,7 @@ vec3 applyLights(vec3 normal, vec3 view, vec3 color, float metallic, float rough
 
     for (int i = 0; i < MAX_LIGHT_COUNT; i++) {
         if (i < lightBlock.count) {
-            Light light = lightBlock.items[i];
+            Light light = lightBlock.light.items[i];
             if (light.type == LightTypeDirectional) {
                 vec3 l = normalize(- light.direction);
                 vec3 h = normalize(l + v);
@@ -164,7 +163,6 @@ void main() {
     float roughness = clamp(roughnessFactor, 0.0, 1.0);
     vec3 view = cameraBlock.viewPosition - fragmentPosition;
     vec3 normal = getNormal();
-    vec3 light = directionalLight;
     vec4 color = sRGBToLinear(texture2D(baseColorTexture, fragmentUv)) * baseColorFactor;
 
 #ifdef HAS_VERTEX_COLOR

@@ -13,9 +13,13 @@ struct Light {
     vec2 padding;
 };
 
-layout(std140) uniform LightBlock {
+struct LightArray {
     Light items[MAX_LIGHT_COUNT];
+};
+
+layout(std140) uniform LightBlock {
     int count;
+    LightArray light;
 } lightBlock;
 
 const int LightTypeDirectional = 0;

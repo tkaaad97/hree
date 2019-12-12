@@ -493,7 +493,7 @@ getLightBlock store = do
     (v, c) <- Component.unsafeGetComponentVector store
     let sized = fromMaybe (Sized.generate . const . Elem $ emptyLight) . Sized.toSized $ v
         emptyLight = marshalLight $ DirectionalLight' (DirectionalLight (Linear.V3 0 (-1) 0) (Linear.V3 1 1 1) 0)
-        block = LightBlock sized (fromIntegral c)
+        block = LightBlock (fromIntegral c) sized
     return block
 
 mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)

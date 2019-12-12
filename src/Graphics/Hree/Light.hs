@@ -26,7 +26,7 @@ import qualified Data.Vector.Storable as SV (slice)
 import qualified Data.Vector.Storable.Sized as Sized (Vector, fromSized)
 import GHC.TypeNats (Nat, natVal)
 import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..))
-import Graphics.Hree.GL.Types (Vec2, Vec3)
+import Graphics.Hree.GL.Types (Vec3)
 import Linear (Additive(zero))
 
 data Light =
@@ -68,14 +68,15 @@ data LightStruct = LightStruct
     , lightInnerConeAngle :: !Float
     , lightOuterConeAngle :: !Float
     , lightType           :: !Int32
-    , lightPadding        :: !Vec2
+    , lightPadding1       :: !Float
+    , lightPadding2       :: !Float
     } deriving (Show, Eq)
 
 type MaxLightCount = (16 :: Nat)
 
 data LightBlock = LightBlock
-    { lightBlockLights     :: !(Sized.Vector MaxLightCount (Elem LightStruct))
-    , lightBlockLightCount :: !Int32
+    { lightBlockLightCount :: !Int32
+    , lightBlockLights     :: !(Sized.Vector MaxLightCount (Elem LightStruct))
     } deriving (Show)
 
 directionalLight :: Vec3 -> Vec3 -> Float -> Light
@@ -94,11 +95,11 @@ spotLightType = 2
 
 marshalLight :: Light -> LightStruct
 marshalLight (DirectionalLight' (DirectionalLight direction color intensity)) =
-    LightStruct direction 0 color intensity Linear.zero 0 0 directionalLightType Linear.zero
+    LightStruct direction 0 color intensity Linear.zero 0 0 directionalLightType 0 0
 marshalLight (PointLight' (PointLight position range color intensity)) =
-    LightStruct Linear.zero range color intensity position 0 0 pointLightType Linear.zero
+    LightStruct Linear.zero range color intensity position 0 0 pointLightType 0 0
 marshalLight (SpotLight' (SpotLight position direction range inner outer color intensity)) =
-    LightStruct direction range color intensity position inner outer spotLightType Linear.zero
+    LightStruct direction range color intensity position inner outer spotLightType 0 0
 marshalLight (UnknownLight a) = a
 
 unmarshalLight :: LightStruct -> Light
@@ -121,10 +122,11 @@ instance Block LightStruct where
         inner <- peekByteOffStd140 ptr (off + 44)
         outer <- peekByteOffStd140 ptr (off + 48)
         type' <- peekByteOffStd140 ptr (off + 52)
-        padding <- peekByteOffStd140 ptr (off + 56)
-        return $ LightStruct direction range color intensity position inner outer type' padding
+        padding1 <- peekByteOffStd140 ptr (off + 56)
+        padding2 <- peekByteOffStd140 ptr (off + 60)
+        return $ LightStruct direction range color intensity position inner outer type' padding1 padding2
 
-    pokeByteOffStd140 ptr off (LightStruct direction range color intensity position inner outer type' padding) = do
+    pokeByteOffStd140 ptr off (LightStruct direction range color intensity position inner outer type' padding1 padding2) = do
         pokeByteOffStd140 ptr off direction
         pokeByteOffStd140 ptr (off + 12) range
         pokeByteOffStd140 ptr (off + 16) color
@@ -133,7 +135,8 @@ instance Block LightStruct where
         pokeByteOffStd140 ptr (off + 44) inner
         pokeByteOffStd140 ptr (off + 48) outer
         pokeByteOffStd140 ptr (off + 52) type'
-        pokeByteOffStd140 ptr (off + 56) padding
+        pokeByteOffStd140 ptr (off + 56) padding1
+        pokeByteOffStd140 ptr (off + 60) padding2
 
 instance Element LightStruct where
     elemAlignmentStd140 _ = 16
@@ -141,16 +144,16 @@ instance Element LightStruct where
 
 instance Block LightBlock where
     alignmentStd140 _ = 16
-    sizeOfStd140 _ = lightsByteSize + 4
+    sizeOfStd140 _ = lightsByteSize + 16
 
     peekByteOffStd140 ptr off = do
-        lights <- peekByteOffStd140 ptr off
-        count <- peekByteOffStd140 ptr (off + lightsByteSize)
-        return $ LightBlock lights count
+        count <- peekByteOffStd140 ptr off
+        lights <- peekByteOffStd140 ptr (off + 16)
+        return $ LightBlock count lights
 
-    pokeByteOffStd140 ptr off (LightBlock lights count) = do
-        pokeByteOffStd140 ptr off lights
-        pokeByteOffStd140 ptr (off + lightsByteSize) count
+    pokeByteOffStd140 ptr off (LightBlock count lights) = do
+        pokeByteOffStd140 ptr off count
+        pokeByteOffStd140 ptr (off + 16) lights
 
 instance Eq LightBlock where
     a == b =
@@ -159,6 +162,7 @@ instance Eq LightBlock where
             slicea = SV.slice 0 counta . Sized.fromSized . lightBlockLights $ a
             sliceb = SV.slice 0 countb . Sized.fromSized . lightBlockLights $ b
         in counta == countb && slicea == sliceb
+
 maxLightCount :: Int
 maxLightCount = fromIntegral . natVal $ (Proxy :: Proxy MaxLightCount)
 
