@@ -8,11 +8,14 @@ module Graphics.Hree.Light
     , DirectionalLight(..)
     , PointLight(..)
     , SpotLight(..)
+    , directionalLight
     , directionalLightType
     , lightsByteSize
     , marshalLight
     , maxLightCount
+    , pointLight
     , pointLightType
+    , spotLight
     , spotLightType
     , unmarshalLight
     ) where
@@ -74,6 +77,15 @@ data LightBlock = LightBlock
     { lightBlockLights     :: !(Sized.Vector MaxLightCount (Elem LightStruct))
     , lightBlockLightCount :: !Int32
     } deriving (Show)
+
+directionalLight :: Vec3 -> Vec3 -> Float -> Light
+directionalLight dir color intensity = DirectionalLight' (DirectionalLight dir color intensity)
+
+pointLight :: Vec3 -> Float -> Vec3 -> Float -> Light
+pointLight pos range color intensity = PointLight' (PointLight pos range color intensity)
+
+spotLight :: Vec3 -> Vec3 -> Float -> Float -> Float -> Vec3 -> Float -> Light
+spotLight pos dir range inner outer color intensity = SpotLight' (SpotLight pos dir range inner outer color intensity)
 
 directionalLightType, pointLightType, spotLightType :: Int32
 directionalLightType = 0

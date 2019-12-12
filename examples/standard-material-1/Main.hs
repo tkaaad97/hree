@@ -6,6 +6,7 @@ import qualified GLW
 import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
+import Graphics.Hree.Light
 import qualified Graphics.Hree.Material as Material
 import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
@@ -43,8 +44,10 @@ main = do
         let material = Material.standardMaterial metalness roughness
                 `Material.setDirectionalLight` V3 (-1) 0 (-5)
             mesh = Mesh geometry material Nothing
+            light = directionalLight (V3 (-1) 0 (-5)) (V3 1 1 1) 1
         meshId <- addMesh scene mesh
         _ <- addNode scene newNode{ nodeMesh = Just meshId } True
+        _ <- addLight scene light
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
