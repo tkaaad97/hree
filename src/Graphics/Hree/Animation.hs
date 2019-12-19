@@ -1,57 +1,47 @@
 {-# LANGUAGE GADTs #-}
 module Graphics.Hree.Animation
     ( Animation(..)
+    , Channel(..)
     , Interpolation(..)
     , KeyFrames(..)
-    , NodePath(..)
-    , Target(..)
+    , Track(..)
     , lowerBound
-    , interpolateStep
-    , interpolateLinear
+    , interpolate
     ) where
 
+import qualified Data.Vector as BV (Vector)
 import qualified Data.Vector.Unboxed as UV (Unbox, Vector, head, last, length,
                                             (!))
 import Graphics.Hree.Math (Quaternion, Vec3)
 import Graphics.Hree.Types (NodeId)
 import Linear (Additive(..), (^*))
 
-data KeyFrames a = KeyFrames
-    { keyFrameTimepoints :: !(UV.Vector Float)
-    , keyFrameValues     :: !(UV.Vector a)
-    } deriving (Show, Eq)
-
-data NodePath a where
-    NodePathTranslation :: NodePath Vec3
-    NodePathRotation :: NodePath Quaternion
-    NodePathScale :: NodePath Vec3
-
-data Target a =
-    TargetNode !NodeId !(NodePath a)
-    deriving (Show, Eq)
-
 data Interpolation =
     InterpolationLinear |
-    InterpolationStep |
-    InterpolationCubicSpline
+    InterpolationStep
+    deriving (Show, Eq)
+
+data KeyFrames a = KeyFrames
+    { keyFramesInterpolation :: !Interpolation
+    , keyFramesTimepoints    :: !(UV.Vector Float)
+    , keyFramesValues        :: !(UV.Vector a)
+    } deriving (Show, Eq)
+
+data Channel = Chennel
+    { channelNode   :: !NodeId
+    , channelTracks :: !(BV.Vector Track)
+    } deriving (Show, Eq)
+
+data Track =
+    TrackNodeTranslation !(KeyFrames Vec3) |
+    TrackNodeRotation !(KeyFrames Quaternion) |
+    TrackNodeScale !(KeyFrames Vec3)
     deriving (Show, Eq)
 
 data Animation a = Animation
-    { animationTarget        :: !(Target a)
-    , animationInterpolation :: !Interpolation
-    , animationKeyframes     :: !(KeyFrames a)
+    { animationChannels :: !(BV.Vector Channel)
+    , animationDuration :: !Float
     } deriving (Show, Eq)
-
-instance Show (NodePath a) where
-    show NodePathTranslation = "NodePathTranslation"
-    show NodePathRotation    = "NodePathRotation"
-    show NodePathScale       = "NodePathScale"
-
-instance Eq (NodePath a) where
-    (==) NodePathTranslation NodePathTranslation = True
-    (==) NodePathRotation NodePathRotation       = True
-    (==) NodePathScale NodePathScale             = True
-    (==) _ _                                     = False
 
 lowerBound :: UV.Vector Float -> Float -> Maybe Int
 lowerBound vec a =
@@ -69,15 +59,13 @@ lowerBound vec a =
                 then Nothing
                 else go (imid + 1) (middle (imid + 1) imax) imax
 
-interpolateStep :: UV.Unbox a => KeyFrames a -> Float -> a
-interpolateStep (KeyFrames timepoints values) t =
+interpolate :: (Fractional a, UV.Unbox (f a), Additive f) => KeyFrames (f a) -> Float -> f a
+interpolate (KeyFrames InterpolationStep timepoints values) t =
     case lowerBound timepoints t of
         Nothing -> UV.last values
         Just 0  -> UV.head values
         Just n  -> values UV.! (n - 1)
-
-interpolateLinear :: (Fractional a, UV.Unbox (f a), Additive f) => KeyFrames (f a) -> Float -> f a
-interpolateLinear (KeyFrames timepoints values) t =
+interpolate (KeyFrames InterpolationLinear timepoints values) t =
     case lowerBound timepoints t of
         Nothing -> UV.last values
         Just 0  -> UV.head values

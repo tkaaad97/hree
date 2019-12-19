@@ -22,28 +22,28 @@ spec = do
                 result = lowerBound vec 3.0
             result `shouldBe` Nothing
 
-    describe "interpolateStep" $ do
+    describe "interpolate Step" $ do
         it "will return key frame value" $ do
             let timepoints = UV.fromList [0.0, 1.0, 2.0]
                 v1 = V3 0 0 0
                 v2 = V3 10 10 10
                 v3 = V3 20 20 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-                keyFrames = KeyFrames timepoints values
-            interpolateStep keyFrames 1.5 `shouldBe` v2
-            interpolateStep keyFrames (-1) `shouldBe` v1
-            interpolateStep keyFrames 0.1 `shouldBe` v1
-            interpolateStep keyFrames 2.5 `shouldBe` v3
+                keyFrames = KeyFrames InterpolationStep timepoints values
+            interpolate keyFrames 1.5 `shouldBe` v2
+            interpolate keyFrames (-1) `shouldBe` v1
+            interpolate keyFrames 0.1 `shouldBe` v1
+            interpolate keyFrames 2.5 `shouldBe` v3
 
-    describe "interpolateLinear" $ do
+    describe "interpolate Linear" $ do
         it "will return linear interpolated key frame value" $ do
             let timepoints = UV.fromList [0.0, 1.0, 2.0]
                 v1 = V3 0 0 0
                 v2 = V3 10 10 10
                 v3 = V3 20 20 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-                keyFrames = KeyFrames timepoints values
-            interpolateLinear keyFrames 1.5 - (V3 15 15 15) `shouldSatisfy` nearZero
-            interpolateLinear keyFrames (-1) - v1 `shouldSatisfy` nearZero
-            interpolateLinear keyFrames 0.1 - (V3 1 1 1) `shouldSatisfy` nearZero
-            interpolateLinear keyFrames 2.5 - v3 `shouldSatisfy` nearZero
+                keyFrames = KeyFrames InterpolationLinear timepoints values
+            interpolate keyFrames 1.5 - (V3 15 15 15) `shouldSatisfy` nearZero
+            interpolate keyFrames (-1) - v1 `shouldSatisfy` nearZero
+            interpolate keyFrames 0.1 - (V3 1 1 1) `shouldSatisfy` nearZero
+            interpolate keyFrames 2.5 - v3 `shouldSatisfy` nearZero
