@@ -5,14 +5,29 @@ module Graphics.Hree.Animation
     , Interpolation(..)
     , KeyFrames(..)
     , Track(..)
+    , addChannel
+    , addTrack
+    , animation
     , applyAnimation
     , applyChannel
     , applyTrack
-    , lowerBound
+    , channel
+    , channelDuration
     , interpolate
+    , linearRotationTrack
+    , linearScaleTrack
+    , linearTranslationTrack
+    , lowerBound
+    , singleTrackAnimation
+    , singleTrackChannel
+    , stepRotationTrack
+    , stepScaleTrack
+    , stepTranslationTrack
+    , trackTimepoints
     ) where
 
-import qualified Data.Vector as BV (Vector, foldl, mapM_)
+import qualified Data.Vector as BV (Vector, foldl, map, mapM_, maximum, null,
+                                    singleton, snoc)
 import qualified Data.Vector.Unboxed as UV (Unbox, Vector, head, last, length,
                                             null, (!))
 import Graphics.Hree.Math (Quaternion, Transform(..), Vec3)
@@ -46,6 +61,61 @@ data Animation = Animation
     { animationChannels :: !(BV.Vector Channel)
     , animationDuration :: !Float
     } deriving (Show, Eq)
+
+trackTimepoints :: Track -> UV.Vector Float
+trackTimepoints (TrackNodeTranslation keyFrames) = keyFramesTimepoints keyFrames
+trackTimepoints (TrackNodeRotation keyFrames) = keyFramesTimepoints keyFrames
+trackTimepoints (TrackNodeScale keyFrames) = keyFramesTimepoints keyFrames
+
+stepTranslationTrack :: UV.Vector Float -> UV.Vector Vec3 -> Track
+stepTranslationTrack times values = TrackNodeTranslation (KeyFrames InterpolationStep times values)
+
+stepRotationTrack :: UV.Vector Float -> UV.Vector Quaternion -> Track
+stepRotationTrack times values = TrackNodeRotation (KeyFrames InterpolationStep times values)
+
+stepScaleTrack :: UV.Vector Float -> UV.Vector Vec3 -> Track
+stepScaleTrack times values = TrackNodeScale (KeyFrames InterpolationStep times values)
+
+linearTranslationTrack :: UV.Vector Float -> UV.Vector Vec3 -> Track
+linearTranslationTrack times values = TrackNodeTranslation (KeyFrames InterpolationLinear times values)
+
+linearRotationTrack :: UV.Vector Float -> UV.Vector Quaternion -> Track
+linearRotationTrack times values = TrackNodeRotation (KeyFrames InterpolationLinear times values)
+
+linearScaleTrack :: UV.Vector Float -> UV.Vector Vec3 -> Track
+linearScaleTrack times values = TrackNodeScale (KeyFrames InterpolationLinear times values)
+
+singleTrackChannel :: NodeId -> Track -> Channel
+singleTrackChannel nodeId track = Channel nodeId (BV.singleton track)
+
+singleTrackAnimation :: NodeId -> Track -> Animation
+singleTrackAnimation nodeId track =
+    let ch = singleTrackChannel nodeId track
+        duration = channelDuration ch
+    in Animation (BV.singleton ch) duration
+
+channelDuration :: Channel -> Float
+channelDuration ch =
+    let tracks = channelTracks ch
+        timepoints = BV.map trackTimepoints tracks
+        durations = BV.map (\v -> if UV.null v then 0 else UV.last v) timepoints
+    in if BV.null durations then 0 else BV.maximum durations
+
+addChannel :: Animation -> Channel -> Animation
+addChannel a c =
+    let cs = animationChannels a `BV.snoc` c
+    in a { animationChannels = cs }
+
+addTrack :: Channel -> Track -> Channel
+addTrack c t =
+    let ts = channelTracks c `BV.snoc` t
+    in c { channelTracks = ts }
+
+channel :: NodeId -> BV.Vector Track -> Channel
+channel = Channel
+
+animation :: BV.Vector Channel -> Float -> Animation
+animation = Animation
 
 lowerBound :: UV.Vector Float -> Float -> Maybe Int
 lowerBound vec a =

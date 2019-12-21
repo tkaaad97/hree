@@ -63,12 +63,12 @@ spec = do
                 keyFrames = KeyFrames InterpolationLinear timepoints values
                 track = TrackNodeTranslation keyFrames
                 channels = BV.singleton $ Channel nodeId (BV.singleton track)
-                animation = Animation channels 2.0
-            applyAnimation scene animation 0
+                ani = Animation channels 2.0
+            applyAnimation scene ani 0
             Hree.readNodeTransform scene nodeId >>= (`shouldBe` Just v1) . fmap transformTranslation
-            applyAnimation scene animation 0.5
+            applyAnimation scene ani 0.5
             Hree.readNodeTransform scene nodeId >>= (`shouldBe` Just (V3 5 5 0)) . fmap transformTranslation
-            applyAnimation scene animation 1.0
+            applyAnimation scene ani 1.0
             Hree.readNodeTransform scene nodeId >>= (`shouldBe` Just (V3 10 10 0)) . fmap transformTranslation
-            applyAnimation scene animation 2.1
+            applyAnimation scene ani 2.1
             Hree.readNodeTransform scene nodeId >>= (`shouldBe` Just (V3 10 10 20)) . fmap transformTranslation
