@@ -34,7 +34,7 @@ import qualified Data.Vector.Unboxed as UV (Unbox, Vector, head, last, length,
 import Graphics.Hree.Math (Quaternion, Transform(..), Vec3)
 import Graphics.Hree.Scene (applyTransformToNode)
 import Graphics.Hree.Types (NodeId, Scene)
-import Linear (Additive(..), slerp, (^*))
+import Linear (Additive(..), slerp)
 
 data Interpolation =
     InterpolationLinear |
@@ -160,7 +160,7 @@ interpolateLinear timepoints values t =
                 t1 = timepoints UV.! n
                 v0 = values UV.! (n - 1)
                 v1 = values UV.! n
-                v = v0 ^+^ (v1 ^-^ v0) ^* realToFrac ((t - t0) / (t1 - t0))
+                v = lerp (realToFrac ((t - t0) / (t1 - t0))) v1 v0
             in v
 
 interpolateQuaternion :: UV.Vector Float -> UV.Vector Quaternion -> Float -> Quaternion
@@ -173,7 +173,7 @@ interpolateQuaternion timepoints values t =
                 t1 = timepoints UV.! n
                 v0 = values UV.! (n - 1)
                 v1 = values UV.! n
-                v = slerp v0 v1 ((t - t0) / (t1 - t0))
+                v = slerp v1 v0 ((t - t0) / (t1 - t0))
             in v
 
 applyChannel :: Scene -> Channel -> Float -> IO ()
