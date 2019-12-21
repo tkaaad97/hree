@@ -14,7 +14,7 @@ module Graphics.Hree.Animation
 
 import qualified Data.Vector as BV (Vector, foldl, mapM_)
 import qualified Data.Vector.Unboxed as UV (Unbox, Vector, head, last, length,
-                                            (!))
+                                            null, (!))
 import Graphics.Hree.Math (Quaternion, Transform(..), Vec3)
 import Graphics.Hree.Scene (applyTransformToNode)
 import Graphics.Hree.Types (NodeId, Scene)
@@ -66,13 +66,13 @@ lowerBound vec a =
 interpolate :: (Fractional a, UV.Unbox (f a), Additive f) => KeyFrames (f a) -> Float -> f a
 interpolate (KeyFrames InterpolationStep timepoints values) t =
     case lowerBound timepoints t of
-        Nothing -> UV.last values
-        Just 0  -> UV.head values
+        Nothing -> if UV.null values then zero else UV.last values
+        Just 0  -> if UV.null values then zero else UV.head values
         Just n  -> values UV.! (n - 1)
 interpolate (KeyFrames InterpolationLinear timepoints values) t =
     case lowerBound timepoints t of
-        Nothing -> UV.last values
-        Just 0  -> UV.head values
+        Nothing -> if UV.null values then zero else UV.last values
+        Just 0  -> if UV.null values then zero else UV.head values
         Just n  ->
             let t0 = timepoints UV.! (n - 1)
                 t1 = timepoints UV.! n
