@@ -160,7 +160,7 @@ executables:
     dependencies:
     - hree
     - GLFW-b
-    - time
+    - chronos
 
   standard-material-1:
     main:                Main.hs

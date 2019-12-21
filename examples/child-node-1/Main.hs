@@ -1,17 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import qualified Chronos as Time (Time(..), now)
+import Data.Fixed (mod')
 import qualified Data.Vector as BV
+import qualified Data.Vector.Unboxed as UV
 import Example
 import qualified GLW
 import qualified Graphics.GL as GL
+import qualified Graphics.Hree.Animation as Animation
 import Graphics.Hree.Camera
 import Graphics.Hree.Geometry.Box
 import qualified Graphics.Hree.Material as Material
 import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
-import Linear (V3(..), V4(..), inv44)
+import Linear (V3(..), V4(..), axisAngle, inv44)
 import Prelude hiding (init)
 
 main :: IO ()
@@ -57,20 +61,28 @@ main =
                 }
         nodeId <- addNode scene node True
 
+        let timepoints = UV.fromList [0.0, 5.0, 10.0]
+            rotations = UV.fromList [axisAngle (V3 0 0 1) 0, axisAngle (V3 0 0 1) pi, axisAngle (V3 0 0 1) 0]
+            track = Animation.linearRotationTrack timepoints rotations
+            channel1 = Animation.singleTrackChannel nodeId track
+            channel2 = Animation.singleTrackChannel childNodeId track
+            animation = Animation.animation (BV.fromList [channel1, channel2]) 10.0
+
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
-        return (scene, camera, nodeId, childNodeId)
+        st <- Time.now
+        return (scene, camera, animation, st)
 
-    deltaAngle = pi / 300
-
-    onDisplay (s, c, n, cn) w = do
+    onDisplay (s, c, animation, st) w = do
         render
         GLFW.pollEvents
-        rotateNode s n (V3 0 0 1) deltaAngle
-        rotateNode s cn (V3 0 0 1) deltaAngle
-        onDisplay (s, c, n, cn) w
+        t <- Time.now
+        let duration = Animation.animationDuration animation
+            t' = realToFrac $ diffTime t st `mod'` realToFrac duration
+        Animation.applyAnimation s animation t'
+        onDisplay (s, c, animation, st) w
 
         where
         render = do
@@ -87,3 +99,9 @@ main =
     updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
         PerspectiveProjection $ Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
+
+diffTime :: Time.Time -> Time.Time -> Double
+diffTime ta tb =
+    let nsa = Time.getTime ta
+        nsb = Time.getTime tb
+    in fromIntegral (nsa - nsb) * 1.0E-9
