@@ -20,6 +20,7 @@ module Graphics.Hree.Scene
     , mkDefaultTextureIfNotExists
     , newNode
     , newScene
+    , readNodeTransform
     , removeLight
     , removeMesh
     , removeNode
@@ -285,6 +286,10 @@ addNode scene node isRoot = do
                 , ssRootNodes = rootNodes
                 }
         in (newState, nodeInfo)
+
+readNodeTransform :: Scene -> NodeId -> IO (Maybe Transform)
+readNodeTransform =
+    flip Component.readComponent . sceneNodeTransformStore
 
 removeNode :: Scene -> NodeId -> IO ()
 removeNode scene nodeId = do

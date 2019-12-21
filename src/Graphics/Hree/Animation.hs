@@ -5,15 +5,19 @@ module Graphics.Hree.Animation
     , Interpolation(..)
     , KeyFrames(..)
     , Track(..)
+    , applyAnimation
+    , applyChannel
+    , applyTrack
     , lowerBound
     , interpolate
     ) where
 
-import qualified Data.Vector as BV (Vector)
+import qualified Data.Vector as BV (Vector, foldl, mapM_)
 import qualified Data.Vector.Unboxed as UV (Unbox, Vector, head, last, length,
                                             (!))
-import Graphics.Hree.Math (Quaternion, Vec3)
-import Graphics.Hree.Types (NodeId)
+import Graphics.Hree.Math (Quaternion, Transform(..), Vec3)
+import Graphics.Hree.Scene (applyTransformToNode)
+import Graphics.Hree.Types (NodeId, Scene)
 import Linear (Additive(..), (^*))
 
 data Interpolation =
@@ -27,7 +31,7 @@ data KeyFrames a = KeyFrames
     , keyFramesValues        :: !(UV.Vector a)
     } deriving (Show, Eq)
 
-data Channel = Chennel
+data Channel = Channel
     { channelNode   :: !NodeId
     , channelTracks :: !(BV.Vector Track)
     } deriving (Show, Eq)
@@ -38,7 +42,7 @@ data Track =
     TrackNodeScale !(KeyFrames Vec3)
     deriving (Show, Eq)
 
-data Animation a = Animation
+data Animation = Animation
     { animationChannels :: !(BV.Vector Channel)
     , animationDuration :: !Float
     } deriving (Show, Eq)
@@ -76,3 +80,20 @@ interpolate (KeyFrames InterpolationLinear timepoints values) t =
                 v1 = values UV.! n
                 v = v0 ^+^ (v1 ^-^ v0) ^* realToFrac ((t - t0) / (t1 - t0))
             in v
+
+applyTrack :: Track -> Float -> Transform -> Transform
+applyTrack (TrackNodeTranslation keyFrames) t trans =
+    trans { transformTranslation = interpolate keyFrames t }
+applyTrack (TrackNodeRotation keyFrames) t trans =
+    trans { transformQuaternion = interpolate keyFrames t }
+applyTrack (TrackNodeScale keyFrames) t trans =
+    trans { transformScale = interpolate keyFrames t }
+
+applyChannel :: Scene -> Channel -> Float -> IO ()
+applyChannel scene (Channel nodeId tracks) t =
+    let f = BV.foldl (\a track -> applyTrack track t . a) id tracks
+    in applyTransformToNode scene nodeId f
+
+applyAnimation :: Scene -> Animation -> Float -> IO ()
+applyAnimation scene (Animation channels _) t =
+    BV.mapM_ (flip (applyChannel scene) t) channels
