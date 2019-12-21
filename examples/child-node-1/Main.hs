@@ -62,10 +62,10 @@ main =
         nodeId <- addNode scene node True
 
         let timepoints = UV.fromList [0.0, 5.0, 10.0]
-            rotations = UV.fromList [axisAngle (V3 0 0 1) 0, axisAngle (V3 0 0 1) pi, axisAngle (V3 0 0 1) 0]
-            track = Animation.linearRotationTrack timepoints rotations
-            channel1 = Animation.singleTrackChannel nodeId track
-            channel2 = Animation.singleTrackChannel childNodeId track
+            rotations = UV.fromList [axisAngle (V3 0 0 1) 0, axisAngle (V3 0 0 1) pi, axisAngle (V3 0 0 1) (2 * pi)]
+            track = Animation.linearRotation timepoints rotations
+            channel1 = Animation.singleChannel nodeId track
+            channel2 = Animation.singleChannel childNodeId track
             animation = Animation.animation (BV.fromList [channel1, channel2]) 10.0
 
         camera <- newCamera proj la

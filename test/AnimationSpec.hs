@@ -2,7 +2,6 @@ module AnimationSpec
     ( spec
     ) where
 
-import qualified Data.Vector as BV
 import qualified Data.Vector.Unboxed as UV
 import Graphics.Hree.Animation
 import Graphics.Hree.Math (Transform(..))
@@ -32,11 +31,10 @@ spec = do
                 v2 = V3 10 10 10
                 v3 = V3 20 20 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-                keyFrames = KeyFrames InterpolationStep timepoints values
-            interpolate keyFrames 1.5 `shouldBe` v2
-            interpolate keyFrames (-1) `shouldBe` v1
-            interpolate keyFrames 0.1 `shouldBe` v1
-            interpolate keyFrames 2.5 `shouldBe` v3
+            interpolateStep timepoints values 1.5 `shouldBe` v2
+            interpolateStep timepoints values (-1) `shouldBe` v1
+            interpolateStep timepoints values 0.1 `shouldBe` v1
+            interpolateStep timepoints values 2.5 `shouldBe` v3
 
     describe "interpolate Linear" $ do
         it "will return linear interpolated key frame value" $ do
@@ -45,11 +43,10 @@ spec = do
                 v2 = V3 10 10 10
                 v3 = V3 20 20 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-                keyFrames = KeyFrames InterpolationLinear timepoints values
-            interpolate keyFrames 1.5 - (V3 15 15 15) `shouldSatisfy` nearZero
-            interpolate keyFrames (-1) - v1 `shouldSatisfy` nearZero
-            interpolate keyFrames 0.1 - (V3 1 1 1) `shouldSatisfy` nearZero
-            interpolate keyFrames 2.5 - v3 `shouldSatisfy` nearZero
+            interpolateLinear timepoints values 1.5 - (V3 15 15 15) `shouldSatisfy` nearZero
+            interpolateLinear timepoints values (-1) - v1 `shouldSatisfy` nearZero
+            interpolateLinear timepoints values 0.1 - (V3 1 1 1) `shouldSatisfy` nearZero
+            interpolateLinear timepoints values 2.5 - v3 `shouldSatisfy` nearZero
 
     describe "applyAnimation" $ do
         it "transform a node" $ do
@@ -60,10 +57,7 @@ spec = do
                 v2 = V3 10 10 0
                 v3 = V3 10 10 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-                keyFrames = KeyFrames InterpolationLinear timepoints values
-                track = TrackNodeTranslation keyFrames
-                channels = BV.singleton $ Channel nodeId (BV.singleton track)
-                ani = Animation channels 2.0
+                ani = singleAnimation nodeId (linearTranslation timepoints values)
             applyAnimation scene ani 0
             Hree.readNodeTransform scene nodeId >>= (`shouldBe` Just v1) . fmap transformTranslation
             applyAnimation scene ani 0.5
