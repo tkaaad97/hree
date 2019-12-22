@@ -26,6 +26,7 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Mutable as MBV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
+import qualified Data.Vector.Unboxed as UV
 import Foreign (Storable)
 import qualified GLW
 import Graphics.Hree.Camera
@@ -94,8 +95,9 @@ data Node = Node
     } deriving (Show, Eq)
 
 data NodeInfo = NodeInfo
-    { nodeInfoId   :: !NodeId
-    , nodeInfoNode :: !Node
+    { nodeInfoId         :: !NodeId
+    , nodeInfoNode       :: !Node
+    , nodeInfoSkinJoints :: !(UV.Vector (Int, Int))
     } deriving (Show, Eq)
 
 data Scene = Scene
@@ -124,7 +126,8 @@ data SceneState = SceneState
     } deriving (Show)
 
 data Skin = Skin
-    { skinInverseBindMatrices :: !(SV.Vector Mat4)
+    { skinSkeleton            :: !NodeId
+    , skinInverseBindMatrices :: !(SV.Vector Mat4)
     , skinJoints              :: !(SV.Vector NodeId)
     } deriving (Show, Eq)
 
