@@ -51,7 +51,6 @@ import Data.Maybe (catMaybes, fromMaybe, maybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
-import qualified Data.Vector.Storable.Sized as Sized
 import Data.Word (Word16, Word32, Word8)
 import Foreign (Ptr)
 import qualified Foreign (castPtr, copyArray, nullPtr, plusPtr, withArray)
@@ -496,9 +495,8 @@ updateLight scene lightId f =
 getLightBlock :: LightStore -> IO LightBlock
 getLightBlock store = do
     (v, c) <- Component.unsafeGetComponentVector store
-    let sized = fromMaybe (Sized.generate . const . Elem $ emptyLight) . Sized.toSized $ v
-        emptyLight = marshalLight $ DirectionalLight' (DirectionalLight (Linear.V3 0 (-1) 0) (Linear.V3 1 1 1) 0)
-        block = LightBlock (fromIntegral c) sized
+    let lights = SV.unsafeSlice 0 c v
+        block = LightBlock . LimitedVector $ lights
     return block
 
 mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)

@@ -1,32 +1,30 @@
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module Graphics.Hree.GL.Block
     ( Block(..)
     , Element(..)
     , Elem(..)
-    , LimitedVector(..)
     , Std140(..)
     ) where
 
 import Data.Int (Int32)
 import Data.Proxy (Proxy(..), asProxyTypeOf)
 import qualified Data.Vector.Generic as GV (imapM_)
-import qualified Data.Vector.Storable as SV (Vector, generateM, length)
+import qualified Data.Vector.Storable as SV (generateM, length)
 import qualified Data.Vector.Storable.Sized as SVS (Vector, generateM, imapM_,
                                                     length)
 import Data.Word (Word32)
 import Foreign (Ptr)
 import qualified Foreign (Storable(..), plusPtr)
-import GHC.TypeNats (KnownNat, Nat, natVal)
+import GHC.TypeNats (KnownNat, natVal)
 import Graphics.Hree.GL.Types (BVec2, BVec3, BVec4, DMat2, DMat2x3, DMat2x4,
                                DMat3, DMat3x2, DMat3x4, DMat4, DMat4x2, DMat4x3,
-                               DVec2, DVec3, DVec4, IVec2, IVec3, IVec4, Mat2,
-                               Mat2x3, Mat2x4, Mat3, Mat3x2, Mat3x4, Mat4,
-                               Mat4x2, Mat4x3, UVec2, UVec3, UVec4, Vec2, Vec3,
-                               Vec4)
+                               DVec2, DVec3, DVec4, IVec2, IVec3, IVec4,
+                               LimitedVector(..), Mat2, Mat2x3, Mat2x4, Mat3,
+                               Mat3x2, Mat3x4, Mat4, Mat4x2, Mat4x3, UVec2,
+                               UVec3, UVec4, Vec2, Vec3, Vec4)
 import Linear (V2(..), V3(..), V4(..))
 
 class Block a where
@@ -54,10 +52,6 @@ class Block a => Element a where
 
 newtype Elem a = Elem { unElem :: a }
     deriving (Show, Eq)
-
-newtype LimitedVector (n :: Nat) a = LimitedVector
-    { unLimitedVector :: SV.Vector a
-    } deriving (Show, Eq)
 
 instance Element a => Foreign.Storable (Elem a) where
     sizeOf _ = elemStrideStd140 (Proxy :: Proxy a)
@@ -661,15 +655,18 @@ instance (Element a, KnownNat n) => Block (LimitedVector n (Elem a)) where
     peekByteOffStd140 ptr off = do
         let align = alignmentStd140 (Proxy :: Proxy a)
             stride = elemStrideStd140 (Proxy :: Proxy a)
+            limit = fromIntegral . natVal $ (Proxy :: Proxy n)
             off' = off + align
         size <- peekByteOffStd140 ptr off :: IO Int32
-        v <- SV.generateM (fromIntegral size) $ \i -> Elem <$> peekByteOffStd140 ptr (off' + stride * i)
+        v <- SV.generateM (min (fromIntegral size) limit) $ \i -> Elem <$> peekByteOffStd140 ptr (off' + stride * i)
         return (LimitedVector v)
     pokeByteOffStd140 ptr off (LimitedVector v) = do
         let align = alignmentStd140 (Proxy :: Proxy a)
             stride = elemStrideStd140 (Proxy :: Proxy a)
+            limit = fromIntegral . natVal $ (Proxy :: Proxy n)
             off' = off + align
             size :: Int32
             size = fromIntegral . SV.length $ v
-        pokeByteOffStd140 ptr off size
+            size' = min size limit
+        pokeByteOffStd140 ptr off size'
         GV.imapM_ (\i -> pokeByteOffStd140 ptr (off' + stride * i) . unElem) v

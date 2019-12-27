@@ -22,11 +22,9 @@ module Graphics.Hree.Light
 
 import Data.Int (Int32)
 import Data.Proxy (Proxy(..))
-import qualified Data.Vector.Storable as SV (slice)
-import qualified Data.Vector.Storable.Sized as Sized (Vector, fromSized)
 import GHC.TypeNats (Nat, natVal)
 import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..))
-import Graphics.Hree.GL.Types (Vec3)
+import Graphics.Hree.GL.Types (LimitedVector(..), Vec3)
 import Linear (Additive(zero))
 
 data Light =
@@ -74,10 +72,9 @@ data LightStruct = LightStruct
 
 type MaxLightCount = (16 :: Nat)
 
-data LightBlock = LightBlock
-    { lightBlockLightCount :: !Int32
-    , lightBlockLights     :: !(Sized.Vector MaxLightCount (Elem LightStruct))
-    } deriving (Show)
+newtype LightBlock = LightBlock
+    { lightBlockLights :: LimitedVector MaxLightCount (Elem LightStruct)
+    } deriving (Show, Eq)
 
 directionalLight :: Vec3 -> Vec3 -> Float -> Light
 directionalLight dir color intensity = DirectionalLight' (DirectionalLight dir color intensity)
@@ -143,25 +140,12 @@ instance Element LightStruct where
     elemStrideStd140 _ = 64
 
 instance Block LightBlock where
-    alignmentStd140 _ = 16
-    sizeOfStd140 _ = lightsByteSize + 16
-
-    peekByteOffStd140 ptr off = do
-        count <- peekByteOffStd140 ptr off
-        lights <- peekByteOffStd140 ptr (off + 16)
-        return $ LightBlock count lights
-
-    pokeByteOffStd140 ptr off (LightBlock count lights) = do
-        pokeByteOffStd140 ptr off count
-        pokeByteOffStd140 ptr (off + 16) lights
-
-instance Eq LightBlock where
-    a == b =
-        let counta = fromIntegral . lightBlockLightCount $ a
-            countb = fromIntegral . lightBlockLightCount $ b
-            slicea = SV.slice 0 counta . Sized.fromSized . lightBlockLights $ a
-            sliceb = SV.slice 0 countb . Sized.fromSized . lightBlockLights $ b
-        in counta == countb && slicea == sliceb
+    alignmentStd140 _ = alignmentStd140 (Proxy :: Proxy (LimitedVector MaxLightCount (Elem LightStruct)))
+    sizeOfStd140 _ = sizeOfStd140 (Proxy :: Proxy (LimitedVector MaxLightCount (Elem LightStruct)))
+    peekByteOffStd140 ptr off =
+        LightBlock <$> peekByteOffStd140 ptr off
+    pokeByteOffStd140 ptr off (LightBlock lights) =
+        pokeByteOffStd140 ptr off lights
 
 maxLightCount :: Int
 maxLightCount = fromIntegral . natVal $ (Proxy :: Proxy MaxLightCount)

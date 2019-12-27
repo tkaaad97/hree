@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE KindSignatures            #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeOperators             #-}
@@ -50,6 +51,7 @@ module Graphics.Hree.GL.Types
     , Vec2
     , Vec3
     , Vec4
+    , LimitedVector(..)
     ) where
 
 import Data.ByteString (ByteString)
@@ -59,6 +61,7 @@ import qualified Data.Vector as BV (Vector)
 import qualified Data.Vector.Storable as SV (Vector)
 import Data.Word (Word32)
 import Foreign (Ptr, Storable)
+import GHC.TypeNats (Nat)
 import qualified GLW
 import qualified Graphics.GL as GL
 import Linear (M22, M23, M24, M32, M33, M34, M42, M43, M44, V2, V3, V4)
@@ -145,6 +148,10 @@ data IndexBuffer = IndexBuffer
     , ibDataType   :: !GL.GLenum
     , ibCount      :: !GL.GLsizei
     , ibByteOffset :: !Int
+    } deriving (Show, Eq)
+
+newtype LimitedVector (n :: Nat) a = LimitedVector
+    { unLimitedVector :: SV.Vector a
     } deriving (Show, Eq)
 
 type BVec2 = V2 Bool
