@@ -1,21 +1,26 @@
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module Graphics.Hree.GL.Block
     ( Block(..)
     , Element(..)
     , Elem(..)
+    , LimitedVector(..)
     , Std140(..)
     ) where
 
 import Data.Int (Int32)
 import Data.Proxy (Proxy(..), asProxyTypeOf)
-import qualified Data.Vector.Storable.Sized as SV (Vector, generateM, imapM_,
-                                                   length)
+import qualified Data.Vector.Generic as GV (imapM_)
+import qualified Data.Vector.Storable as SV (Vector, generateM, length)
+import qualified Data.Vector.Storable.Sized as SVS (Vector, generateM, imapM_,
+                                                    length)
 import Data.Word (Word32)
 import Foreign (Ptr)
 import qualified Foreign (Storable(..), plusPtr)
-import GHC.TypeNats (KnownNat)
+import GHC.TypeNats (KnownNat, Nat, natVal)
 import Graphics.Hree.GL.Types (BVec2, BVec3, BVec4, DMat2, DMat2x3, DMat2x4,
                                DMat3, DMat3x2, DMat3x4, DMat4, DMat4x2, DMat4x3,
                                DVec2, DVec3, DVec4, IVec2, IVec3, IVec4, Mat2,
@@ -49,6 +54,10 @@ class Block a => Element a where
 
 newtype Elem a = Elem { unElem :: a }
     deriving (Show, Eq)
+
+newtype LimitedVector (n :: Nat) a = LimitedVector
+    { unLimitedVector :: SV.Vector a
+    } deriving (Show, Eq)
 
 instance Element a => Foreign.Storable (Elem a) where
     sizeOf _ = elemStrideStd140 (Proxy :: Proxy a)
@@ -633,12 +642,34 @@ instance Element DMat4x3 where
     elemAlignmentStd140 _ = 32
     elemStrideStd140 _ = 128
 
-instance (Element a, KnownNat n) => Block (SV.Vector n (Elem a)) where
+instance (Element a, KnownNat n) => Block (SVS.Vector n (Elem a)) where
     alignmentStd140 _ = elemAlignmentStd140 (Proxy :: Proxy a)
-    sizeOfStd140 v = SV.length (asProxyTypeOf undefined v) * elemStrideStd140 (Proxy :: Proxy a)
+    sizeOfStd140 v = SVS.length (asProxyTypeOf undefined v) * elemStrideStd140 (Proxy :: Proxy a)
     peekByteOffStd140 ptr off =
         let stride = elemStrideStd140 (Proxy :: Proxy a)
-        in SV.generateM $ \i -> Elem <$> peekByteOffStd140 ptr (off + stride * fromIntegral i)
+        in SVS.generateM $ \i -> Elem <$> peekByteOffStd140 ptr (off + stride * fromIntegral i)
     pokeByteOffStd140 ptr off v =
         let stride = elemStrideStd140 (Proxy :: Proxy a)
-        in SV.imapM_ (\i -> pokeByteOffStd140 ptr (off + stride * fromIntegral i) . unElem) v
+        in SVS.imapM_ (\i -> pokeByteOffStd140 ptr (off + stride * fromIntegral i) . unElem) v
+
+instance (Element a, KnownNat n) => Block (LimitedVector n (Elem a)) where
+    alignmentStd140 _ = elemAlignmentStd140 (Proxy :: Proxy a)
+    sizeOfStd140 _ =
+        let h = elemAlignmentStd140 (Proxy :: Proxy a)
+            b = fromIntegral (natVal (Proxy :: Proxy n)) * elemStrideStd140 (Proxy :: Proxy a)
+        in h + b
+    peekByteOffStd140 ptr off = do
+        let align = alignmentStd140 (Proxy :: Proxy a)
+            stride = elemStrideStd140 (Proxy :: Proxy a)
+            off' = off + align
+        size <- peekByteOffStd140 ptr off :: IO Int32
+        v <- SV.generateM (fromIntegral size) $ \i -> Elem <$> peekByteOffStd140 ptr (off' + stride * i)
+        return (LimitedVector v)
+    pokeByteOffStd140 ptr off (LimitedVector v) = do
+        let align = alignmentStd140 (Proxy :: Proxy a)
+            stride = elemStrideStd140 (Proxy :: Proxy a)
+            off' = off + align
+            size :: Int32
+            size = fromIntegral . SV.length $ v
+        pokeByteOffStd140 ptr off size
+        GV.imapM_ (\i -> pokeByteOffStd140 ptr (off' + stride * i) . unElem) v
