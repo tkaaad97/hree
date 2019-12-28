@@ -118,6 +118,8 @@ skinJointInverseMatricesBlockBindingIndex = BufferBindingIndex 4
 renderNodes :: BV.Vector (ByteString, BufferBindingIndex) -> Scene -> SceneState -> IO ()
 renderNodes ubbs scene state = do
     _ <- runMaybeT $ updateNodeMatrices scene state
+    skins <- Component.getComponentSlice (sceneSkinStore scene)
+    BV.mapM_ (updateSkinJoints scene) =<< BV.unsafeFreeze skins
     maybe (return ()) (renderMany ubbs) =<< runMaybeT (nodeToRenderInfos scene state)
     return ()
 
@@ -548,11 +550,8 @@ updateSkinJoints scene skin = go . skinJointMatricesBinder $ skin
             lift $ pokeByteOffStd140 (Foreign.castPtr p) (off + stride * i) mat
 
 getLightBlock :: LightStore -> IO LightBlock
-getLightBlock store = do
-    (v, c) <- Component.unsafeGetComponentVector store
-    let lights = SV.unsafeSlice 0 c v
-        block = LightBlock . LimitedVector $ lights
-    return block
+getLightBlock store =
+    LightBlock . LimitedVector <$> (SV.unsafeFreeze =<< Component.getComponentSlice store)
 
 mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)
 mkProgramIfNotExists scene pspec = do
@@ -670,7 +669,7 @@ deleteScene :: Scene -> IO ()
 deleteScene scene = do
     (buffers, textures) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
     meshes <- Component.getComponentSlice (sceneMeshStore scene)
-    vaos <- BV.map meshInfoVertexArray <$> BV.freeze meshes
+    vaos <- BV.map meshInfoVertexArray <$> BV.unsafeFreeze meshes
     BV.mapM_ GLW.deleteObject vaos
     GLW.deleteObjects buffers
     GLW.deleteObjects textures
