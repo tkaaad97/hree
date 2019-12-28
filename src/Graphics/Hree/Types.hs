@@ -15,6 +15,8 @@ module Graphics.Hree.Types
     , NodeInfo(..)
     , Scene(..)
     , SceneState(..)
+    , Skin(..)
+    , SkinId(..)
     ) where
 
 import Data.ByteString (ByteString)
@@ -118,6 +120,7 @@ data SceneState = SceneState
     { ssMeshCounter       :: !MeshId
     , ssNodeCounter       :: !NodeId
     , ssLightCounter      :: !LightId
+    , ssSkinCounter       :: !SkinId
     , ssRootNodes         :: !(BV.Vector NodeId)
     , ssBuffers           :: ![GLW.Buffer]
     , ssTextures          :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))

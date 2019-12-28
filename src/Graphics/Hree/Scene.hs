@@ -15,6 +15,7 @@ module Graphics.Hree.Scene
     , addNode
     , addRootNodes
     , addSampler
+    , addSkin
     , addTexture
     , applyTransformToNode
     , deleteScene
@@ -51,6 +52,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, maybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
+import qualified Data.Vector.Generic as GV (imapM_)
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word16, Word32, Word8)
 import Foreign (Ptr)
@@ -66,7 +68,7 @@ import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.GL
-import Graphics.Hree.GL.Block (Block(..), Elem(..))
+import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..), Std140(..))
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
@@ -494,6 +496,42 @@ updateLight scene lightId f =
     where
     g = Elem . marshalLight . f . unmarshalLight . unElem
 
+addSkin :: Scene -> NodeId -> SV.Vector NodeId -> SV.Vector Mat4 -> IO SkinId
+addSkin scene nodeId joints inverseBindMatrices = do
+    skinId <- atomicModifyIORef' (sceneState scene) addSkinFunc
+    let len = SV.length joints
+        invLen = SV.length inverseBindMatrices
+        jointMats = SV.replicate len (Elem Linear.identity)
+        invMats =
+            if invLen < len
+                then SV.map Elem inverseBindMatrices `mappend` SV.replicate (len - invLen) (Elem Linear.identity)
+                else SV.map Elem . SV.slice 0 len $ inverseBindMatrices
+    jointMatBinder <- mkMatricesBlockBinder scene jointMats
+    invMatBinder <- mkMatricesBlockBinder scene invMats
+    let skin = Skin nodeId inverseBindMatrices joints jointMatBinder invMatBinder
+    Component.addComponent skinId skin (sceneSkinStore scene)
+    return skinId
+
+    where
+    addSkinFunc state =
+        let skinId = ssSkinCounter state
+            skinIdNext = skinId + 1
+            newState = state { ssSkinCounter = skinIdNext }
+        in (newState, skinId)
+
+updateSkinJoints :: Scene -> Skin -> IO ()
+updateSkinJoints scene skin = go . skinJointMatricesBinder $ skin
+    where
+    joints = skinJoints skin
+    store = sceneNodeTransformMatrixStore scene
+    stride = elemStrideStd140 (Proxy :: Proxy Mat4)
+    off = alignmentStd140 (Proxy :: Proxy Mat4)
+    go (MatricesBlockBinder binder) =
+        updateUniformBlockWith binder $ \p ->
+        flip GV.imapM_ joints $ \i nodeId -> runMaybeT $ do
+            mat <- MaybeT $ Component.readComponent nodeId store
+            lift $ pokeByteOffStd140 (Foreign.castPtr p) (off + stride * i) mat
+
 getLightBlock :: LightStore -> IO LightBlock
 getLightBlock store = do
     (v, c) <- Component.unsafeGetComponentVector store
@@ -602,6 +640,7 @@ initialSceneState =
     let meshCounter = MeshId 1
         nodeCounter = NodeId 1
         lightCounter = LightId 1
+        skinCounter = SkinId 1
         rootNodes = BV.empty
         buffers = mempty
         textures = mempty
@@ -610,7 +649,7 @@ initialSceneState =
         cameraBlockBinder = Nothing
         lightBlockBinder = Nothing
         programs = mempty
-    in SceneState meshCounter nodeCounter lightCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder programs
+    in SceneState meshCounter nodeCounter lightCounter skinCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder programs
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
