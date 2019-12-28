@@ -1,5 +1,5 @@
 module Graphics.Hree.GL.UniformBlock
-    ( UniformBlockBinder
+    ( UniformBlockBinder(..)
     , bindUniformBuffer
     , newUniformBlockBinder
     , updateAndBindUniformBuffer

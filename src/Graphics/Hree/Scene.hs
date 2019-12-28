@@ -97,6 +97,8 @@ renderScene scene camera = do
     ubbs = BV.fromList
         [ ("CameraBlock", cameraBlockBindingIndex)
         , ("LightBlock", lightBlockBindingIndex)
+        , ("SkinJointMatricesBlock", skinJointMatricesBlockBindingIndex)
+        , ("SkinJointInverseMatricesBlock", skinJointInverseMatricesBlockBindingIndex)
         ]
     bindCamera maybeBinder = do
         cameraBlock <- updateCameraBlock camera
@@ -167,6 +169,7 @@ nodeToRenderInfos scene state =
     catMaybes <$> foldNodes scene state go () []
     where
     meshStore = sceneMeshStore scene
+    skinStore = sceneSkinStore scene
     globalMatrixStore = sceneNodeGlobalTransformMatrixStore scene
 
     go node () xs = do
@@ -176,21 +179,24 @@ nodeToRenderInfos scene state =
     f node = do
         let nodeId = nodeInfoId node
             inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
+            maybeSkinId = nodeSkin . nodeInfoNode $ node
         meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
         meshInfo <- MaybeT $ Component.readComponent meshId meshStore
         program <- either (lift . fmap fst . mkProgramIfNotExists scene) return $ meshInfoProgram meshInfo
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
         defaultTexture <- lift $ mkDefaultTextureIfNotExists scene
+        skin <- maybe (return Nothing) (lift . flip Component.readComponent skinStore) maybeSkinId
         let matrix = globalMatrix !*! inverseBindMatrix
-        let renderInfo = toRenderInfo program defaultTexture meshInfo matrix
+        let renderInfo = toRenderInfo program defaultTexture meshInfo skin matrix
         return renderInfo
 
-toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> Mat4 -> RenderInfo
-toRenderInfo program defaultTexture meshInfo matrix =
+toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> Maybe Skin -> Mat4 -> RenderInfo
+toRenderInfo program defaultTexture meshInfo skin matrix =
     let maybeUniform = toUniformEntry ("modelMatrix", Uniform matrix)
         uniforms = BV.mapMaybe toUniformEntry $ (BV.fromList . Map.toList $ materialUniforms material) `mappend` textureUniforms
         uniforms' = maybe uniforms (BV.snoc uniforms) maybeUniform
-        renderInfo = RenderInfo program dm vao uniforms' mempty textures
+        ubs = maybe mempty getSkinUbs skin
+        renderInfo = RenderInfo program dm vao uniforms' ubs textures
     in renderInfo
     where
     mesh = meshInfoMesh meshInfo
@@ -206,6 +212,11 @@ toRenderInfo program defaultTexture meshInfo matrix =
         then BV.singleton defaultTexture
         else BV.map snd mtextures
     textureUniforms = BV.zip (BV.map fst mtextures) (BV.generate (BV.length textures) (Uniform . (fromIntegral :: Int -> GL.GLuint)))
+    getSkinUbs x =
+        let joint = (skinJointMatricesBlockBindingIndex, getMatricesBlockBinderBuffer . skinJointMatricesBinder $ x)
+            inv = (skinJointInverseMatricesBlockBindingIndex, getMatricesBlockBinderBuffer . skinJointInverseMatricesBinder $ x)
+        in BV.fromList [joint, inv]
+    getMatricesBlockBinderBuffer (MatricesBlockBinder binder) = uniformBlockBinderBuffer binder
 
 resolveDrawMethod :: Mesh -> DrawMethod
 resolveDrawMethod mesh =
@@ -287,7 +298,7 @@ addNode scene node isRoot = do
             rootNodes = if isRoot
                 then BV.snoc (ssRootNodes state) nodeId
                 else ssRootNodes state
-            nodeInfo = NodeInfo nodeId node mempty
+            nodeInfo = NodeInfo nodeId node
             newState = state
                 { ssNodeCounter = nodeIdNext
                 , ssRootNodes = rootNodes

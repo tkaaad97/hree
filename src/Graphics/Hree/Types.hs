@@ -30,7 +30,6 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Mutable as MBV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
-import qualified Data.Vector.Unboxed as UV
 import Foreign (Storable)
 import GHC.TypeNats (KnownNat)
 import qualified GLW
@@ -100,9 +99,8 @@ data Node = Node
     } deriving (Show, Eq)
 
 data NodeInfo = NodeInfo
-    { nodeInfoId         :: !NodeId
-    , nodeInfoNode       :: !Node
-    , nodeInfoSkinJoints :: !(UV.Vector (Int, Int))
+    { nodeInfoId   :: !NodeId
+    , nodeInfoNode :: !Node
     } deriving (Show, Eq)
 
 data Scene = Scene
