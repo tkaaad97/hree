@@ -17,8 +17,10 @@ module Graphics.Hree.Types
     , SceneState(..)
     , Skin(..)
     , SkinId(..)
+    , TransformInfo(..)
     ) where
 
+import Chronos (Time)
 import Data.ByteString (ByteString)
 import qualified Data.Component as Component
 import Data.Hashable (Hashable(..))
@@ -30,7 +32,7 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Mutable as MBV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
-import Foreign (Storable)
+import Foreign (Storable(..), castPtr, plusPtr)
 import GHC.TypeNats (KnownNat)
 import qualified GLW
 import Graphics.Hree.Camera
@@ -103,11 +105,17 @@ data NodeInfo = NodeInfo
     , nodeInfoNode :: !Node
     } deriving (Show, Eq)
 
+data TransformInfo = TransformInfo
+    { transformInfoTransform :: !Transform
+    , transformInfoUpdated   :: !Bool
+    , transformInfoSyncedAt  :: !Time
+    } deriving (Show, Eq)
+
 data Scene = Scene
     { sceneState                          :: !(IORef SceneState)
     , sceneMeshStore                      :: !(Component.ComponentStore MBV.MVector MeshId MeshInfo)
     , sceneNodeStore                      :: !(Component.ComponentStore MBV.MVector NodeId NodeInfo)
-    , sceneNodeTransformStore             :: !(Component.ComponentStore MSV.MVector NodeId Transform)
+    , sceneNodeTransformStore             :: !(Component.ComponentStore MSV.MVector NodeId TransformInfo)
     , sceneNodeTransformMatrixStore       :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
     , sceneNodeGlobalTransformMatrixStore :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
     , sceneLightStore                     :: !LightStore
@@ -145,3 +153,19 @@ type LightStore = Component.ComponentStore MSV.MVector LightId (Elem LightStruct
 
 instance Show MatricesBlockBinder where
     show (MatricesBlockBinder a) = "MatricesBlockBinder {" ++ show a ++ "}"
+
+instance Storable TransformInfo where
+    sizeOf _ = 56
+
+    alignment _ = 8
+
+    peek ptr = do
+        transform <- peek $ castPtr ptr
+        updated <- peek $ castPtr ptr `plusPtr` 40
+        syncedAt <- peek $ castPtr ptr `plusPtr` 48
+        return $ TransformInfo transform updated syncedAt
+
+    poke ptr (TransformInfo transform updated syncedAt) = do
+        poke (castPtr ptr) transform
+        poke (castPtr ptr `plusPtr` 40) updated
+        poke (castPtr ptr `plusPtr` 48) syncedAt

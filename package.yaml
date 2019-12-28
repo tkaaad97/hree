@@ -27,6 +27,7 @@ dependencies:
 - bytestring
 - base64-bytestring
 - cereal
+- chronos
 - containers
 - directory
 - filepath
@@ -160,7 +161,6 @@ executables:
     dependencies:
     - hree
     - GLFW-b
-    - chronos
 
   standard-material-1:
     main:                Main.hs

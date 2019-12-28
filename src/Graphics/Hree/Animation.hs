@@ -131,17 +131,17 @@ lowerBound vec a =
 
 interpolate :: KeyFrames -> Float -> Transform -> Transform
 interpolate (KeyFrames InterpolationStep timepoints (TrackNodeTranslation values)) t trans =
-    trans { transformTranslation = interpolateStep timepoints values t, transformUpdated = True }
+    trans { transformTranslation = interpolateStep timepoints values t }
 interpolate (KeyFrames InterpolationStep timepoints (TrackNodeRotation values)) t trans =
-    trans { transformQuaternion = interpolateStep timepoints values t, transformUpdated = True }
+    trans { transformQuaternion = interpolateStep timepoints values t }
 interpolate (KeyFrames InterpolationStep timepoints (TrackNodeScale values)) t trans =
-    trans { transformScale = interpolateStep timepoints values t, transformUpdated = True }
+    trans { transformScale = interpolateStep timepoints values t }
 interpolate (KeyFrames InterpolationLinear timepoints (TrackNodeTranslation values)) t trans =
-    trans { transformTranslation = interpolateLinear timepoints values t, transformUpdated = True }
+    trans { transformTranslation = interpolateLinear timepoints values t }
 interpolate (KeyFrames InterpolationLinear timepoints (TrackNodeRotation values)) t trans =
-    trans { transformQuaternion = interpolateQuaternion timepoints values t, transformUpdated = True }
+    trans { transformQuaternion = interpolateQuaternion timepoints values t }
 interpolate (KeyFrames InterpolationLinear timepoints (TrackNodeScale values)) t trans =
-    trans { transformScale = interpolateLinear timepoints values t, transformUpdated = True }
+    trans { transformScale = interpolateLinear timepoints values t }
 
 interpolateStep :: (Additive f, UV.Unbox (f a), Num a) => UV.Vector Float -> UV.Vector (f a) -> Float -> f a
 interpolateStep timepoints values t =

@@ -34,6 +34,7 @@ module Graphics.Hree.Scene
     , updateNode
     ) where
 
+import qualified Chronos as Time (Time, epoch, now)
 import Control.Exception (bracketOnError, throwIO)
 import Control.Monad (void, when)
 import Control.Monad.Trans.Class (lift)
@@ -84,12 +85,14 @@ import qualified System.Random.MWC as Random (asGenIO, uniformR,
 
 renderScene :: Scene -> Camera -> IO ()
 renderScene scene camera = do
+    t <- Time.now
     GLW.glClearColor 1 1 1 1
     GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
     state <- readIORef . sceneState $ scene
     bindCamera (ssCameraBlockBinder state)
     bindLight (ssLightBlockBinder state)
     renderNodes
+        t
         ubbs
         scene
         state
@@ -115,9 +118,9 @@ lightBlockBindingIndex = BufferBindingIndex 2
 skinJointMatricesBlockBindingIndex = BufferBindingIndex 3
 skinJointInverseMatricesBlockBindingIndex = BufferBindingIndex 4
 
-renderNodes :: BV.Vector (ByteString, BufferBindingIndex) -> Scene -> SceneState -> IO ()
-renderNodes ubbs scene state = do
-    _ <- runMaybeT $ updateNodeMatrices scene state
+renderNodes :: Time.Time -> BV.Vector (ByteString, BufferBindingIndex) -> Scene -> SceneState -> IO ()
+renderNodes t ubbs scene state = do
+    _ <- runMaybeT $ updateNodeMatrices t scene state
     skins <- Component.getComponentSlice (sceneSkinStore scene)
     BV.mapM_ (updateSkinJoints scene) =<< BV.unsafeFreeze skins
     maybe (return ()) (renderMany ubbs) =<< runMaybeT (nodeToRenderInfos scene state)
@@ -136,26 +139,30 @@ foldNodes scene state f a b = do
         nodes <- BV.mapM (MaybeT . flip Component.readComponent nodeStore) nodeIds
         BV.foldM' (go x1) y1 nodes
 
-updateNodeMatrices :: Scene -> SceneState -> MaybeT IO ()
-updateNodeMatrices scene state = foldNodes scene state go (zeroTransform, Linear.identity, False) ()
+updateNodeMatrices :: Time.Time -> Scene -> SceneState -> MaybeT IO ()
+updateNodeMatrices t scene state = foldNodes scene state go (False, Linear.identity, False) ()
     where
     transformStore = sceneNodeTransformStore scene
     matrixStore = sceneNodeTransformMatrixStore scene
     globalMatrixStore = sceneNodeGlobalTransformMatrixStore scene
 
-    go node (parentTransform, parentGlobalMatrix, parentGlobalUpdated) _ = do
+    go node (parentUpdated, parentGlobalMatrix, parentGlobalUpdated) _ = do
         let nodeId = nodeInfoId node
-        transform <- MaybeT $ Component.readComponent nodeId transformStore
+        transformInfo <- MaybeT $ Component.readComponent nodeId transformStore
+        let transform = transformInfoTransform transformInfo
+            updated = transformInfoUpdated transformInfo
 
         localMatrix <- lift $
-            if transformUpdated transform
+            if updated
                 then do
                     let matrix = transformMatrix transform
+                        tinfo = transformInfo { transformInfoUpdated = False, transformInfoSyncedAt = t }
                     _ <- Component.writeComponent nodeId matrix matrixStore
+                    _ <- Component.writeComponent nodeId tinfo transformStore
                     return matrix
                 else fromMaybe Linear.identity <$> Component.readComponent nodeId matrixStore
 
-        let globalUpdated = parentGlobalUpdated || transformUpdated parentTransform || transformUpdated transform
+        let globalUpdated = parentGlobalUpdated || parentUpdated || updated
         globalMatrix <- lift $
             if globalUpdated
                 then do
@@ -164,7 +171,7 @@ updateNodeMatrices scene state = foldNodes scene state go (zeroTransform, Linear
                     return matrix
                 else fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
 
-        return ((transform, globalMatrix, globalUpdated), ())
+        return ((updated, globalMatrix, globalUpdated), ())
 
 nodeToRenderInfos :: Scene -> SceneState -> MaybeT IO [RenderInfo]
 nodeToRenderInfos scene state =
@@ -285,11 +292,12 @@ addNode :: Scene -> Node -> Bool -> IO NodeId
 addNode scene node isRoot = do
     nodeInfo <- atomicModifyIORef' (sceneState scene) addNodeFunc
     let nodeId = nodeInfoId nodeInfo
-        transform = Transform (nodeTranslation node) (nodeRotation node) (nodeScale node) False
+        transform = Transform (nodeTranslation node) (nodeRotation node) (nodeScale node)
+        transformInfo = TransformInfo transform False Time.epoch
         matrix = transformMatrix transform
         globalMatrix = Linear.identity
     Component.addComponent nodeId nodeInfo (sceneNodeStore scene)
-    Component.addComponent nodeId transform (sceneNodeTransformStore scene)
+    Component.addComponent nodeId transformInfo (sceneNodeTransformStore scene)
     Component.addComponent nodeId matrix (sceneNodeTransformMatrixStore scene)
     Component.addComponent nodeId globalMatrix (sceneNodeGlobalTransformMatrixStore scene)
     return nodeId
@@ -308,8 +316,10 @@ addNode scene node isRoot = do
         in (newState, nodeInfo)
 
 readNodeTransform :: Scene -> NodeId -> IO (Maybe Transform)
-readNodeTransform =
-    flip Component.readComponent . sceneNodeTransformStore
+readNodeTransform scene nodeId =
+    fmap transformInfoTransform <$> Component.readComponent nodeId store
+    where
+    store = sceneNodeTransformStore scene
 
 removeNode :: Scene -> NodeId -> IO ()
 removeNode scene nodeId = do
@@ -340,7 +350,6 @@ translateNode scene nodeId v = applyTransformToNode scene nodeId f
     where
     f transform = transform
         { transformTranslation = transformTranslation transform ^+^ v
-        , transformUpdated = True
         }
 
 rotateNode :: Scene -> NodeId -> Vec3 -> Float -> IO ()
@@ -348,14 +357,14 @@ rotateNode scene nodeId axis angle = applyTransformToNode scene nodeId f
     where
     f transform = transform
         { transformQuaternion = transformQuaternion transform * Linear.axisAngle axis angle
-        , transformUpdated = True
         }
 
 applyTransformToNode :: Scene -> NodeId -> (Transform -> Transform) -> IO ()
 applyTransformToNode scene nodeId f =
-    void $ Component.modifyComponent nodeId f transformStore
+    void $ Component.modifyComponent nodeId g transformStore
     where
     transformStore = sceneNodeTransformStore scene
+    g tinfo @ (TransformInfo transform _ _) = tinfo { transformInfoTransform = f transform, transformInfoUpdated = True }
 
 updateMeshInstanceCount :: Scene -> MeshId -> Maybe Int -> IO ()
 updateMeshInstanceCount scene meshId c =
