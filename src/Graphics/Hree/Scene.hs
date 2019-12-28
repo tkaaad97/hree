@@ -68,7 +68,7 @@ import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.GL
-import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..), Std140(..))
+import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..))
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
@@ -94,8 +94,6 @@ renderScene scene camera = do
         scene
         state
     where
-    cameraBlockBindingIndex = 1
-    lightBlockBindingIndex = 2
     ubbs = BV.fromList
         [ ("CameraBlock", cameraBlockBindingIndex)
         , ("LightBlock", lightBlockBindingIndex)
@@ -109,7 +107,13 @@ renderScene scene camera = do
         ubb <- maybe (mkLightBlockBinder scene lightBlock) return maybeBinder
         updateAndBindUniformBuffer ubb lightBlock lightBlockBindingIndex
 
-renderNodes :: BV.Vector (ByteString, GL.GLuint) -> Scene -> SceneState -> IO ()
+cameraBlockBindingIndex, lightBlockBindingIndex, skinJointMatricesBlockBindingIndex, skinJointInverseMatricesBlockBindingIndex :: BufferBindingIndex
+cameraBlockBindingIndex = BufferBindingIndex 1
+lightBlockBindingIndex = BufferBindingIndex 2
+skinJointMatricesBlockBindingIndex = BufferBindingIndex 3
+skinJointInverseMatricesBlockBindingIndex = BufferBindingIndex 4
+
+renderNodes :: BV.Vector (ByteString, BufferBindingIndex) -> Scene -> SceneState -> IO ()
 renderNodes ubbs scene state = do
     _ <- runMaybeT $ updateNodeMatrices scene state
     maybe (return ()) (renderMany ubbs) =<< runMaybeT (nodeToRenderInfos scene state)
@@ -186,7 +190,7 @@ toRenderInfo program defaultTexture meshInfo matrix =
     let maybeUniform = toUniformEntry ("modelMatrix", Uniform matrix)
         uniforms = BV.mapMaybe toUniformEntry $ (BV.fromList . Map.toList $ materialUniforms material) `mappend` textureUniforms
         uniforms' = maybe uniforms (BV.snoc uniforms) maybeUniform
-        renderInfo = RenderInfo program dm vao uniforms' textures
+        renderInfo = RenderInfo program dm vao uniforms' mempty textures
     in renderInfo
     where
     mesh = meshInfoMesh meshInfo

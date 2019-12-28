@@ -25,7 +25,7 @@ import qualified Graphics.GL as GL (GLuint)
 import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
 
-render :: BV.Vector (ByteString, GL.GLuint) -> RenderInfo -> Maybe GLW.Program -> IO (Maybe GLW.Program)
+render :: BV.Vector (ByteString, BufferBindingIndex) -> RenderInfo -> Maybe GLW.Program -> IO (Maybe GLW.Program)
 render commons a cur = do
     setCurrentProgram cur program
     GLW.glBindVertexArray (riVertexArray a)
@@ -43,7 +43,7 @@ render commons a cur = do
     setCurrentProgram _ p = do
         bindUniformBlocks p . BV.mapMaybe toUniformBlockPair $ commons
         GLW.glUseProgram p
-    toUniformBlockPair (k, bindingIndex) = do
+    toUniformBlockPair (k, BufferBindingIndex bindingIndex) = do
         blockInfo <- Map.lookup k uniformBlocks
         return (bindingIndex, ubiUniformBlockIndex blockInfo)
 
@@ -66,7 +66,7 @@ bindTextures textures = mapM_ bindTexture $ BV.zip (BV.generate (length textures
         GLW.glBindTextureUnit (fromIntegral index) texture
         GLW.glBindSampler (fromIntegral index) sampler
 
-renderMany :: Foldable t => BV.Vector (ByteString, GL.GLuint) -> t RenderInfo -> IO ()
+renderMany :: Foldable t => BV.Vector (ByteString, BufferBindingIndex) -> t RenderInfo -> IO ()
 renderMany common = void . foldrM (render common) Nothing
 
 drawWith :: DrawMethod -> IO ()

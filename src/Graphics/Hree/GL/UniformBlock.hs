@@ -16,7 +16,7 @@ import qualified GLW (Buffer, glBindBufferBase, glNamedBufferData)
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL (updateBuffer)
 import Graphics.Hree.GL.Block (Block(..), Std140(..))
-import Graphics.Hree.GL.Types (BufferSource(..))
+import Graphics.Hree.GL.Types (BufferBindingIndex(..), BufferSource(..))
 
 data UniformBlockBinder a = UniformBlockBinder
     { uniformBlockBinderBuffer :: !GLW.Buffer
@@ -53,7 +53,7 @@ bindUniformBuffer :: UniformBlockBinder a -> GL.GLuint -> IO ()
 bindUniformBuffer (UniformBlockBinder buffer _) bindingIndex =
     GLW.glBindBufferBase GL.GL_UNIFORM_BUFFER bindingIndex buffer
 
-updateAndBindUniformBuffer :: (Eq a, Block a) => UniformBlockBinder a -> a -> GL.GLuint -> IO ()
-updateAndBindUniformBuffer ubb a bindingIndex = do
+updateAndBindUniformBuffer :: (Eq a, Block a) => UniformBlockBinder a -> a -> BufferBindingIndex -> IO ()
+updateAndBindUniformBuffer ubb a (BufferBindingIndex bindingIndex) = do
     updateUniformBlock ubb a
     bindUniformBuffer ubb bindingIndex

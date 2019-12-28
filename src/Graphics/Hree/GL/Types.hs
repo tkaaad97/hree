@@ -9,6 +9,7 @@ module Graphics.Hree.GL.Types
     , AttribFormat(..)
     , AttribInfo(..)
     , BufferSource(..)
+    , BufferBindingIndex(..)
     , BindBufferSetting(..)
     , DrawMethod(..)
     , IndexBuffer(..)
@@ -109,11 +110,12 @@ data ProgramInfo = ProgramInfo
     } deriving (Show)
 
 data RenderInfo = RenderInfo
-    { riProgram     :: !ProgramInfo
-    , riDrawMethod  :: !DrawMethod
-    , riVertexArray :: !GLW.VertexArray
-    , riUniforms    :: !(BV.Vector (GLW.UniformLocation, Uniform))
-    , riTextures    :: !(BV.Vector Texture)
+    { riProgram       :: !ProgramInfo
+    , riDrawMethod    :: !DrawMethod
+    , riVertexArray   :: !GLW.VertexArray
+    , riUniforms      :: !(BV.Vector (GLW.UniformLocation, Uniform))
+    , riUniformBlocks :: !(BV.Vector (BufferBindingIndex, GLW.Buffer))
+    , riTextures      :: !(BV.Vector Texture)
     }
 
 data DrawMethod =
@@ -152,6 +154,10 @@ data IndexBuffer = IndexBuffer
 
 newtype LimitedVector (n :: Nat) a = LimitedVector
     { unLimitedVector :: SV.Vector a
+    } deriving (Show, Eq)
+
+newtype BufferBindingIndex = BufferBindingIndex
+    { unBufferBindingIndex :: GL.GLuint
     } deriving (Show, Eq)
 
 type BVec2 = V2 Bool
