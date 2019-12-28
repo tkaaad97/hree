@@ -1,10 +1,12 @@
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Graphics.Hree.Types
     ( Geometry(..)
     , LightId(..)
     , LightStore
     , Material(..)
+    , MatricesBlockBinder(..)
     , Mesh(..)
     , MeshId(..)
     , MeshInfo(..)
@@ -28,6 +30,7 @@ import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import Foreign (Storable)
+import GHC.TypeNats (KnownNat)
 import qualified GLW
 import Graphics.Hree.Camera
 import Graphics.Hree.GL.Block (Elem)
@@ -125,10 +128,19 @@ data SceneState = SceneState
     , ssPrograms          :: !(Map ProgramName ProgramInfo)
     } deriving (Show)
 
+data MatricesBlockBinder = forall n. KnownNat n => MatricesBlockBinder
+    { unMatricesBlockBinder :: !(UniformBlockBinder (LimitedVector n (Elem Mat4)))
+    }
+
 data Skin = Skin
-    { skinSkeleton            :: !NodeId
-    , skinInverseBindMatrices :: !(SV.Vector Mat4)
-    , skinJoints              :: !(SV.Vector NodeId)
-    } deriving (Show, Eq)
+    { skinSkeleton                   :: !NodeId
+    , skinInverseBindMatrices        :: !(SV.Vector Mat4)
+    , skinJoints                     :: !(SV.Vector NodeId)
+    , skinJointMatricesBinder        :: !MatricesBlockBinder
+    , skinJointInverseMatricesBinder :: !MatricesBlockBinder
+    } deriving (Show)
 
 type LightStore = Component.ComponentStore MSV.MVector LightId (Elem LightStruct)
+
+instance Show MatricesBlockBinder where
+    show (MatricesBlockBinder a) = "MatricesBlockBinder {" ++ show a ++ "}"

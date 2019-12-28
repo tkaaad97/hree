@@ -1,5 +1,6 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Hree.Scene
     ( MeshId(..)
     , MeshInfo(..)
@@ -54,6 +55,7 @@ import qualified Data.Vector.Storable as SV
 import Data.Word (Word16, Word32, Word8)
 import Foreign (Ptr)
 import qualified Foreign (castPtr, copyArray, nullPtr, plusPtr, withArray)
+import GHC.TypeNats (KnownNat)
 import qualified GLW
 import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit,
                                                     glDepthBufferBit)
@@ -562,6 +564,23 @@ mkLightBlockBinder scene block = do
     where
     setLightBlockBinder ubb s =
         (s { ssLightBlockBinder = Just ubb }, ())
+
+mkMatricesBlockBinder :: Scene -> SV.Vector (Elem Mat4) -> IO MatricesBlockBinder
+mkMatricesBlockBinder scene mats = do
+    buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
+    addBufferResource scene buffer
+    go buffer
+
+    where
+    len = SV.length mats
+    go buffer
+        | len <= 128 = mk (Proxy :: Proxy 128) buffer
+        | len <= 256 = mk (Proxy :: Proxy 256) buffer
+        | otherwise  = mk (Proxy :: Proxy 512) buffer
+
+    mk :: forall p n. KnownNat n => p n -> GLW.Buffer -> IO MatricesBlockBinder
+    mk _ buffer =
+        MatricesBlockBinder <$> newUniformBlockBinder buffer (LimitedVector mats :: LimitedVector n (Elem Mat4))
 
 newScene :: IO Scene
 newScene = do
