@@ -3,7 +3,7 @@
 #ifdef USE_SKINNING
 
 struct JointMatrixArray {
-    Light items[MAX_JOINT_COUNT];
+    mat4 items[MAX_JOINT_COUNT];
 };
 
 layout(std140) uniform JointMatricesBlock {
