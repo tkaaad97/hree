@@ -189,9 +189,9 @@ nodeToRenderInfos scene state =
     f node = do
         let nodeId = nodeInfoId node
             inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
-            maybeSkinId = nodeSkin . nodeInfoNode $ node
         meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
         meshInfo <- MaybeT $ Component.readComponent meshId meshStore
+        let maybeSkinId = meshInfoSkin meshInfo
         program <- either (lift . fmap fst . mkProgramIfNotExists scene) return $ meshInfoProgram meshInfo
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
         defaultTexture <- lift $ mkDefaultTextureIfNotExists scene
@@ -270,7 +270,7 @@ addMesh_ scene mesh maybeSkinId = do
             bos = map fst . IntMap.elems $ buffers
             bos' = maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
             programInfo = Right program
-            minfo = MeshInfo meshId mesh bos' programInfo vao
+            minfo = MeshInfo meshId mesh maybeSkinId bos' programInfo vao
             newState = state
                 { ssMeshCounter = meshIdNext
                 }
@@ -341,7 +341,7 @@ addRootNodes scene nodeIds = atomicModifyIORef' (sceneState scene) addRootNodesF
         in (state', ())
 
 newNode :: Node
-newNode = Node Nothing Nothing Nothing BV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1) Linear.identity
+newNode = Node Nothing Nothing BV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1) Linear.identity
 
 translateNode :: Scene -> NodeId -> Vec3 -> IO ()
 translateNode scene nodeId v = applyTransformToNode scene nodeId f

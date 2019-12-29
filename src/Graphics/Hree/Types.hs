@@ -76,6 +76,7 @@ data Mesh = Mesh
 data MeshInfo = MeshInfo
     { meshInfoId          :: !MeshId
     , meshInfoMesh        :: !Mesh
+    , meshInfoSkin        :: !(Maybe SkinId)
     , meshInfoBuffers     :: ![GLW.Buffer]
     , meshInfoProgram     :: !(Either ProgramSpec ProgramInfo)
     , meshInfoVertexArray :: !GLW.VertexArray
@@ -92,7 +93,6 @@ newtype SkinId = SkinId
 data Node = Node
     { nodeName              :: !(Maybe Text)
     , nodeMesh              :: !(Maybe MeshId)
-    , nodeSkin              :: !(Maybe SkinId)
     , nodeChildren          :: !(BV.Vector NodeId)
     , nodeTranslation       :: !Vec3
     , nodeRotation          :: !Quaternion
