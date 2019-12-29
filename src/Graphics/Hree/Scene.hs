@@ -16,6 +16,7 @@ module Graphics.Hree.Scene
     , addRootNodes
     , addSampler
     , addSkin
+    , addSkinnedMesh
     , addTexture
     , applyTransformToNode
     , deleteScene
@@ -245,42 +246,39 @@ resolveDrawMethod mesh =
         DrawElementsInstanced PrimitiveType.glTriangles indicesCount dt (Foreign.nullPtr `Foreign.plusPtr` offset) instanceCount
 
 addMesh :: Scene -> Mesh -> IO MeshId
-addMesh scene mesh = do
+addMesh scene mesh = addMesh_ scene mesh Nothing
+
+addSkinnedMesh :: Scene -> Mesh -> SkinId -> IO MeshId
+addSkinnedMesh scene mesh skin = addMesh_ scene mesh (Just skin)
+
+addMesh_ :: Scene -> Mesh -> Maybe SkinId -> IO MeshId
+addMesh_ scene mesh maybeSkinId = do
+    maybeSkin <- maybe (return Nothing) (`Component.readComponent` sceneSkinStore scene) maybeSkinId
+    let pspec = resolveProgramSpec mesh maybeSkin
     (program, _) <- mkProgramIfNotExists scene pspec
-    maybeProgram <- lookupProgramInfo
     GLW.glUseProgram (programInfoProgram program)
     vao <- mkVertexArray (geometryAttribBindings geo) buffers maybeIndexBuffer program
-    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc maybeProgram vao)
+    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc program vao)
     let meshId = meshInfoId minfo
     Component.addComponent meshId minfo (sceneMeshStore scene)
     return meshId
 
     where
-    addMeshFunc maybeProgram vao state =
+    addMeshFunc program vao state =
         let meshId = ssMeshCounter state
             meshIdNext = meshId + 1
             bos = map fst . IntMap.elems $ buffers
             bos' = maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
-            programInfo = maybe (Left pspec) Right maybeProgram
+            programInfo = Right program
             minfo = MeshInfo meshId mesh bos' programInfo vao
-            programs = maybe
-                        (ssPrograms state)
-                        (\p -> Map.insert (getProgramName pspec) p (ssPrograms state))
-                        maybeProgram
             newState = state
                 { ssMeshCounter = meshIdNext
-                , ssPrograms = programs
                 }
         in (newState, minfo)
-
-    lookupProgramInfo = do
-        programs <- fmap ssPrograms . readIORef . sceneState $ scene
-        return . Map.lookup (getProgramName pspec) $ programs
 
     geo = meshGeometry mesh
     buffers = geometryBuffers geo
     maybeIndexBuffer = geometryIndexBuffer geo
-    pspec = resolveProgramSpec mesh
 
 removeMesh :: Scene -> MeshId -> IO ()
 removeMesh scene meshId = do
