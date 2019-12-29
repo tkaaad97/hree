@@ -24,6 +24,7 @@ out vec4 fragmentColor;
 #endif
 
 #include <camerablock.glsl>
+#include <skin.glsl>
 
 uniform mat4 modelMatrix = mat4(1.0);
 

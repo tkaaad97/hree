@@ -17,12 +17,16 @@ module Graphics.Hree.Program
     , getProgramName
     , mkProgram
     , setGlslVersion
+    , setHasJointIndices
+    , setHasJointWeights
     , setHasMetallicRoughnessMap
     , setHasNormalMap
     , setHasVertexNormal
     , setHasVertexTangent
     , setHasVertexColor
+    , setMaxJointCount
     , setMaxLightCount
+    , setUseVertexSkinning
     , spriteProgramSpec
     , standardProgramSpec
     , testProgramSpec
@@ -60,12 +64,16 @@ import System.IO.Error (userError)
 
 data Options = Options
     { optionsGlslVersion             :: !(Maybe Int)
-    , optionsHasNormalMap            :: !Bool
+    , optionsHasJointIndices         :: !Bool
+    , optionsHasJointWeights         :: !Bool
     , optionsHasMetallicRoughnessMap :: !Bool
+    , optionsHasNormalMap            :: !Bool
+    , optionsHasVertexColor          :: !Bool
     , optionsHasVertexNormal         :: !Bool
     , optionsHasVertexTangent        :: !Bool
-    , optionsHasVertexColor          :: !Bool
+    , optionsMaxJointCount           :: !Int
     , optionsMaxLightCount           :: !Int
+    , optionsUseVertexSkinning       :: !Bool
     } deriving (Show, Eq, Generic)
 
 data EmbeddedProgramType =
@@ -98,16 +106,26 @@ newtype ProgramName = ProgramName
 defaultOptions :: Options
 defaultOptions = Options
     { optionsGlslVersion = Just 450
+    , optionsHasJointIndices = False
+    , optionsHasJointWeights = False
     , optionsHasNormalMap = False
     , optionsHasMetallicRoughnessMap = False
     , optionsHasVertexNormal = False
     , optionsHasVertexTangent = False
     , optionsHasVertexColor = False
+    , optionsMaxJointCount = 128
     , optionsMaxLightCount = maxLightCount
+    , optionsUseVertexSkinning = False
     }
 
 setGlslVersion :: Options -> Maybe Int -> Options
 setGlslVersion options a = options { optionsGlslVersion = a }
+
+setHasJointIndices :: Options -> Bool -> Options
+setHasJointIndices options a = options { optionsHasJointIndices = a }
+
+setHasJointWeights :: Options -> Bool -> Options
+setHasJointWeights options a = options { optionsHasJointWeights = a }
 
 setHasNormalMap :: Options -> Bool -> Options
 setHasNormalMap options a = options { optionsHasNormalMap = a }
@@ -124,8 +142,14 @@ setHasVertexTangent options a = options { optionsHasVertexTangent = a }
 setHasVertexColor :: Options -> Bool -> Options
 setHasVertexColor options a = options { optionsHasVertexColor = a }
 
+setMaxJointCount :: Options -> Int -> Options
+setMaxJointCount options a = options { optionsMaxJointCount = a }
+
 setMaxLightCount :: Options -> Int -> Options
 setMaxLightCount options a = options { optionsMaxLightCount = a }
+
+setUseVertexSkinning :: Options -> Bool -> Options
+setUseVertexSkinning options a = options { optionsUseVertexSkinning = a }
 
 basicProgramSpec :: Options -> ProgramSpec
 basicProgramSpec = EmbeddedProgram BasicProgram
@@ -219,6 +243,12 @@ getEmbeddedFragmentShaderSource TestProgram = $(preprocessFile "shader/test-frag
 renderOptions :: Options -> ByteString
 renderOptions options = ByteString.intercalate "\n" . catMaybes $
     [ mappend "#version " . ByteString.pack . show <$> optionsGlslVersion options
+    , if optionsHasJointIndices options
+        then Just "#define HAS_JOINT_INDICES"
+        else Nothing
+    , if optionsHasJointWeights options
+        then Just "#define HAS_JOINT_WEIGHTS"
+        else Nothing
     , if optionsHasNormalMap options
         then Just "#define HAS_NORMAL_MAP"
         else Nothing
@@ -234,7 +264,11 @@ renderOptions options = ByteString.intercalate "\n" . catMaybes $
     , if optionsHasVertexColor options
         then Just "#define HAS_VERTEX_COLOR"
         else Nothing
+    , Just $ "#define MAX_JOINT_COUNT " `mappend` (ByteString.pack . show . optionsMaxJointCount $ options)
     , Just $ "#define MAX_LIGHT_COUNT " `mappend` (ByteString.pack . show . optionsMaxLightCount $ options)
+    , if optionsUseVertexSkinning options
+        then Just "#define USE_VERTEX_SKINNING"
+        else Nothing
     , Just ""
     ]
 

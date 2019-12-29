@@ -16,6 +16,8 @@ resolveProgramSpec mesh =
         material = meshMaterial mesh
         textures = materialTextures material
         options = defaultOptions
+            & applyWhen (hasAttribute geo "jointIndices") (`setHasJointIndices` True)
+            & applyWhen (hasAttribute geo "jointWeights") (`setHasJointWeights` True)
             & applyWhen (hasAttribute geo "normal") (`setHasVertexNormal` True)
             & applyWhen (hasAttribute geo "tangent") (`setHasVertexTangent` True)
             & applyWhen (hasAttribute geo "color") (`setHasVertexColor` True)
