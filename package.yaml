@@ -140,6 +140,15 @@ executables:
     - hree
     - GLFW-b
 
+  skinning-1:
+    main:                Main.hs
+    source-dirs:
+    - examples/skinning-1
+    - examples-common
+    dependencies:
+    - hree
+    - GLFW-b
+
 tests:
   hree-test:
     main:                Spec.hs
