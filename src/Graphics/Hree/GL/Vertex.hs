@@ -20,12 +20,13 @@ import Data.Proxy (Proxy)
 import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
 import qualified Graphics.GL as GL
+import Graphics.Hree.GL (attribFormat)
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Math
 
 data VertexField = VertexField
-    { vertexFieldAttribName   :: !ByteString
-    , vertexFieldAttribFormat :: !AttribFormat
+    { vertexFieldAttribName      :: !ByteString
+    , vertexFieldAttributeFormat :: !AttributeFormat
     } deriving (Show, Eq)
 
 data VertexSpec = VertexSpec
@@ -80,10 +81,10 @@ instance Vertex BasicVertex where
     vertexSpec _ = VertexSpec bbs fields
 
         where
-        positionField = VertexField "position" (AttribFormat 3 GL.GL_FLOAT False positionOffset)
-        normalField = VertexField "normal" (AttribFormat 3 GL.GL_FLOAT False normalOffset)
-        uvField = VertexField "uv" (AttribFormat 2 GL.GL_FLOAT False uvOffset)
-        colorField = VertexField "color" (AttribFormat 4 GL.GL_UNSIGNED_BYTE True colorOffset)
+        positionField = VertexField "position" (attribFormat 3 GL.GL_FLOAT False positionOffset)
+        normalField = VertexField "normal" (attribFormat 3 GL.GL_FLOAT False normalOffset)
+        uvField = VertexField "uv" (attribFormat 2 GL.GL_FLOAT False uvOffset)
+        colorField = VertexField "color" (attribFormat 4 GL.GL_UNSIGNED_BYTE True colorOffset)
         fields = [ positionField
             , normalField
             , uvField
@@ -114,8 +115,8 @@ instance Vertex PositionAndNormal where
     vertexSpec _ = VertexSpec bbs fields
 
         where
-        positionField = VertexField "position" (AttribFormat 3 GL.GL_FLOAT False positionOffset)
-        normalField = VertexField "normal" (AttribFormat 3 GL.GL_FLOAT False normalOffset)
+        positionField = VertexField "position" (attribFormat 3 GL.GL_FLOAT False positionOffset)
+        normalField = VertexField "normal" (attribFormat 3 GL.GL_FLOAT False normalOffset)
         fields = [ positionField
             , normalField
             ]
@@ -129,7 +130,7 @@ instance Vertex Uv where
     vertexSpec _ = VertexSpec bbs fields
 
         where
-        uvField = VertexField "uv" (AttribFormat 2 GL.GL_FLOAT False 0)
+        uvField = VertexField "uv" (attribFormat 2 GL.GL_FLOAT False 0)
         fields = [ uvField ]
         bbs = BindBufferSetting 0 (sizeOf (undefined :: Uv)) 0
 
@@ -156,8 +157,8 @@ instance Vertex SpriteOffset where
     vertexSpec _ = VertexSpec bbs fields
 
         where
-        positionOffsetField = VertexField "positionOffset" (AttribFormat 3 GL.GL_FLOAT False 0)
-        uvOffsetField = VertexField "uvOffset" (AttribFormat 2 GL.GL_FLOAT False 12)
+        positionOffsetField = VertexField "positionOffset" (attribFormat 3 GL.GL_FLOAT False 0)
+        uvOffsetField = VertexField "uvOffset" (attribFormat 2 GL.GL_FLOAT False 12)
         fields =
             [ positionOffsetField
             , uvOffsetField
@@ -196,11 +197,11 @@ instance Vertex SpriteVertex where
     vertexSpec _ = VertexSpec bbs fields
 
         where
-        positionField = VertexField "position" (AttribFormat 3 GL.GL_FLOAT False 0)
-        sizeField = VertexField "size" (AttribFormat 3 GL.GL_FLOAT False 12)
-        angleField = VertexField "angle" (AttribFormat 1 GL.GL_FLOAT False 24)
-        uvField = VertexField "uv" (AttribFormat 2 GL.GL_FLOAT False 28)
-        uvSizeField = VertexField "uvSize" (AttribFormat 2 GL.GL_FLOAT False 36)
+        positionField = VertexField "position" (attribFormat 3 GL.GL_FLOAT False 0)
+        sizeField = VertexField "size" (attribFormat 3 GL.GL_FLOAT False 12)
+        angleField = VertexField "angle" (attribFormat 1 GL.GL_FLOAT False 24)
+        uvField = VertexField "uv" (attribFormat 2 GL.GL_FLOAT False 28)
+        uvSizeField = VertexField "uvSize" (attribFormat 2 GL.GL_FLOAT False 36)
         fields =
             [ positionField
             , sizeField

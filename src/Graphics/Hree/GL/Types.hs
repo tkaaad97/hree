@@ -6,7 +6,10 @@
 {-# LANGUAGE TypeOperators             #-}
 module Graphics.Hree.GL.Types
     ( AttribBinding(..)
+    , AttributeFormat(..)
     , AttribFormat(..)
+    , AttribIFormat(..)
+    , AttribLFormat(..)
     , AttribInfo(..)
     , BufferSource(..)
     , BufferBindingIndex(..)
@@ -87,11 +90,29 @@ data UniformBlockInfo = UniformBlockInfo
     , ubiUniformBlockUniforms :: !(BV.Vector UniformInfo)
     } deriving (Show, Eq)
 
+data AttributeFormat =
+    AttribFormat' AttribFormat |
+    AttribIFormat' AttribIFormat |
+    AttribLFormat' AttribLFormat
+    deriving (Show, Eq)
+
 data AttribFormat = AttribFormat
     { attribFormatSize           :: !Int
     , attribFormatComponentType  :: !GL.GLenum
     , attribFormatNormalized     :: !Bool
     , attribFormatRelativeOffset :: !Int
+    } deriving (Show, Eq)
+
+data AttribIFormat = AttribIFormat
+    { attribIFormatSize           :: !Int
+    , attribIFormatComponentType  :: !GL.GLenum
+    , attribIFormatRelativeOffset :: !Int
+    } deriving (Show, Eq)
+
+data AttribLFormat = AttribLFormat
+    { attribLFormatSize           :: !Int
+    , attribLFormatComponentType  :: !GL.GLenum
+    , attribLFormatRelativeOffset :: !Int
     } deriving (Show, Eq)
 
 data AttribInfo = AttribInfo
@@ -137,8 +158,8 @@ data BindBufferSetting = BindBufferSetting
     } deriving (Show, Eq)
 
 data AttribBinding = AttribBinding
-    { attribBindingIndex        :: !GLW.BindingIndex
-    , attribBindingAttribFormat :: !AttribFormat
+    { attribBindingIndex           :: !GLW.BindingIndex
+    , attribBindingAttributeFormat :: !AttributeFormat
     } deriving (Show, Eq)
 
 newtype Texture = Texture

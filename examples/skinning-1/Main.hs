@@ -14,15 +14,15 @@ import qualified Graphics.GL as GL
 import qualified Graphics.Hree.Animation as Animation
 import Graphics.Hree.Camera
 import qualified Graphics.Hree.Geometry as Geometry
-import Graphics.Hree.GL.Types (AttribFormat(..), BindBufferSetting(..), IVec4,
-                               Vec3, Vec4)
+import Graphics.Hree.GL (attribFormat, attribIFormat)
+import Graphics.Hree.GL.Types (BindBufferSetting(..), IVec4, Vec3, Vec4)
 import Graphics.Hree.GL.Vertex (Vertex(..), VertexField(..), VertexSpec(..))
 import qualified Graphics.Hree.Light as Light
 import qualified Graphics.Hree.Material as Material
 import qualified Graphics.Hree.Scene as Scene
 import Graphics.Hree.Types (Geometry(..), Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
-import Linear (Quaternion(..), V3(..), V4(..), axisAngle, inv44)
+import Linear (Quaternion(..), V3(..), V4(..))
 import Prelude hiding (init)
 
 data SkinVertex = SkinVertex
@@ -51,9 +51,9 @@ instance Vertex SkinVertex where
     vertexSpec _ = VertexSpec bbs fields
 
         where
-        positionField = VertexField "position" (AttribFormat 3 GL.GL_FLOAT False 0)
-        jointIndicesField = VertexField "jointIndices" (AttribFormat 4 GL.GL_INT False 12)
-        jointWeightsField = VertexField "jointWeights" (AttribFormat 4 GL.GL_FLOAT False 28)
+        positionField = VertexField "position" (attribFormat 3 GL.GL_FLOAT False 0)
+        jointIndicesField = VertexField "jointIndices" (attribIFormat 4 GL.GL_INT 12)
+        jointWeightsField = VertexField "jointWeights" (attribFormat 4 GL.GL_FLOAT False 28)
         fields =
             [ positionField
             , jointIndicesField
@@ -98,18 +98,18 @@ main =
     timePoints = UV.fromList [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5]
 
     rotations = UV.fromList
-        [ Quaternion 0.0 (V3 0.0 0.0 1.0)
-        , Quaternion 0.0 (V3 0.0 0.383 0.924)
-        , Quaternion 0.0 (V3 0.0 0.707 0.707)
-        , Quaternion 0.0 (V3 0.0 0.707 0.707)
-        , Quaternion 0.0 (V3 0.0 0.383 0.924)
-        , Quaternion 0.0 (V3 0.0 0.0 1.0)
-        , Quaternion 0.0 (V3 0.0 0.0 1.0)
-        , Quaternion 0.0 (V3 0.0 (-0.383) 0.924)
-        , Quaternion 0.0 (V3 0.0 (-0.707) 0.707)
-        , Quaternion 0.0 (V3 0.0 (-0.707) 0.707)
-        , Quaternion 0.0 (V3 0.0 (-0.383) 0.924)
-        , Quaternion 0.0 (V3 0.0 0.0 1.0)
+        [ Quaternion 1.0 (V3 0.0 0.0 0.0)
+        , Quaternion 0.924 (V3 0.0 0.0 0.383)
+        , Quaternion 0.707 (V3 0.0 0.0 0.707)
+        , Quaternion 0.707 (V3 0.0 0.0 0.707)
+        , Quaternion 0.924 (V3 0.0 0.0 0.383)
+        , Quaternion 1.0 (V3 0.0 0.0 0.0)
+        , Quaternion 1.0 (V3 0.0 0.0 0.0)
+        , Quaternion 0.924 (V3 0.0 0.0 (-0.383))
+        , Quaternion 0.707 (V3 0.0 0.0 (-0.707))
+        , Quaternion 0.707 (V3 0.0 0.0 (-0.707))
+        , Quaternion 0.924 (V3 0.0 0.0 (-0.383))
+        , Quaternion 1.0 (V3 0.0 0.0 0.0)
         ]
 
     defaultAspect = fromIntegral width / fromIntegral height
@@ -126,7 +126,7 @@ main =
         indexBuffer <- Scene.addIndexBufferUInt scene indices
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry { geometryIndexBuffer = Just indexBuffer } vs GL.GL_STREAM_DRAW scene
 
-        nodeId2 <- Scene.addNode scene Scene.newNode { nodeRotation = Quaternion 0 (V3 0 0 1) } False
+        nodeId2 <- Scene.addNode scene Scene.newNode { nodeRotation = Quaternion 1 (V3 0 0 0) } False
         nodeId1 <- Scene.addNode scene Scene.newNode { nodeChildren = BV.singleton nodeId2, nodeTranslation = V3 0 1 0 } False
         nodeId0 <- Scene.addNode scene Scene.newNode { nodeChildren = BV.singleton nodeId1 } True
 

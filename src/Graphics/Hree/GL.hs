@@ -1,5 +1,8 @@
 module Graphics.Hree.GL
-    ( mkBuffer
+    ( attribFormat
+    , attribIFormat
+    , attribLFormat
+    , mkBuffer
     , mkVertexArray
     , renderMany
     , updateBuffer
@@ -148,13 +151,39 @@ mkVertexArray attribBindings buffers indexBuffer programInfo = do
 
 
 setVertexArrayAttribFormatAndBinding :: GLW.VertexArray -> GLW.AttribLocation -> AttribBinding -> IO ()
-setVertexArrayAttribFormatAndBinding vao attribLocation (AttribBinding binding format) = do
+setVertexArrayAttribFormatAndBinding vao attribLocation (AttribBinding binding (AttribFormat' (AttribFormat fsize formatComponentType fnormalized foffset))) = do
     GLW.glVertexArrayAttribBinding vao attribLocation binding
     GLW.glVertexArrayAttribFormat vao attribLocation formatSize formatComponentType formatNormalized formatRelativeOffset
     GLW.glEnableVertexArrayAttrib vao attribLocation
 
     where
-    AttribFormat fsize formatComponentType fnormalized foffset = format
     formatSize = fromIntegral fsize
     formatNormalized = fromIntegral . fromEnum $ fnormalized
     formatRelativeOffset = fromIntegral foffset
+
+setVertexArrayAttribFormatAndBinding vao attribLocation (AttribBinding binding (AttribIFormat' (AttribIFormat fsize formatComponentType foffset))) = do
+    GLW.glVertexArrayAttribBinding vao attribLocation binding
+    GLW.glVertexArrayAttribIFormat vao attribLocation formatSize formatComponentType formatRelativeOffset
+    GLW.glEnableVertexArrayAttrib vao attribLocation
+
+    where
+    formatSize = fromIntegral fsize
+    formatRelativeOffset = fromIntegral foffset
+
+setVertexArrayAttribFormatAndBinding vao attribLocation (AttribBinding binding (AttribLFormat' (AttribLFormat fsize formatComponentType foffset))) = do
+    GLW.glVertexArrayAttribBinding vao attribLocation binding
+    GLW.glVertexArrayAttribLFormat vao attribLocation formatSize formatComponentType formatRelativeOffset
+    GLW.glEnableVertexArrayAttrib vao attribLocation
+
+    where
+    formatSize = fromIntegral fsize
+    formatRelativeOffset = fromIntegral foffset
+
+attribFormat :: Int -> GL.GLenum -> Bool -> Int -> AttributeFormat
+attribFormat size type' normalized relativeOffset = AttribFormat' $ AttribFormat size type' normalized relativeOffset
+
+attribIFormat :: Int -> GL.GLenum -> Int -> AttributeFormat
+attribIFormat size type' relativeOffset = AttribIFormat' $ AttribIFormat size type' relativeOffset
+
+attribLFormat :: Int -> GL.GLenum -> Int -> AttributeFormat
+attribLFormat size type' relativeOffset = AttribLFormat' $ AttribLFormat size type' relativeOffset

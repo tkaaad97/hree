@@ -62,7 +62,8 @@ import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
-import qualified Graphics.Hree.GL.Types as Hree (AttribFormat(..),
+import qualified Graphics.Hree.GL as Hree (attribFormat)
+import qualified Graphics.Hree.GL.Types as Hree (AttributeFormat(..),
                                                  BindBufferSetting(..),
                                                  BufferSource(..),
                                                  IndexBuffer(..), Texture(..))
@@ -635,11 +636,11 @@ addAttribBindings (bindingIndex, geometry0) ((bufferView, buffer), attribs) =
     stride = fromMaybe (calcStrideFromAccessors accessors) $ bufferViewByteStride bufferView
     bbs = Hree.BindBufferSetting offset stride 0
     attribFormats = Map.fromList . map f $ attribs
-    f (key, accessor) = (convertAttribName key, accessorToAttribFormat accessor)
+    f (key, accessor) = (convertAttribName key, accessorToAttributeFormat accessor)
 
-accessorToAttribFormat :: Accessor -> Hree.AttribFormat
-accessorToAttribFormat accessor =
-    Hree.AttribFormat num formatComponentType normalized offset
+accessorToAttributeFormat :: Accessor -> Hree.AttributeFormat
+accessorToAttributeFormat accessor =
+    Hree.attribFormat num formatComponentType normalized offset
     where
     componentType = accessorComponentType accessor
     valueType = accessorType accessor
