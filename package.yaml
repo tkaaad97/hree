@@ -53,6 +53,7 @@ ghc-options:
 - -Wpartial-fields
 - -Wredundant-constraints
 - -Wtabs
+- -O2
 
 library:
   source-dirs: src
@@ -63,10 +64,6 @@ executables:
     source-dirs:
     - examples/flat-color-1
     - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - GLFW-b
@@ -76,10 +73,6 @@ executables:
     source-dirs:
     - examples/texture-1
     - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - GLFW-b
@@ -89,10 +82,6 @@ executables:
     source-dirs:
     - examples/geometry-box-1
     - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - GLFW-b
@@ -102,10 +91,6 @@ executables:
     source-dirs:
     - examples/transform-rotate-1
     - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - GLFW-b
@@ -115,10 +100,6 @@ executables:
     source-dirs:
     - examples/sprite-instanced-1
     - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - GLFW-b
@@ -128,10 +109,6 @@ executables:
     source-dirs:
     - examples/format-loader-1
     - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - GLFW-b
@@ -141,10 +118,6 @@ executables:
     source-dirs:
     - examples/gltf-minimal-1
     - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - GLFW-b
@@ -154,10 +127,6 @@ executables:
     source-dirs:
     - examples/child-node-1
     - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - GLFW-b
@@ -167,10 +136,6 @@ executables:
     source-dirs:
     - examples/standard-material-1
     - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - GLFW-b
@@ -179,10 +144,6 @@ tests:
   hree-test:
     main:                Spec.hs
     source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - hree
     - hspec
