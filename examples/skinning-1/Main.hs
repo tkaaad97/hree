@@ -2,6 +2,7 @@
 module Main where
 
 import qualified Chronos as Time (Time(..), now)
+import Control.Concurrent (threadDelay)
 import Data.Fixed (mod')
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
@@ -16,6 +17,7 @@ import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.GL.Types (AttribFormat(..), BindBufferSetting(..), IVec4,
                                Vec3, Vec4)
 import Graphics.Hree.GL.Vertex (Vertex(..), VertexField(..), VertexSpec(..))
+import qualified Graphics.Hree.Light as Light
 import qualified Graphics.Hree.Material as Material
 import qualified Graphics.Hree.Scene as Scene
 import Graphics.Hree.Types (Geometry(..), Mesh(..), Node(..))
@@ -130,7 +132,8 @@ main =
 
         skinId <- Scene.addSkin scene nodeId0 (SV.fromList [nodeId1, nodeId2]) invMats
 
-        let material = Material.flatColorMaterial (V4 0.1 0.1 0.95 1)
+        let material = Material.standardMaterial 0 0
+                `Material.setBaseColorFactor` V4 0.1 0.1 0.8 1.0
             mesh = Mesh geometry material Nothing
         meshId <- Scene.addSkinnedMesh scene mesh skinId
 
@@ -143,12 +146,16 @@ main =
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
+        let light = Light.directionalLight (V3 0.5 (-1) 0.5) (V3 1 1 1) 1
+        _ <- Scene.addLight scene light
+
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
         st <- Time.now
         return (scene, camera, animation, st)
 
     onDisplay (s, c, animation, st) w = do
         render
+        threadDelay 10000
         GLFW.pollEvents
         t <- Time.now
         let duration = Animation.animationDuration animation

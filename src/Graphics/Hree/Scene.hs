@@ -101,8 +101,8 @@ renderScene scene camera = do
     ubbs = BV.fromList
         [ ("CameraBlock", cameraBlockBindingIndex)
         , ("LightBlock", lightBlockBindingIndex)
-        , ("SkinJointMatricesBlock", skinJointMatricesBlockBindingIndex)
-        , ("SkinJointInverseMatricesBlock", skinJointInverseMatricesBlockBindingIndex)
+        , ("JointMatricesBlock", skinJointMatricesBlockBindingIndex)
+        , ("JointInverseBindMatricesBlock", skinJointInverseMatricesBlockBindingIndex)
         ]
     bindCamera maybeBinder = do
         cameraBlock <- updateCameraBlock camera

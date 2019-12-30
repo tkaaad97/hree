@@ -21,7 +21,7 @@ import qualified Data.Vector.Storable as SV
 import qualified Foreign (Storable(..), castPtr)
 import qualified GLW
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
-import qualified Graphics.GL as GL (GLuint)
+import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import System.IO.Error (userError)
 
@@ -29,22 +29,23 @@ render :: BV.Vector (ByteString, BufferBindingIndex) -> RenderInfo -> Maybe GLW.
 render commons a cur = do
     setCurrentProgram cur program
     GLW.glBindVertexArray (riVertexArray a)
+    bindUniformBlockBuffers (riUniformBlocks a)
     bindUniforms uniforms
     bindTextures textures
     drawWith method
     return . Just $ program
     where
     program = programInfoProgram . riProgram $ a
-    uniformBlocks = programInfoUniformBlocks . riProgram $ a
+    uniformBlockInfos = programInfoUniformBlocks . riProgram $ a
     method = riDrawMethod a
     uniforms = riUniforms a
     textures = riTextures a
     setCurrentProgram (Just p0) p1 | p0 == p1 = return ()
     setCurrentProgram _ p = do
-        bindUniformBlocks p . BV.mapMaybe toUniformBlockPair $ commons
+        setUniformBlocksBindingPoints p . BV.mapMaybe toUniformBlockPair $ commons
         GLW.glUseProgram p
     toUniformBlockPair (k, BufferBindingIndex bindingIndex) = do
-        blockInfo <- Map.lookup k uniformBlocks
+        blockInfo <- Map.lookup k uniformBlockInfos
         return (bindingIndex, ubiUniformBlockIndex blockInfo)
 
 bindUniforms :: BV.Vector (GLW.UniformLocation, Uniform) -> IO ()
@@ -53,11 +54,17 @@ bindUniforms = mapM_ bindUniform
     bindUniform (uniformLocation, Uniform a) =
         GLW.uniform uniformLocation a
 
-bindUniformBlocks :: GLW.Program -> BV.Vector (GL.GLuint, GL.GLuint) -> IO ()
-bindUniformBlocks program = mapM_ bindUniformBlockBinding
+setUniformBlocksBindingPoints :: GLW.Program -> BV.Vector (GL.GLuint, GL.GLuint) -> IO ()
+setUniformBlocksBindingPoints program = mapM_ setUniformBlockBindingPoint
     where
-    bindUniformBlockBinding (bindingIndex, blockIndex) =
+    setUniformBlockBindingPoint (bindingIndex, blockIndex) =
         GLW.glUniformBlockBinding program blockIndex bindingIndex
+
+bindUniformBlockBuffers :: BV.Vector (BufferBindingIndex, GLW.Buffer) -> IO ()
+bindUniformBlockBuffers = mapM_ bindUniformBlockBuffer
+    where
+    bindUniformBlockBuffer (BufferBindingIndex bindingIndex, buffer) =
+        GLW.glBindBufferBase GL.GL_UNIFORM_BUFFER bindingIndex buffer
 
 bindTextures :: BV.Vector Texture -> IO ()
 bindTextures textures = mapM_ bindTexture $ BV.zip (BV.generate (length textures) id) textures
