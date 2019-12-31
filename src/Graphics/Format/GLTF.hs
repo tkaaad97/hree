@@ -293,6 +293,7 @@ data GLTF = GLTF
     , gltfSamplers    :: !(BV.Vector Sampler)
     , gltfTextures    :: !(BV.Vector Texture)
     , gltfMaterials   :: !(BV.Vector Material)
+    , gltfAnimations  :: !(BV.Vector Animation)
     } deriving (Show, Eq)
 
 instance Aeson.FromJSON Buffer where
@@ -356,6 +357,50 @@ instance Aeson.FromJSON Node where
         translation <- mapM fromVectorToVec3 =<< v Aeson..:? "translation"
         name <- v Aeson..:? "name"
         return $ Node camera children skin matrix mesh rotation scale translation name
+
+instance Aeson.FromJSON Animation where
+    parseJSON = Aeson.withObject "Animation" $ \v -> do
+        channels <- v Aeson..: "channels"
+        samplers <- v Aeson..: "samplers"
+        name <- v Aeson..:? "name"
+        extensions <- v Aeson..:? "extensions"
+        extras <- v Aeson..:? "extras"
+        return $ Animation channels samplers name extensions extras
+
+instance Aeson.FromJSON Channel where
+    parseJSON = Aeson.withObject "Channel" $ \v -> do
+        sampler <- v Aeson..: "sampler"
+        target <- v Aeson..: "target"
+        return $ Channel sampler target
+
+instance Aeson.FromJSON ChannelTarget where
+    parseJSON = Aeson.withObject "ChannelTarget" $ \v -> do
+        node <- v Aeson..: "node"
+        path <- v Aeson..: "path"
+        return $ ChannelTarget node path
+
+instance Aeson.FromJSON ChannelTargetPath where
+    parseJSON = Aeson.withText "ChannelTargetPath" f
+        where
+        f "translation" = return ChannelTargetPathTranslation
+        f "rotation"   = return ChannelTargetPathRotation
+        f "scale"  = return ChannelTargetPathScale
+        f other    = fail $ "invalid channel target path: " ++ Text.unpack other
+
+instance Aeson.FromJSON AnimationSampler where
+    parseJSON = Aeson.withObject "AnimationSampler" $ \v -> do
+        input <- v Aeson..: "input"
+        interpolation <- v Aeson..: "interpolation"
+        output <- v Aeson..: "output"
+        return $ AnimationSampler input interpolation output
+
+instance Aeson.FromJSON AnimationInterpolation where
+    parseJSON = Aeson.withText "AnimationInterpolation" f
+        where
+        f "LINEAR" = return AnimationInterpolationLinear
+        f "STEP"   = return AnimationInterpolationStep
+        f "CUBICSPLINE"  = return AnimationInterpolationCubicSpline
+        f other    = fail $ "invalid animation interpolation: " ++ Text.unpack other
 
 instance Aeson.FromJSON Image where
     parseJSON = Aeson.withObject "Image" $ \v -> do
@@ -461,7 +506,8 @@ instance Aeson.FromJSON GLTF where
         samplers <- v Aeson..:? "samplers" Aeson..!= BV.empty
         textures <- v Aeson..:? "textures" Aeson..!= BV.empty
         materials <- v Aeson..:? "materials" Aeson..!= BV.empty
-        return $ GLTF scenes nodes meshes buffers bufferViews accessors images samplers textures materials
+        animations <- v Aeson..:? "animations" Aeson..!= BV.empty
+        return $ GLTF scenes nodes meshes buffers bufferViews accessors images samplers textures materials animations
 
 marshalComponentType :: ComponentType -> Int
 marshalComponentType Byte'          = 5120
