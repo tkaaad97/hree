@@ -173,7 +173,7 @@ interpolateQuaternion timepoints values t =
                 t1 = timepoints UV.! n
                 v0 = values UV.! (n - 1)
                 v1 = values UV.! n
-                v = slerp v1 v0 ((t - t0) / (t1 - t0))
+                v = slerp v0 v1 ((t - t0) / (t1 - t0))
             in v
 
 applyChannel :: Scene -> Channel -> Float -> IO ()

@@ -114,7 +114,7 @@ main =
 
     defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = orthographic (-defaultAspect) defaultAspect (-1.0) 1.0 0.001 10.0
+    proj = perspective 90 defaultAspect 0.001 1000.0
 
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
@@ -137,7 +137,7 @@ main =
             mesh = Mesh geometry material Nothing
         meshId <- Scene.addSkinnedMesh scene mesh skinId
 
-        Scene.updateNode scene nodeId0 (\n -> n { nodeMesh = Just meshId })
+        _ <- Scene.updateNode scene nodeId0 (\n -> n { nodeMesh = Just meshId })
 
         let track = Animation.linearRotation timePoints rotations
             channel = Animation.singleChannel nodeId2 track
@@ -155,7 +155,7 @@ main =
 
     onDisplay (s, c, animation, st) w = do
         render
-        threadDelay 10000
+        threadDelay 100000
         GLFW.pollEvents
         t <- Time.now
         let duration = Animation.animationDuration animation
