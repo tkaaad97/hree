@@ -141,13 +141,13 @@ foldNodes scene state f a b = do
         BV.foldM' (go x1) y1 nodes
 
 updateNodeMatrices :: Time.Time -> Scene -> SceneState -> MaybeT IO ()
-updateNodeMatrices t scene state = foldNodes scene state go (False, Linear.identity, False) ()
+updateNodeMatrices t scene state = foldNodes scene state go (Linear.identity, False) ()
     where
     transformStore = sceneNodeTransformStore scene
     matrixStore = sceneNodeTransformMatrixStore scene
     globalMatrixStore = sceneNodeGlobalTransformMatrixStore scene
 
-    go node (parentUpdated, parentGlobalMatrix, parentGlobalUpdated) _ = do
+    go node (parentGlobalMatrix, parentGlobalUpdated) _ = do
         let nodeId = nodeInfoId node
         transformInfo <- MaybeT $ Component.readComponent nodeId transformStore
         let transform = transformInfoTransform transformInfo
@@ -163,7 +163,7 @@ updateNodeMatrices t scene state = foldNodes scene state go (False, Linear.ident
                     return matrix
                 else fromMaybe Linear.identity <$> Component.readComponent nodeId matrixStore
 
-        let globalUpdated = parentGlobalUpdated || parentUpdated || updated
+        let globalUpdated = parentGlobalUpdated || updated
         globalMatrix <- lift $
             if globalUpdated
                 then do
@@ -172,7 +172,7 @@ updateNodeMatrices t scene state = foldNodes scene state go (False, Linear.ident
                     return matrix
                 else fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
 
-        return ((updated, globalMatrix, globalUpdated), ())
+        return ((globalMatrix, globalUpdated), ())
 
 nodeToRenderInfos :: Scene -> SceneState -> MaybeT IO [RenderInfo]
 nodeToRenderInfos scene state =
@@ -291,7 +291,7 @@ addNode scene node isRoot = do
     nodeInfo <- atomicModifyIORef' (sceneState scene) addNodeFunc
     let nodeId = nodeInfoId nodeInfo
         transform = Transform (nodeTranslation node) (nodeRotation node) (nodeScale node)
-        transformInfo = TransformInfo transform False Time.epoch
+        transformInfo = TransformInfo transform True Time.epoch
         matrix = transformMatrix transform
         globalMatrix = Linear.identity
     Component.addComponent nodeId nodeInfo (sceneNodeStore scene)
@@ -547,7 +547,7 @@ updateSkinJoints :: Scene -> Skin -> IO ()
 updateSkinJoints scene skin = go . skinJointMatricesBinder $ skin
     where
     joints = skinJoints skin
-    store = sceneNodeTransformMatrixStore scene
+    store = sceneNodeGlobalTransformMatrixStore scene
     stride = elemStrideStd140 (Proxy :: Proxy Mat4)
     off = alignmentStd140 (Proxy :: Proxy Mat4)
     go (MatricesBlockBinder binder) =
