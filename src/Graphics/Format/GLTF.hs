@@ -62,7 +62,7 @@ import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
-import qualified Graphics.Hree.GL as Hree (attribFormat)
+import qualified Graphics.Hree.GL as Hree (attribFormat, attribIFormat)
 import qualified Graphics.Hree.GL.Types as Hree (AttributeFormat(..),
                                                  BindBufferSetting(..),
                                                  BufferSource(..),
@@ -99,6 +99,7 @@ data ComponentType =
     UnsignedByte' |
     Short' |
     UnsignedShort' |
+    Int' |
     UnsignedInt' |
     Float'
     deriving (Show, Eq)
@@ -536,6 +537,7 @@ marshalComponentType Byte'          = 5120
 marshalComponentType UnsignedByte'  = 5121
 marshalComponentType Short'         = 5122
 marshalComponentType UnsignedShort' = 5123
+marshalComponentType Int'           = 5124
 marshalComponentType UnsignedInt'   = 5125
 marshalComponentType Float'         = 5126
 
@@ -545,6 +547,7 @@ unmarshalComponentType a
     | a == 5121 = Just UnsignedByte'
     | a == 5122 = Just Short'
     | a == 5123 = Just UnsignedShort'
+    | a == 5124 = Just Int'
     | a == 5125 = Just UnsignedInt'
     | a == 5126 = Just Float'
     | otherwise = Nothing
@@ -554,6 +557,7 @@ componentByteSize Byte'          = 1
 componentByteSize UnsignedByte'  = 1
 componentByteSize Short'         = 2
 componentByteSize UnsignedShort' = 2
+componentByteSize Int'           = 4
 componentByteSize UnsignedInt'   = 4
 componentByteSize Float'         = 4
 
@@ -562,8 +566,18 @@ componentTypeToGLenum Byte'          = GL.GL_BYTE
 componentTypeToGLenum UnsignedByte'  = GL.GL_UNSIGNED_BYTE
 componentTypeToGLenum Short'         = GL.GL_SHORT
 componentTypeToGLenum UnsignedShort' = GL.GL_UNSIGNED_SHORT
+componentTypeToGLenum Int'           = GL.GL_INT
 componentTypeToGLenum UnsignedInt'   = GL.GL_UNSIGNED_INT
 componentTypeToGLenum Float'         = GL.GL_FLOAT
+
+isIntegralType :: ComponentType -> Bool
+isIntegralType Byte'          = True
+isIntegralType UnsignedByte'  = True
+isIntegralType Short'         = True
+isIntegralType UnsignedShort' = True
+isIntegralType Int'           = True
+isIntegralType UnsignedInt'   = True
+isIntegralType Float'         = False
 
 marshalValueType :: ValueType -> Text
 marshalValueType Scalar = "SCALAR"
@@ -744,7 +758,9 @@ addAttribBindings (bindingIndex, geometry0) ((bufferView, buffer), attribs) =
 
 accessorToAttributeFormat :: Accessor -> Hree.AttributeFormat
 accessorToAttributeFormat accessor =
-    Hree.attribFormat num formatComponentType normalized offset
+    if isIntegralType componentType
+        then Hree.attribIFormat num formatComponentType offset
+        else Hree.attribFormat num formatComponentType normalized offset
     where
     componentType = accessorComponentType accessor
     valueType = accessorType accessor
