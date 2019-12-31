@@ -146,7 +146,7 @@ main =
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
-        let light = Light.directionalLight (V3 0.5 (-1) 0.5) (V3 1 1 1) 1
+        let light = Light.directionalLight (V3 0.5 (-1) (-0.5)) (V3 1 1 1) 1
         _ <- Scene.addLight scene light
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
