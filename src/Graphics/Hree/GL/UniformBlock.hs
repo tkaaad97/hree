@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Hree.GL.UniformBlock
     ( UniformBlockBinder(..)
     , bindUniformBuffer
@@ -9,10 +10,9 @@ module Graphics.Hree.GL.UniformBlock
     ) where
 
 import Control.Monad (when)
-import Data.Proxy (asProxyTypeOf)
 import qualified Foreign (ForeignPtr, Ptr, Storable(..), castPtr,
                           mallocForeignPtr, withForeignPtr)
-import qualified GLW (Buffer, glBindBufferBase, glNamedBufferData)
+import qualified GLW (Buffer, glBindBufferBase)
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL (updateBuffer)
 import Graphics.Hree.GL.Block (Block(..), Std140(..))
@@ -35,19 +35,17 @@ updateUniformBlock ubb @ (UniformBlockBinder _ ptr) a = do
     prev <- unStd140 <$> Foreign.withForeignPtr ptr Foreign.peek
     when (a /= prev) $ updateUniformBlock_ ubb a
 
-updateUniformBlock_ :: (Block a) => UniformBlockBinder a -> a -> IO ()
+updateUniformBlock_ :: forall a. (Block a) => UniformBlockBinder a -> a -> IO ()
 updateUniformBlock_ (UniformBlockBinder buffer ptr) a =
     Foreign.withForeignPtr ptr $ \p -> do
         Foreign.poke p (Std140 a)
-        let size = fromIntegral $ Foreign.sizeOf (Std140 a)
-        GLW.glNamedBufferData buffer size (Foreign.castPtr p) GL.GL_DYNAMIC_DRAW
+        writeBuffer (Foreign.castPtr p :: Foreign.Ptr a) buffer
 
-updateUniformBlockWith :: (Block a) => UniformBlockBinder a -> (Foreign.Ptr () -> IO ()) -> IO ()
+updateUniformBlockWith :: forall a. (Block a) => UniformBlockBinder a -> (Foreign.Ptr () -> IO ()) -> IO ()
 updateUniformBlockWith (UniformBlockBinder buffer ptr) f =
     Foreign.withForeignPtr ptr $ \p -> do
         f (Foreign.castPtr p)
-        let size = fromIntegral $ Foreign.sizeOf (asProxyTypeOf undefined ptr)
-        GLW.glNamedBufferData buffer size (Foreign.castPtr p) GL.GL_DYNAMIC_DRAW
+        writeBuffer (Foreign.castPtr p :: Foreign.Ptr a) buffer
 
 bindUniformBuffer :: UniformBlockBinder a -> GL.GLuint -> IO ()
 bindUniformBuffer (UniformBlockBinder buffer _) bindingIndex =

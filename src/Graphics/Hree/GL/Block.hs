@@ -17,8 +17,9 @@ import qualified Data.Vector.Storable.Sized as SVS (Vector, generateM, imapM_,
                                                     length)
 import Data.Word (Word32)
 import Foreign (Ptr)
-import qualified Foreign (Storable(..), plusPtr)
+import qualified Foreign (Storable(..), castPtr, plusPtr)
 import GHC.TypeNats (KnownNat, natVal)
+import qualified GLW
 import Graphics.Hree.GL.Types (BVec2, BVec3, BVec4, DMat2, DMat2x3, DMat2x4,
                                DMat3, DMat3x2, DMat3x4, DMat4, DMat4x2, DMat4x3,
                                DVec2, DVec3, DVec4, IVec2, IVec3, IVec4,
@@ -36,6 +37,7 @@ class Block a where
     pokeElemOffStd140 :: Ptr a -> Int -> a -> IO ()
     peekByteOffStd140 :: Ptr b -> Int -> IO a
     pokeByteOffStd140 :: Ptr b -> Int -> a -> IO ()
+    writeBuffer :: Ptr a -> GLW.Buffer -> IO ()
 
     peekStd140 ptr = peekElemOffStd140 ptr 0
     pokeStd140 ptr = pokeElemOffStd140 ptr 0
@@ -45,6 +47,10 @@ class Block a where
 
     peekByteOffStd140 ptr off = peekStd140 (ptr `Foreign.plusPtr` off)
     pokeByteOffStd140 ptr off = pokeStd140 (ptr `Foreign.plusPtr` off)
+
+    writeBuffer ptr buffer =
+        let size = fromIntegral $ sizeOfStd140 ptr
+        in GLW.glNamedBufferSubData buffer 0 size (Foreign.castPtr ptr)
 
 class Block a => Element a where
     elemAlignmentStd140 :: p a -> Int
@@ -653,7 +659,7 @@ instance (Element a, KnownNat n) => Block (LimitedVector n (Elem a)) where
             b = fromIntegral (natVal (Proxy :: Proxy n)) * elemStrideStd140 (Proxy :: Proxy a)
         in h + b
     peekByteOffStd140 ptr off = do
-        let align = alignmentStd140 (Proxy :: Proxy a)
+        let align = elemAlignmentStd140 (Proxy :: Proxy a)
             stride = elemStrideStd140 (Proxy :: Proxy a)
             limit = fromIntegral . natVal $ (Proxy :: Proxy n)
             off' = off + align
@@ -661,7 +667,7 @@ instance (Element a, KnownNat n) => Block (LimitedVector n (Elem a)) where
         v <- SV.generateM (min (fromIntegral size) limit) $ \i -> Elem <$> peekByteOffStd140 ptr (off' + stride * i)
         return (LimitedVector v)
     pokeByteOffStd140 ptr off (LimitedVector v) = do
-        let align = alignmentStd140 (Proxy :: Proxy a)
+        let align = elemAlignmentStd140 (Proxy :: Proxy a)
             stride = elemStrideStd140 (Proxy :: Proxy a)
             limit = fromIntegral . natVal $ (Proxy :: Proxy n)
             off' = off + align
@@ -670,3 +676,10 @@ instance (Element a, KnownNat n) => Block (LimitedVector n (Elem a)) where
             size' = min size limit
         pokeByteOffStd140 ptr off size'
         GV.imapM_ (\i -> pokeByteOffStd140 ptr (off' + stride * i) . unElem) v
+    writeBuffer ptr buffer = do
+        len <- peekStd140 (Foreign.castPtr ptr) :: IO Int32
+        let align = elemAlignmentStd140 (Proxy :: Proxy a)
+            stride = elemStrideStd140 (Proxy :: Proxy a)
+            limit = fromIntegral . natVal $ (Proxy :: Proxy n)
+            size = fromIntegral (align + (min (fromIntegral len) limit * stride))
+        GLW.glNamedBufferSubData buffer 0 size (Foreign.castPtr ptr)
