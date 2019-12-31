@@ -166,6 +166,42 @@ data Node = Node
     , nodeName        :: !(Maybe Text)
     } deriving (Show, Eq)
 
+data Animation = Animation
+    { animationChannels   :: !(BV.Vector Channel)
+    , animationSamplers   :: !(BV.Vector AnimationSampler)
+    , animationName       :: !(Maybe Text)
+    , animationExtensions :: !(Maybe Aeson.Object)
+    , animationExtras     :: !(Maybe Aeson.Value)
+    } deriving (Show, Eq)
+
+data Channel = Channel
+    { channelSampler :: !Int
+    , channelTarget  :: !ChannelTarget
+    } deriving (Show, Eq)
+
+data ChannelTarget = ChannelTarget
+    { channelTargetNode :: !Int
+    , channelTargetPath :: !ChannelTargetPath
+    } deriving (Show, Eq)
+
+data ChannelTargetPath =
+    ChannelTargetPathTranslation |
+    ChannelTargetPathRotation |
+    ChannelTargetPathScale
+    deriving (Show, Eq)
+
+data AnimationSampler = AnimationSampler
+    { animationSamplerInput         :: !Int
+    , animationSamplerInterpolation :: !AnimationInterpolation
+    , animationSamplerOutput        :: !Int
+    } deriving (Show, Eq)
+
+data AnimationInterpolation =
+    AnimationInterpolationLinear |
+    AnimationInterpolationStep |
+    AnimationInterpolationCubicSpline
+    deriving (Show, Eq)
+
 data Image = Image
     { imageUri        :: !(Maybe Text)
     , imageMimeType   :: !(Maybe Text)
