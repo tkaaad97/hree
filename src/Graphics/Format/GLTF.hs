@@ -202,6 +202,15 @@ data AnimationInterpolation =
     AnimationInterpolationCubicSpline
     deriving (Show, Eq)
 
+data Skin = Skin
+    { skinInverseBindMatrices :: !(Maybe Int)
+    , skinSkeleton            :: !(Maybe Int)
+    , skinJoints              :: !(BV.Vector Int)
+    , skinName                :: !(Maybe Text)
+    , skinExtensions          :: !(Maybe Aeson.Object)
+    , skinExtras              :: !(Maybe Aeson.Value)
+    } deriving (Show, Eq)
+
 data Image = Image
     { imageUri        :: !(Maybe Text)
     , imageMimeType   :: !(Maybe Text)
@@ -294,6 +303,7 @@ data GLTF = GLTF
     , gltfTextures    :: !(BV.Vector Texture)
     , gltfMaterials   :: !(BV.Vector Material)
     , gltfAnimations  :: !(BV.Vector Animation)
+    , gltfSkins       :: !(BV.Vector Skin)
     } deriving (Show, Eq)
 
 instance Aeson.FromJSON Buffer where
@@ -402,6 +412,17 @@ instance Aeson.FromJSON AnimationInterpolation where
         f "CUBICSPLINE"  = return AnimationInterpolationCubicSpline
         f other    = fail $ "invalid animation interpolation: " ++ Text.unpack other
 
+instance Aeson.FromJSON Skin where
+    parseJSON = Aeson.withObject "Skin" $ \v -> do
+        invMats <- v Aeson..:? "inverseBindMatrices"
+        skeleton <- v Aeson..:? "skeleton"
+        joints <- v Aeson..: "joints"
+        name <- v Aeson..:? "name"
+        extensions <- v Aeson..:? "extensions"
+        extras <- v Aeson..:? "extras"
+        return $ Skin invMats skeleton joints name extensions extras
+
+
 instance Aeson.FromJSON Image where
     parseJSON = Aeson.withObject "Image" $ \v -> do
         uri <- v Aeson..:? "uri"
@@ -507,7 +528,8 @@ instance Aeson.FromJSON GLTF where
         textures <- v Aeson..:? "textures" Aeson..!= BV.empty
         materials <- v Aeson..:? "materials" Aeson..!= BV.empty
         animations <- v Aeson..:? "animations" Aeson..!= BV.empty
-        return $ GLTF scenes nodes meshes buffers bufferViews accessors images samplers textures materials animations
+        skins <- v Aeson..:? "skins" Aeson..!= BV.empty
+        return $ GLTF scenes nodes meshes buffers bufferViews accessors images samplers textures materials animations skins
 
 marshalComponentType :: ComponentType -> Int
 marshalComponentType Byte'          = 5120
