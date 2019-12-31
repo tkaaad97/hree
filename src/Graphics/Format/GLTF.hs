@@ -688,8 +688,9 @@ loadSceneFromFile path scene = do
     samplers <- createSamplers scene samplers_
     let textures = createTextures defaultTexture sources samplers textures_
         materials = createMaterials textures materials_
+    nodeIds <- createNodes scene nodes_ rootNodes
     meshes <- createGLTFMeshes scene buffers bufferViews_ accessors_ materials meshes_
-    createNodes scene nodes_ rootNodes meshes
+    BV.imapM_ (createMeshNodes scene nodeIds meshes) nodes_
     return gltf
 
 parseUri :: FilePath -> Int -> ByteString -> IO ByteString
@@ -833,11 +834,10 @@ convertToIndexBufferDataType UnsignedShort' = return GL.GL_UNSIGNED_SHORT
 convertToIndexBufferDataType UnsignedInt' = return GL.GL_UNSIGNED_INT
 convertToIndexBufferDataType a = fail $ "invalid componentType: " ++ show a
 
-createNodes :: Hree.Scene -> BV.Vector Node -> BV.Vector Int -> BV.Vector (BV.Vector Hree.MeshId) -> IO ()
-createNodes scene nodes rootNodes meshes = do
+createNodes :: Hree.Scene -> BV.Vector Node -> BV.Vector Int -> IO (BV.Vector Hree.NodeId)
+createNodes scene nodes rootNodes = do
     nodeIds <- BV.mapM (createNode scene) nodes
     BV.imapM_ (setNodeChildren scene nodeIds) nodes
-    BV.imapM_ (createMeshNodes scene nodeIds meshes) nodes
     let rootNodeIds = BV.map (nodeIds BV.!) rootNodes
     Hree.addRootNodes scene rootNodeIds
 
