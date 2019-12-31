@@ -38,10 +38,10 @@ void main()
 {
 #if defined(USE_VERTEX_SKINNING) && defined(HAS_JOINT_INDICES) && defined(HAS_JOINT_WEIGHTS)
     mat4 transformMatrix =
-        jointWeights.x * jointMatricesBlock.data.items[jointIndices.x] * jointInverseBindMatricesBlock.data.items[jointIndices.x] +
-        jointWeights.y * jointMatricesBlock.data.items[jointIndices.y] * jointInverseBindMatricesBlock.data.items[jointIndices.y] +
-        jointWeights.z * jointMatricesBlock.data.items[jointIndices.z] * jointInverseBindMatricesBlock.data.items[jointIndices.z] +
-        jointWeights.w * jointMatricesBlock.data.items[jointIndices.w] * jointInverseBindMatricesBlock.data.items[jointIndices.w];
+        jointWeights.x * jointMatricesBlock.items[jointIndices.x] * jointInverseBindMatricesBlock.items[jointIndices.x] +
+        jointWeights.y * jointMatricesBlock.items[jointIndices.y] * jointInverseBindMatricesBlock.items[jointIndices.y] +
+        jointWeights.z * jointMatricesBlock.items[jointIndices.z] * jointInverseBindMatricesBlock.items[jointIndices.z] +
+        jointWeights.w * jointMatricesBlock.items[jointIndices.w] * jointInverseBindMatricesBlock.items[jointIndices.w];
 #else
     mat4 transformMatrix = modelMatrix;
 #endif
