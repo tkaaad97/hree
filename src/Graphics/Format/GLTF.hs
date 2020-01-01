@@ -91,7 +91,7 @@ import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
                                                         setSamplerParameter)
 import qualified Graphics.Hree.Scene as Hree (addBuffer, addMesh, addNode,
                                               addRootNodes, addSampler, addSkin,
-                                              addTexture,
+                                              addSkinnedMesh, addTexture,
                                               mkDefaultTextureIfNotExists,
                                               newNode, updateNode)
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
@@ -701,8 +701,8 @@ loadSceneFromFile path scene = do
         materials = createMaterials textures materials_
     nodeIds <- createNodes scene nodes_ rootNodes
     skinIds <- createSkins scene nodes_ nodeIds bss bufferViews_ accessors_ skins_
-    meshes <- createGLTFMeshes scene buffers bufferViews_ accessors_ materials meshes_
-    BV.imapM_ (createMeshNodes scene nodeIds meshes) nodes_
+    meshes <- createGLTFMeshes buffers bufferViews_ accessors_ materials meshes_
+    BV.imapM_ (createMeshNodes scene nodeIds meshes skinIds) nodes_
     return gltf
 
 parseUri :: FilePath -> Int -> ByteString -> IO ByteString
@@ -732,16 +732,16 @@ createBuffer cd scene (Buffer byteLength uri) = do
 createBuffers :: FilePath -> Hree.Scene -> BV.Vector Buffer -> IO (BV.Vector (GLW.Buffer, ByteString))
 createBuffers cd scene = BV.mapM (createBuffer cd scene)
 
-createGLTFMeshes :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector Hree.MeshId))
-createGLTFMeshes scene buffers bufferViews accessors materials =
-    BV.mapM (createMeshes scene buffers bufferViews accessors materials)
+createGLTFMeshes :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector Hree.Mesh))
+createGLTFMeshes buffers bufferViews accessors materials =
+    BV.mapM (createMeshes buffers bufferViews accessors materials)
 
-createMeshes :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> Mesh -> IO (BV.Vector Hree.MeshId)
-createMeshes scene buffers bufferViews accessors materials =
-    BV.mapM (createMeshFromPrimitive scene buffers bufferViews accessors materials) . meshPrimitives
+createMeshes :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> Mesh -> IO (BV.Vector Hree.Mesh)
+createMeshes buffers bufferViews accessors materials =
+    BV.mapM (createMeshFromPrimitive buffers bufferViews accessors materials) . meshPrimitives
 
-createMeshFromPrimitive :: Hree.Scene -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> Primitive -> IO Hree.MeshId
-createMeshFromPrimitive scene buffers bufferViews accessors materials primitive = do
+createMeshFromPrimitive :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> Primitive -> IO Hree.Mesh
+createMeshFromPrimitive buffers bufferViews accessors materials primitive = do
     groups <- either error return $ groupAttributes buffers bufferViews accessors primitive
     let (_, geometry) = foldl addAttribBindings (1, Hree.newGeometry) groups
         verticesCount = minimum . map (accessorCount . snd) . concatMap snd $ groups
@@ -754,8 +754,7 @@ createMeshFromPrimitive scene buffers bufferViews accessors materials primitive 
         material = fromMaybe defaultMaterial $ do
             materialIndex <- primitiveMaterial primitive
             materials BV.!? materialIndex
-        mesh = Hree.Mesh geometry2 material Nothing
-    Hree.addMesh scene mesh
+    return $ Hree.Mesh geometry2 material Nothing
 
 addAttribBindings :: (Int, Hree.Geometry) -> ((BufferView, GLW.Buffer), [(Text, Accessor)]) -> (Int, Hree.Geometry)
 addAttribBindings (bindingIndex, geometry0) ((bufferView, buffer), attribs) =
@@ -876,11 +875,15 @@ setNodeChildren scene nodeIds i a =
     children = BV.map (nodeIds BV.!) (nodeChildren a)
     f node = node { Hree.nodeChildren = children }
 
-createMeshNodes :: Hree.Scene -> BV.Vector Hree.NodeId -> BV.Vector (BV.Vector Hree.MeshId) -> Int -> Node -> IO ()
-createMeshNodes scene nodeIds meshes i a =
+createMeshNodes :: Hree.Scene -> BV.Vector Hree.NodeId -> BV.Vector (BV.Vector Hree.Mesh) -> BV.Vector Hree.SkinId -> Int -> Node -> IO ()
+createMeshNodes scene nodeIds meshsets skinIds i a =
     whenJust (nodeMesh a) $ \j -> do
         let nodeId = nodeIds BV.! i
-            meshIds = meshes BV.! j
+            meshes = meshsets BV.! j
+            maybeSkinId = (skinIds BV.!) <$> nodeSkin a
+        meshIds <- case maybeSkinId of
+                    Just skinId -> BV.mapM (flip (Hree.addSkinnedMesh scene) skinId) meshes
+                    Nothing -> BV.mapM (Hree.addMesh scene) meshes
         children <- BV.mapM (createMeshNode scene) meshIds
         void . Hree.updateNode scene nodeId $ \node ->
             node { Hree.nodeChildren = Hree.nodeChildren node `mappend` children }
