@@ -9,6 +9,9 @@ import qualified Data.Vector as BV
 import qualified Graphics.Format.GLTF as GLTF
 import Test.Hspec
 
+emptyNode :: GLTF.Node
+emptyNode = GLTF.Node Nothing mempty Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+
 spec :: Spec
 spec = do
     describe "parse" $ do
@@ -119,3 +122,28 @@ spec = do
             let uri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9bpaVUHCwiIpKhOlkQFXHUKhShQqgVWnUwufQLmjQkKS6OgmvBwY/FqoOLs64OroIg+AHi4uqk6CIl/i8ptIjx4Lgf7+497t4B/kaFqWbXOKBqlpFOJoRsblUIviKMCELox7DETH1OFFPwHF/38PH1Ls6zvM/9OXqUvMkAn0A8y3TDIt4gnt60dM77xFFWkhTic+Ixgy5I/Mh12eU3zkWH/TwzamTS88RRYqHYwXIHs5KhEk8RxxRVo3x/1mWF8xZntVJjrXvyF0by2soy12kOIYlFLEGEABk1lFGBhTitGikm0rSf8PAPOn6RXDK5ymDkWEAVKiTHD/4Hv7s1C5MTblIkAXS/2PbHCBDcBZp12/4+tu3mCRB4Bq60tr/aAGY+Sa+3tdgR0LsNXFy3NXkPuNwBBp50yZAcKUDTXygA72f0TTmg7xYIr7m9tfZx+gBkqKvUDXBwCIwWKXvd492hzt7+PdPq7wc0hnKOt4d7nAAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+MKDAgXGTOZGXsAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAAFklEQVQI12P4z8DA8J+BkYHh////DAAe9gT9SMYJHwAAAABJRU5ErkJggg=="
             img <- GLTF.createImageFromUri "" uri Nothing
             expectImage img
+
+    describe "searchCommonRoot" $ do
+        it "case 1" $ do
+            let rootNode = emptyNode { GLTF.nodeChildren = BV.fromList [1] }
+                childNode0 = emptyNode { GLTF.nodeChildren = BV.fromList [2] }
+                childNode1 = emptyNode { GLTF.nodeChildren = BV.fromList [3] }
+                childNode2 = emptyNode
+                nodes = BV.fromList [rootNode, childNode0, childNode1, childNode2]
+                joints = BV.fromList [1,2,3]
+            result <- GLTF.searchCommonRoot nodes joints
+            result `shouldBe` 0
+
+        it "case 2" $ do
+            let node0 = emptyNode
+                node1 = emptyNode
+                node2 = emptyNode { GLTF.nodeChildren = BV.fromList [0] }
+                node3 = emptyNode { GLTF.nodeChildren = BV.fromList [1] }
+                node4 = emptyNode { GLTF.nodeChildren = BV.fromList [2, 3] }
+                node5 = emptyNode { GLTF.nodeChildren = BV.fromList [4] }
+                node6 = emptyNode { GLTF.nodeChildren = BV.fromList [5] }
+                node7 = emptyNode { GLTF.nodeChildren = BV.fromList [6] }
+                nodes = BV.fromList [node0, node1, node2, node3, node4, node5, node6, node7]
+                joints = BV.fromList [0,1]
+            result <- GLTF.searchCommonRoot nodes joints
+            result `shouldBe` 4

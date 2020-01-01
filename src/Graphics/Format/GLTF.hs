@@ -28,6 +28,7 @@ module Graphics.Format.GLTF
     , marshalComponentType
     , marshalValueType
     , numberOfComponent
+    , searchCommonRoot
     , unmarshalComponentType
     , unmarshalValueType
     ) where
@@ -43,9 +44,12 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (drop, isPrefixOf, readFile,
                                                 stripPrefix, take)
 import qualified Data.ByteString.Base64 as Base64 (decode)
-import qualified Data.ByteString.Char8 as ByteString (break, dropWhile, unpack)
+import qualified Data.ByteString.Char8 as ByteString (break, dropWhile, unpack,
+                                                      useAsCString)
 import Data.Either (either)
 import Data.Function ((&))
+import qualified Data.IntSet as IntSet (empty, fromList, isSubsetOf, member,
+                                        union)
 import qualified Data.List as List (groupBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (fromList, toList)
@@ -53,11 +57,15 @@ import Data.Maybe (fromMaybe, maybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
-import qualified Data.Vector as BV (Vector, empty, imapM_, map, mapM, unzip,
-                                    (!), (!?))
-import qualified Data.Vector.Storable as SV (unsafeWith)
-import qualified Data.Vector.Unboxed as UV (Vector, length, (!))
-import Foreign (castPtr)
+import qualified Data.Vector as BV (Vector, empty, foldM', head, imapM_, length,
+                                    map, mapM, toList, unsafeFreeze, unzip, (!),
+                                    (!?))
+import qualified Data.Vector.Mutable as MBV (read, replicate, write)
+import qualified Data.Vector.Storable as SV (Vector, empty, generate, generateM,
+                                             unsafeWith)
+import qualified Data.Vector.Unboxed as UV (Vector, length, unsafeFreeze, (!))
+import qualified Data.Vector.Unboxed.Mutable as MUV (read, replicate, write)
+import qualified Foreign (castPtr, peekByteOff)
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
@@ -82,14 +90,15 @@ import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
                                                         glTextureWrapT,
                                                         setSamplerParameter)
 import qualified Graphics.Hree.Scene as Hree (addBuffer, addMesh, addNode,
-                                              addRootNodes, addSampler,
+                                              addRootNodes, addSampler, addSkin,
                                               addTexture,
                                               mkDefaultTextureIfNotExists,
                                               newNode, updateNode)
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
                                                 TextureSourceData(..))
 import qualified Graphics.Hree.Types as Hree (Geometry(..), Material, Mesh(..),
-                                              MeshId, Node(..), NodeId, Scene)
+                                              MeshId, Node(..), NodeId, Scene,
+                                              SkinId)
 import qualified Linear (Quaternion(..), V3(..), V4(..), zero)
 import System.Directory (canonicalizePath)
 import System.FilePath (dropFileName, (</>))
@@ -679,6 +688,8 @@ loadSceneFromFile path scene = do
         meshes_ = gltfMeshes gltf
         nodes_ = gltfNodes gltf
         scenes_ = gltfScenes gltf
+        animations_ = gltfAnimations gltf
+        skins_ = gltfSkins gltf
         rootNodes = maybe mempty sceneNodes $ scenes_ BV.!? 0
         basepath = dropFileName path
     defaultTexture <- Hree.mkDefaultTextureIfNotExists scene
@@ -689,6 +700,7 @@ loadSceneFromFile path scene = do
     let textures = createTextures defaultTexture sources samplers textures_
         materials = createMaterials textures materials_
     nodeIds <- createNodes scene nodes_ rootNodes
+    skinIds <- createSkins scene nodes_ nodeIds bss bufferViews_ accessors_ skins_
     meshes <- createGLTFMeshes scene buffers bufferViews_ accessors_ materials meshes_
     BV.imapM_ (createMeshNodes scene nodeIds meshes) nodes_
     return gltf
@@ -840,6 +852,7 @@ createNodes scene nodes rootNodes = do
     BV.imapM_ (setNodeChildren scene nodeIds) nodes
     let rootNodeIds = BV.map (nodeIds BV.!) rootNodes
     Hree.addRootNodes scene rootNodeIds
+    return nodeIds
 
 createNode :: Hree.Scene -> Node -> IO Hree.NodeId
 createNode scene a =
@@ -877,6 +890,75 @@ createMeshNode scene meshId =
     Hree.addNode scene node False
     where
     node = Hree.newNode { Hree.nodeMesh = Just meshId }
+
+createSkins :: Hree.Scene -> BV.Vector Node -> BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Skin -> IO (BV.Vector Hree.SkinId)
+createSkins scene nodes nodeIds buffers bufferViews accessors =
+    mapM (createSkin scene nodes nodeIds buffers bufferViews accessors)
+
+createSkin :: Hree.Scene -> BV.Vector Node -> BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Skin -> IO Hree.SkinId
+createSkin scene nodes nodeIds buffers bufferViews accessors skin = do
+    let joints = skinJoints skin
+    invMats <- maybe (return SV.empty) (createMatricesFromBuffer buffers bufferViews accessors) $ skinInverseBindMatrices skin
+    skeleton <- maybe (searchCommonRoot nodes joints) return . skinSkeleton $ skin
+    let skeletonNodeId = nodeIds BV.! skeleton
+        jointNodeIds = SV.generate (BV.length joints) (nodeIds BV.!)
+    Hree.addSkin scene skeletonNodeId jointNodeIds invMats
+
+createMatricesFromBuffer :: BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector Mat4)
+createMatricesFromBuffer buffers bufferViews accessors i = do
+    let accessor = accessors BV.! i
+        view = bufferViews BV.! accessorBufferView accessor
+        buffer = buffers BV.! bufferViewBuffer view
+        byteOffset = bufferViewByteOffset view
+        byteLen = bufferViewByteLength view
+        count = accessorCount accessor
+        slice = ByteString.take byteLen . ByteString.drop byteOffset $ buffer
+        matByteSize = 64
+    ByteString.useAsCString slice $ \ptr ->
+        SV.generateM count (Foreign.peekByteOff ptr . (matByteSize *))
+
+searchCommonRoot :: BV.Vector Node -> BV.Vector Int -> IO Int
+searchCommonRoot nodes joints = do
+    let nodeCount = BV.length nodes
+        joint0 = BV.head joints
+        jointSet = IntSet.fromList . BV.toList $ joints
+    parents <- MUV.replicate nodeCount (-1)
+    BV.imapM_ (\i n -> BV.mapM (flip (MUV.write parents) i) (nodeChildren n)) nodes
+
+    root <- flip searchRoot joint0 =<< UV.unsafeFreeze parents
+
+    descendantSearched <- MUV.replicate nodeCount False
+    descendants <- MBV.replicate nodeCount IntSet.empty
+
+    _ <- searchDescendants descendantSearched descendants root
+
+    parentsFreezed <- UV.unsafeFreeze parents
+    descendantsFreezed <- BV.unsafeFreeze descendants
+    searchCommon parentsFreezed descendantsFreezed jointSet joint0
+
+    where
+    searchRoot parents i =
+        if parents UV.! i < 0
+            then return i
+            else searchRoot parents (parents UV.! i)
+
+    searchDescendants descendantSearched memo i = do
+        let node = nodes BV.! i
+        searched <- MUV.read descendantSearched i
+        if searched
+            then MBV.read memo i
+            else do
+                let childrenSet = IntSet.fromList . BV.toList $ nodeChildren node
+                ds <- BV.foldM' (\a b -> IntSet.union a <$> searchDescendants descendantSearched memo b) childrenSet . nodeChildren $ node
+                MUV.write descendantSearched i True
+                MBV.write memo i ds
+                return ds
+
+    searchCommon parents descendants jointSet i
+        | i < 0 = throwIO . userError $ "common root not found"
+        | IntSet.member i jointSet = searchCommon parents descendants jointSet (parents UV.! i)
+        | IntSet.isSubsetOf jointSet (descendants BV.! i) = return i
+        | otherwise = searchCommon parents descendants jointSet (parents UV.! i)
 
 createImage :: FilePath -> BV.Vector ByteString -> BV.Vector BufferView -> Image -> IO (Picture.Image Picture.PixelRGBA8)
 createImage cd buffers bufferViews image = go (imageUri image) (imageBufferView image) (imageMimeType image)
@@ -937,7 +1019,7 @@ createTextureSource cd scene buffers bufferViews image = do
         height = fromIntegral $ Picture.imageHeight source
         settings = Hree.TextureSettings 1 GL.GL_RGBA8 width height False
     (_, texture) <- SV.unsafeWith (Picture.imageData source) $ \ptr -> do
-        let sourceData = Hree.TextureSourceData width height PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (castPtr ptr)
+        let sourceData = Hree.TextureSourceData width height PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr ptr)
         Hree.addTexture scene name settings sourceData
     let sname = Text.encodeUtf8 $ fromMaybe "glTF_sourcesampler_" (imageName image)
     (_, sampler) <- Hree.addSampler scene sname
