@@ -1,5 +1,6 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Format.GLTF
     ( Accessor(..)
     , AlphaMode(..)
@@ -48,12 +49,14 @@ import qualified Data.ByteString.Char8 as ByteString (break, dropWhile, unpack,
                                                       useAsCString)
 import Data.Either (either)
 import Data.Function ((&))
+import Data.Int (Int16, Int8)
 import qualified Data.IntSet as IntSet (empty, fromList, isSubsetOf, member,
                                         union)
 import qualified Data.List as List (groupBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (fromList, toList)
 import Data.Maybe (fromMaybe, maybe)
+import Data.Proxy (Proxy(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
@@ -65,16 +68,19 @@ import qualified Data.Vector.Storable as SV (Vector, empty, generate, generateM,
                                              unsafeWith)
 import qualified Data.Vector.Unboxed as UV (Vector, length, unsafeFreeze, (!))
 import qualified Data.Vector.Unboxed.Mutable as MUV (read, replicate, write)
-import qualified Foreign (castPtr, peekByteOff)
+import Data.Word (Word16, Word8)
+import qualified Foreign (Ptr, Storable(..), castPtr, peekByteOff)
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
+import qualified Graphics.Hree.Animation as Hree (Animation)
 import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
 import qualified Graphics.Hree.GL as Hree (attribFormat, attribIFormat)
 import qualified Graphics.Hree.GL.Types as Hree (AttributeFormat(..),
                                                  BindBufferSetting(..),
                                                  BufferSource(..),
-                                                 IndexBuffer(..), Texture(..))
+                                                 IndexBuffer(..), Mat4,
+                                                 Texture(..), Vec3, Vec4)
 import qualified Graphics.Hree.Material as Hree (flatColorMaterial,
                                                  setBaseColorFactor,
                                                  setBaseColorTexture,
@@ -83,7 +89,7 @@ import qualified Graphics.Hree.Material as Hree (flatColorMaterial,
                                                  setNormalTexture,
                                                  setRoughnessFactor,
                                                  standardMaterial)
-import Graphics.Hree.Math
+import qualified Graphics.Hree.Math as Hree (Quaternion)
 import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
                                                         glTextureMinFilter,
                                                         glTextureWrapS,
@@ -168,11 +174,11 @@ data Node = Node
     { nodeCamera      :: !(Maybe Int)
     , nodeChildren    :: !(BV.Vector Int)
     , nodeSkin        :: !(Maybe Int)
-    , nodeMatrix      :: !(Maybe Mat4)
+    , nodeMatrix      :: !(Maybe Hree.Mat4)
     , nodeMesh        :: !(Maybe Int)
-    , nodeRotation    :: !(Maybe Quaternion)
-    , nodeScale       :: !(Maybe Vec3)
-    , nodeTranslation :: !(Maybe Vec3)
+    , nodeRotation    :: !(Maybe Hree.Quaternion)
+    , nodeScale       :: !(Maybe Hree.Vec3)
+    , nodeTranslation :: !(Maybe Hree.Vec3)
     , nodeName        :: !(Maybe Text)
     } deriving (Show, Eq)
 
@@ -617,7 +623,7 @@ numberOfComponent Mat2   = 2
 numberOfComponent Mat3   = 3
 numberOfComponent Mat4   = 4
 
-fromVectorToVec3 :: UV.Vector Float -> Aeson.Parser Vec3
+fromVectorToVec3 :: UV.Vector Float -> Aeson.Parser Hree.Vec3
 fromVectorToVec3 v
     | UV.length v == 3 =
         let a0 = v UV.! 0
@@ -626,7 +632,7 @@ fromVectorToVec3 v
         in return $ Linear.V3 a0 a1 a2
     | otherwise = fail "bad array size"
 
-fromVectorToVec4 :: UV.Vector Float -> Aeson.Parser Vec4
+fromVectorToVec4 :: UV.Vector Float -> Aeson.Parser Hree.Vec4
 fromVectorToVec4 v
     | UV.length v == 3 =
         let a0 = v UV.! 0
@@ -636,17 +642,17 @@ fromVectorToVec4 v
         in return $ Linear.V4 a0 a1 a2 a3
     | otherwise = fail "bad array size"
 
-fromVectorToQuaternion :: UV.Vector Float -> Aeson.Parser Quaternion
+fromVectorToQuaternion :: UV.Vector Float -> Aeson.Parser Hree.Quaternion
 fromVectorToQuaternion v
     | UV.length v == 4 =
-        let a0 = v UV.! 0
-            a1 = v UV.! 1
-            a2 = v UV.! 2
-            a3 = v UV.! 3
+        let a0 = v UV.! 3
+            a1 = v UV.! 0
+            a2 = v UV.! 1
+            a3 = v UV.! 2
         in return $ Linear.Quaternion a0 (Linear.V3 a1 a2 a3)
     | otherwise = fail "bad array size"
 
-fromVectorToMat4 :: UV.Vector Float -> Aeson.Parser Mat4
+fromVectorToMat4 :: UV.Vector Float -> Aeson.Parser Hree.Mat4
 fromVectorToMat4 v
     | UV.length v == 16 =
         let a00 = v UV.! 0
@@ -901,14 +907,14 @@ createSkins scene nodes nodeIds buffers bufferViews accessors =
 createSkin :: Hree.Scene -> BV.Vector Node -> BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Skin -> IO Hree.SkinId
 createSkin scene nodes nodeIds buffers bufferViews accessors skin = do
     let joints = skinJoints skin
-    invMats <- maybe (return SV.empty) (createMatricesFromBuffer buffers bufferViews accessors) $ skinInverseBindMatrices skin
+    invMats <- maybe (return SV.empty) (createMat4VectorFromBuffer buffers bufferViews accessors) $ skinInverseBindMatrices skin
     skeleton <- maybe (searchCommonRoot nodes joints) return . skinSkeleton $ skin
     let skeletonNodeId = nodeIds BV.! skeleton
         jointNodeIds = SV.generate (BV.length joints) (nodeIds BV.!)
     Hree.addSkin scene skeletonNodeId jointNodeIds invMats
 
-createMatricesFromBuffer :: BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector Mat4)
-createMatricesFromBuffer buffers bufferViews accessors i = do
+createVectorFromBuffer :: forall a. Foreign.Storable a => Proxy a -> (Foreign.Ptr () -> Int -> IO a) -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector a)
+createVectorFromBuffer _ peekByteOff buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
         view = bufferViews BV.! accessorBufferView accessor
         buffer = buffers BV.! bufferViewBuffer view
@@ -916,9 +922,59 @@ createMatricesFromBuffer buffers bufferViews accessors i = do
         byteLen = bufferViewByteLength view
         count = accessorCount accessor
         slice = ByteString.take byteLen . ByteString.drop byteOffset $ buffer
-        matByteSize = 64
+        elemByteSize = Foreign.sizeOf (undefined :: a)
+        stride = fromMaybe elemByteSize . bufferViewByteStride $ view
+        aoffset = accessorByteOffset accessor
+    unless (stride - aoffset >= elemByteSize) . throwIO . userError $ "bad stride"
+    unless (byteLen >= stride * count) . throwIO . userError $ "bad bufferView byte length"
     ByteString.useAsCString slice $ \ptr ->
-        SV.generateM count (Foreign.peekByteOff ptr . (matByteSize *))
+        SV.generateM count (\j -> peekByteOff (Foreign.castPtr ptr) (aoffset + stride * j))
+
+createMat4VectorFromBuffer :: BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector Hree.Mat4)
+createMat4VectorFromBuffer buffers bufferViews accessors i = do
+    let accessor = accessors BV.! i
+    unless (accessorType accessor == Mat4) . throwIO . userError $ "bad valueType"
+    unless (accessorComponentType accessor == Float') . throwIO . userError $ "bad componentType"
+    createVectorFromBuffer Proxy Foreign.peekByteOff buffers bufferViews accessors i
+
+createVec3VectorFromBuffer :: BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector Hree.Vec3)
+createVec3VectorFromBuffer buffers bufferViews accessors i = do
+    let accessor = accessors BV.! i
+    unless (accessorType accessor == Vec3) . throwIO . userError $ "bad valueType"
+    unless (accessorComponentType accessor == Float') . throwIO . userError $ "bad componentType"
+    createVectorFromBuffer Proxy Foreign.peekByteOff buffers bufferViews accessors i
+
+createQuaternionVectorFromBuffer :: BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector Hree.Quaternion)
+createQuaternionVectorFromBuffer buffers bufferViews accessors i = do
+    let accessor = accessors BV.! i
+        valueType = accessorType accessor
+        componentType = accessorComponentType accessor
+    peekByteOff <- maybe (throwIO . userError $ "bad accessor") return $ mkQuaternionPeekByteOff valueType componentType
+    createVectorFromBuffer Proxy peekByteOff buffers bufferViews accessors i
+
+mkQuaternionPeekByteOff :: ValueType -> ComponentType -> Maybe (Foreign.Ptr () -> Int -> IO (Linear.Quaternion Float))
+mkQuaternionPeekByteOff Vec4 Float' = Just Foreign.peekByteOff
+mkQuaternionPeekByteOff Vec4 Byte' = Just ((fmap f .) . Foreign.peekByteOff)
+    where
+    f :: Linear.V4 Int8 -> Linear.Quaternion Float
+    f (Linear.V4 x y z w) = Linear.Quaternion (toFloat w) (Linear.V3 (toFloat x) (toFloat y) (toFloat z))
+    toFloat a = max (fromIntegral a / 127.0) (-1.0)
+mkQuaternionPeekByteOff Vec4 UnsignedByte' = Just ((fmap f .) . Foreign.peekByteOff)
+    where
+    f :: Linear.V4 Word8 -> Linear.Quaternion Float
+    f (Linear.V4 x y z w) = Linear.Quaternion (toFloat w) (Linear.V3 (toFloat x) (toFloat y) (toFloat z))
+    toFloat a = max (fromIntegral a / 256.0) (-1.0)
+mkQuaternionPeekByteOff Vec4 Short' = Just ((fmap f .) . Foreign.peekByteOff)
+    where
+    f :: Linear.V4 Int16 -> Linear.Quaternion Float
+    f (Linear.V4 x y z w) = Linear.Quaternion (toFloat w) (Linear.V3 (toFloat x) (toFloat y) (toFloat z))
+    toFloat a = max (fromIntegral a / 32767.0) (-1.0)
+mkQuaternionPeekByteOff Vec4 UnsignedShort' = Just ((fmap f .) . Foreign.peekByteOff)
+    where
+    f :: Linear.V4 Word16 -> Linear.Quaternion Float
+    f (Linear.V4 x y z w) = Linear.Quaternion (toFloat w) (Linear.V3 (toFloat x) (toFloat y) (toFloat z))
+    toFloat a = max (fromIntegral a / 65535.0) (-1.0)
+mkQuaternionPeekByteOff _ _ = Nothing
 
 searchCommonRoot :: BV.Vector Node -> BV.Vector Int -> IO Int
 searchCommonRoot nodes joints = do
