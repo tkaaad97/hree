@@ -76,7 +76,7 @@ main = do
 
     onDisplay (s, c, Just (animation, st)) w = do
         render
-        threadDelay 100000
+        threadDelay 20000
         GLFW.pollEvents
         t <- Time.now
         let duration = Animation.animationDuration animation
@@ -91,7 +91,7 @@ main = do
 
     onDisplay (s, c, Nothing) w = do
         render
-        threadDelay 100000
+        threadDelay 20000
         GLFW.pollEvents
         onDisplay (s, c, Nothing) w
 
