@@ -53,9 +53,8 @@ import Data.Function ((&))
 import Data.Int (Int16, Int8)
 import qualified Data.IntSet as IntSet (empty, fromList, isSubsetOf, member,
                                         union)
-import qualified Data.List as List (groupBy)
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map (fromList, toList)
+import qualified Data.Map.Strict as Map (singleton, toList)
 import Data.Maybe (fromMaybe, maybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
@@ -760,9 +759,9 @@ createMeshes buffers bufferViews accessors materials =
 
 createMeshFromPrimitive :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.Material -> Primitive -> IO Hree.Mesh
 createMeshFromPrimitive buffers bufferViews accessors materials primitive = do
-    groups <- either error return $ groupAttributes buffers bufferViews accessors primitive
-    let (_, geometry) = foldl addAttribBindings (1, Hree.newGeometry) groups
-        verticesCount = minimum . map (accessorCount . snd) . concatMap snd $ groups
+    attributes <- either (throwIO . userError) return . mapM f . Map.toList . primitiveAttributes $ primitive
+    let (_, geometry) = foldl addAttribBinding (1, Hree.newGeometry) attributes
+        verticesCount = minimum . map (accessorCount . snd . snd) $ attributes
         geometry1 = geometry { Hree.geometryVerticesCount = verticesCount }
 
     geometry2 <- flip (maybe (return geometry1)) (primitiveIndices primitive) $
@@ -773,18 +772,24 @@ createMeshFromPrimitive buffers bufferViews accessors materials primitive = do
             materialIndex <- primitiveMaterial primitive
             materials BV.!? materialIndex
     return $ Hree.Mesh geometry2 material Nothing
+    where
+    f (key, aid) = do
+        accessor <- maybe (Left $ "invalid accessor identifier: " ++ show aid) return $ accessors BV.!? aid
+        let bvid = accessorBufferView accessor
+        bufferView <- maybe (Left $ "invalid bufferView identifier: " ++ show bvid) return $ bufferViews BV.!? bvid
+        let bid = bufferViewBuffer bufferView
+        buffer <- maybe (Left $ "invalid buffer identifier: " ++ show bid) return $ buffers BV.!? bid
+        return ((bufferView, buffer), (key, accessor))
 
-addAttribBindings :: (Int, Hree.Geometry) -> ((BufferView, GLW.Buffer), [(Text, Accessor)]) -> (Int, Hree.Geometry)
-addAttribBindings (bindingIndex, geometry0) ((bufferView, buffer), attribs) =
-    let geometry1 = Hree.addAttribBindings geometry0 bindingIndex attribFormats (buffer, bbs)
+addAttribBinding :: (Int, Hree.Geometry) -> ((BufferView, GLW.Buffer), (Text, Accessor)) -> (Int, Hree.Geometry)
+addAttribBinding (bindingIndex, geometry0) ((bufferView, buffer), (attribKey, accessor)) =
+    let geometry1 = Hree.addAttribBindings geometry0 bindingIndex attribFormat (buffer, bbs)
     in (bindingIndex + 1, geometry1)
     where
-    accessors = map snd attribs
-    offset = bufferViewByteOffset bufferView
-    stride = fromMaybe (calcStrideFromAccessors accessors) $ bufferViewByteStride bufferView
+    offset = bufferViewByteOffset bufferView + accessorByteOffset accessor
+    stride = fromMaybe (calcStrideFromAccessors [accessor]) $ bufferViewByteStride bufferView
     bbs = Hree.BindBufferSetting offset stride 0
-    attribFormats = Map.fromList . map f $ attribs
-    f (key, accessor) = (convertAttribName key, accessorToAttributeFormat accessor)
+    attribFormat = Map.singleton (convertAttribName attribKey) (accessorToAttributeFormat accessor)
 
 accessorToAttributeFormat :: Accessor -> Hree.AttributeFormat
 accessorToAttributeFormat accessor =
@@ -820,25 +825,6 @@ accessorByteStride accessor = num * componentByteSize componentType
     componentType = accessorComponentType accessor
     valueType = accessorType accessor
     num = numberOfComponent valueType
-
-groupAttributes :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Primitive -> Either String [((BufferView, GLW.Buffer), [(Text, Accessor)])]
-groupAttributes buffers bufferViews accessors primitive = do
-    attributes <- mapM f . Map.toList . primitiveAttributes $ primitive
-    let groups = List.groupBy sameBufferView attributes
-        groups' = map g groups
-    return groups'
-    where
-    f (key, aid) = do
-        accessor <- maybe (Left $ "invalid accessor identifier: " ++ show aid) return $ accessors BV.!? aid
-        let bvid = accessorBufferView accessor
-        bufferView <- maybe (Left $ "invalid bufferView identifier: " ++ show bvid) return $ bufferViews BV.!? bvid
-        let bid = bufferViewBuffer bufferView
-        buffer <- maybe (Left $ "invalid buffer identifier: " ++ show bid) return $ buffers BV.!? bid
-        return ((bufferView, buffer), (key, accessor))
-    g group =
-        let (common, _) = head group
-        in (common, map snd group)
-    sameBufferView ((a, _), _) ((b, _), _) = a == b
 
 setIndexBuffer :: Hree.Geometry -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> Either String Hree.Geometry
 setIndexBuffer geometry buffers bufferViews accessors i = do
