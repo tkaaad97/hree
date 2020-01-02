@@ -37,9 +37,9 @@ main = do
     height = 480
     defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = perspective 90 defaultAspect 0.001 1000.0
+    proj = perspective 90 defaultAspect 0.0001 10000.0
 
-    la = lookAt (V3 0 0 10) (V3 0 0 0) (V3 0 1 0)
+    la = lookAt (V3 0 0 5) (V3 0 0 0) (V3 0 1 0)
 
     init path w = do
         GL.glEnable GL.GL_CULL_FACE

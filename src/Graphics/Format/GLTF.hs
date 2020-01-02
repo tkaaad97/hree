@@ -109,7 +109,7 @@ import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
 import qualified Graphics.Hree.Types as Hree (Geometry(..), Material, Mesh(..),
                                               MeshId, Node(..), NodeId, Scene,
                                               SkinId)
-import qualified Linear (Quaternion(..), V3(..), V4(..), zero)
+import qualified Linear (Quaternion(..), V3(..), V4(..), transpose, zero)
 import System.Directory (canonicalizePath)
 import System.FilePath (dropFileName, (</>))
 
@@ -643,7 +643,7 @@ fromVectorToVec3 v
 
 fromVectorToVec4 :: UV.Vector Float -> Aeson.Parser Hree.Vec4
 fromVectorToVec4 v
-    | UV.length v == 3 =
+    | UV.length v == 4 =
         let a0 = v UV.! 0
             a1 = v UV.! 1
             a2 = v UV.! 2
@@ -862,7 +862,7 @@ createNode scene a =
     Hree.addNode scene node False
     where
     translation = fromMaybe Linear.zero (nodeTranslation a)
-    rotation = fromMaybe Linear.zero (nodeRotation a)
+    rotation = fromMaybe (Linear.Quaternion 1 (Linear.V3 0 0 0)) (nodeRotation a)
     scale = fromMaybe (Linear.V3 1 1 1) (nodeScale a)
     node = Hree.newNode
             { Hree.nodeName = nodeName a
@@ -908,7 +908,7 @@ createSkin scene nodes nodeIds buffers bufferViews accessors skin = do
     invMats <- maybe (return SV.empty) (createMat4VectorFromBuffer SV.generateM buffers bufferViews accessors) $ skinInverseBindMatrices skin
     skeleton <- maybe (searchCommonRoot nodes joints) return . skinSkeleton $ skin
     let skeletonNodeId = nodeIds BV.! skeleton
-        jointNodeIds = SV.generate (BV.length joints) (nodeIds BV.!)
+        jointNodeIds = SV.generate (BV.length joints) ((nodeIds BV.!) . (joints BV.!))
     Hree.addSkin scene skeletonNodeId jointNodeIds invMats
 
 createAnimations :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Animation -> IO (BV.Vector Hree.Animation)
@@ -990,7 +990,7 @@ createMat4VectorFromBuffer generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
     unless (accessorType accessor == Mat4) . throwIO . userError $ "bad valueType"
     unless (accessorComponentType accessor == Float') . throwIO . userError $ "bad componentType"
-    createVectorFromBuffer 64 Foreign.peekByteOff generateM buffers bufferViews accessors i
+    createVectorFromBuffer 64 ((fmap Linear.transpose .) . Foreign.peekByteOff) generateM buffers bufferViews accessors i
 
 createVec3VectorFromBuffer ::
     (Int -> (Int -> IO Hree.Vec3) -> IO v) ->
@@ -1012,7 +1012,10 @@ createQuaternionVectorFromBuffer generateM buffers bufferViews accessors i = do
     createVectorFromBuffer minStride peekByteOff generateM buffers bufferViews accessors i
 
 mkQuaternionPeekByteOffAndStride :: ValueType -> ComponentType -> Maybe (Foreign.Ptr () -> Int -> IO (Linear.Quaternion Float), Int)
-mkQuaternionPeekByteOffAndStride Vec4 Float' = Just (Foreign.peekByteOff, 16)
+mkQuaternionPeekByteOffAndStride Vec4 Float' = Just ((fmap f .) . Foreign.peekByteOff, 16)
+    where
+    f :: Linear.V4 Float -> Linear.Quaternion Float
+    f (Linear.V4 x y z w) = Linear.Quaternion w (Linear.V3 x y z)
 mkQuaternionPeekByteOffAndStride Vec4 Byte' = Just ((fmap f .) . Foreign.peekByteOff, 4)
     where
     f :: Linear.V4 Int8 -> Linear.Quaternion Float
