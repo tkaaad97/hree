@@ -968,22 +968,22 @@ convertInterpolation AnimationInterpolationStep = Hree.InterpolationStep
 convertInterpolation AnimationInterpolationCubicSpline = Hree.InterpolationLinear
 
 createVectorFromBuffer ::
-    forall a v. Foreign.Storable a =>
+    forall a v.
+    Int ->
     (Foreign.Ptr () -> Int -> IO a) ->
     (Int -> (Int -> IO a) -> IO v) ->
     BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO v
-createVectorFromBuffer peekByteOff generateM buffers bufferViews accessors i = do
+createVectorFromBuffer minStride peekByteOff generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
         view = bufferViews BV.! accessorBufferView accessor
         buffer = buffers BV.! bufferViewBuffer view
         byteOffset = bufferViewByteOffset view
         byteLen = bufferViewByteLength view
         count = accessorCount accessor
-        slice = ByteString.take byteLen . ByteString.drop byteOffset $ buffer
-        elemByteSize = Foreign.sizeOf (undefined :: a)
-        stride = fromMaybe elemByteSize . bufferViewByteStride $ view
         aoffset = accessorByteOffset accessor
-    unless (stride - aoffset >= elemByteSize) . throwIO . userError $ "bad stride"
+        slice = ByteString.take byteLen . ByteString.drop byteOffset $ buffer
+        stride = fromMaybe minStride . bufferViewByteStride $ view
+    unless (stride >= minStride) . throwIO . userError $ "bad stride. i: " ++ show i ++ ", minStride: " ++ show minStride ++ ", actual: " ++ show stride
     unless (byteLen >= stride * count) . throwIO . userError $ "bad bufferView byte length"
     ByteString.useAsCString slice $ \ptr ->
         generateM count (\j -> peekByteOff (Foreign.castPtr ptr) (aoffset + stride * j))
@@ -995,7 +995,7 @@ createFloatVectorFromBuffer generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
     unless (accessorType accessor == Scalar) . throwIO . userError $ "bad valueType"
     unless (accessorComponentType accessor == Float') . throwIO . userError $ "bad componentType"
-    createVectorFromBuffer Foreign.peekByteOff generateM buffers bufferViews accessors i
+    createVectorFromBuffer 4 Foreign.peekByteOff generateM buffers bufferViews accessors i
 
 createMat4VectorFromBuffer ::
     (Int -> (Int -> IO Hree.Mat4) -> IO v) ->
@@ -1004,7 +1004,7 @@ createMat4VectorFromBuffer generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
     unless (accessorType accessor == Mat4) . throwIO . userError $ "bad valueType"
     unless (accessorComponentType accessor == Float') . throwIO . userError $ "bad componentType"
-    createVectorFromBuffer Foreign.peekByteOff generateM buffers bufferViews accessors i
+    createVectorFromBuffer 64 Foreign.peekByteOff generateM buffers bufferViews accessors i
 
 createVec3VectorFromBuffer ::
     (Int -> (Int -> IO Hree.Vec3) -> IO v) ->
@@ -1013,7 +1013,7 @@ createVec3VectorFromBuffer generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
     unless (accessorType accessor == Vec3) . throwIO . userError $ "bad valueType"
     unless (accessorComponentType accessor == Float') . throwIO . userError $ "bad componentType"
-    createVectorFromBuffer Foreign.peekByteOff generateM buffers bufferViews accessors i
+    createVectorFromBuffer 12 Foreign.peekByteOff generateM buffers bufferViews accessors i
 
 createQuaternionVectorFromBuffer ::
     (Int -> (Int -> IO Hree.Quaternion) -> IO v) ->
@@ -1022,32 +1022,32 @@ createQuaternionVectorFromBuffer generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
         valueType = accessorType accessor
         componentType = accessorComponentType accessor
-    peekByteOff <- maybe (throwIO . userError $ "bad accessor") return $ mkQuaternionPeekByteOff valueType componentType
-    createVectorFromBuffer peekByteOff generateM buffers bufferViews accessors i
+    (peekByteOff, minStride) <- maybe (throwIO . userError $ "bad accessor") return $ mkQuaternionPeekByteOffAndStride valueType componentType
+    createVectorFromBuffer minStride peekByteOff generateM buffers bufferViews accessors i
 
-mkQuaternionPeekByteOff :: ValueType -> ComponentType -> Maybe (Foreign.Ptr () -> Int -> IO (Linear.Quaternion Float))
-mkQuaternionPeekByteOff Vec4 Float' = Just Foreign.peekByteOff
-mkQuaternionPeekByteOff Vec4 Byte' = Just ((fmap f .) . Foreign.peekByteOff)
+mkQuaternionPeekByteOffAndStride :: ValueType -> ComponentType -> Maybe (Foreign.Ptr () -> Int -> IO (Linear.Quaternion Float), Int)
+mkQuaternionPeekByteOffAndStride Vec4 Float' = Just (Foreign.peekByteOff, 16)
+mkQuaternionPeekByteOffAndStride Vec4 Byte' = Just ((fmap f .) . Foreign.peekByteOff, 4)
     where
     f :: Linear.V4 Int8 -> Linear.Quaternion Float
     f (Linear.V4 x y z w) = Linear.Quaternion (toFloat w) (Linear.V3 (toFloat x) (toFloat y) (toFloat z))
     toFloat a = max (fromIntegral a / 127.0) (-1.0)
-mkQuaternionPeekByteOff Vec4 UnsignedByte' = Just ((fmap f .) . Foreign.peekByteOff)
+mkQuaternionPeekByteOffAndStride Vec4 UnsignedByte' = Just ((fmap f .) . Foreign.peekByteOff, 4)
     where
     f :: Linear.V4 Word8 -> Linear.Quaternion Float
     f (Linear.V4 x y z w) = Linear.Quaternion (toFloat w) (Linear.V3 (toFloat x) (toFloat y) (toFloat z))
     toFloat a = max (fromIntegral a / 256.0) (-1.0)
-mkQuaternionPeekByteOff Vec4 Short' = Just ((fmap f .) . Foreign.peekByteOff)
+mkQuaternionPeekByteOffAndStride Vec4 Short' = Just ((fmap f .) . Foreign.peekByteOff, 8)
     where
     f :: Linear.V4 Int16 -> Linear.Quaternion Float
     f (Linear.V4 x y z w) = Linear.Quaternion (toFloat w) (Linear.V3 (toFloat x) (toFloat y) (toFloat z))
     toFloat a = max (fromIntegral a / 32767.0) (-1.0)
-mkQuaternionPeekByteOff Vec4 UnsignedShort' = Just ((fmap f .) . Foreign.peekByteOff)
+mkQuaternionPeekByteOffAndStride Vec4 UnsignedShort' = Just ((fmap f .) . Foreign.peekByteOff, 8)
     where
     f :: Linear.V4 Word16 -> Linear.Quaternion Float
     f (Linear.V4 x y z w) = Linear.Quaternion (toFloat w) (Linear.V3 (toFloat x) (toFloat y) (toFloat z))
     toFloat a = max (fromIntegral a / 65535.0) (-1.0)
-mkQuaternionPeekByteOff _ _ = Nothing
+mkQuaternionPeekByteOffAndStride _ _ = Nothing
 
 searchCommonRoot :: BV.Vector Node -> BV.Vector Int -> IO Int
 searchCommonRoot nodes joints = do
