@@ -794,13 +794,12 @@ addAttribBinding (bindingIndex, geometry0) ((bufferView, buffer), (attribKey, ac
 accessorToAttributeFormat :: Accessor -> Hree.AttributeFormat
 accessorToAttributeFormat accessor =
     if isIntegralType componentType
-        then Hree.attribIFormat num formatComponentType offset
-        else Hree.attribFormat num formatComponentType normalized offset
+        then Hree.attribIFormat num formatComponentType 0
+        else Hree.attribFormat num formatComponentType normalized 0
     where
     componentType = accessorComponentType accessor
     valueType = accessorType accessor
     normalized = accessorNormalized accessor
-    offset = accessorByteOffset accessor
     formatComponentType = componentTypeToGLenum componentType
     num = numberOfComponent valueType
 
