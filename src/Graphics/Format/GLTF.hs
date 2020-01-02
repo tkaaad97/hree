@@ -812,8 +812,8 @@ convertAttribName name
     | name == "TEXCOORD_0" = "uv"
     | name == "TEXCOORD_1" = "uv1"
     | name == "COLOR_0" = "color"
-    | name == "JOINTS_0" = "joint"
-    | name == "WEIGHTS_0" = "weight"
+    | name == "JOINTS_0" = "jointIndices"
+    | name == "WEIGHTS_0" = "jointWeights"
     | otherwise = "unknown"
 
 calcStrideFromAccessors :: [Accessor] -> Int
