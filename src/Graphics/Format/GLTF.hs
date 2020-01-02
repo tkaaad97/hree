@@ -18,6 +18,7 @@ module Graphics.Format.GLTF
     , Primitive(..)
     , Sampler(..)
     , Scene(..)
+    , Supplement(..)
     , Texture(..)
     , TextureInfo(..)
     , ValueType(..)

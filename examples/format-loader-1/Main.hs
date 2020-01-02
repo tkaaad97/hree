@@ -1,14 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import qualified Chronos as Time (Time(..), now)
+import Control.Concurrent (threadDelay)
 import Control.Exception (throwIO)
 import Control.Monad (void)
+import Data.Fixed (mod')
+import qualified Data.Vector as BV (head, null)
 import Example
 import qualified GLW
-import qualified Graphics.Format.GLTF as GLTF (loadSceneFromFile)
+import qualified Graphics.Format.GLTF as GLTF (Supplement(..),
+                                               loadSceneFromFile)
 import qualified Graphics.Format.PLY as PLY (loadGeometryFromFile)
 import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
 import qualified Graphics.GL as GL
+import qualified Graphics.Hree.Animation as Animation
 import Graphics.Hree.Camera
 import Graphics.Hree.Light (directionalLight)
 import qualified Graphics.Hree.Material as Material
@@ -39,18 +45,22 @@ main = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
         scene <- newScene
-        loadScene path scene (FilePath.takeExtension path)
+        a <- loadScene path scene (FilePath.takeExtension path)
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
-        return (scene, camera)
+        return (scene, camera, a)
 
     loadScene path scene ".gltf" = do
-        _ <- GLTF.loadSceneFromFile path scene
+        (_, sup) <- GLTF.loadSceneFromFile path scene
         let light = directionalLight (V3 0.5 (-1) (-0.5)) (V3 1 1 1) 1
+            animations = GLTF.supplementAnimations sup
+        st <- Time.now
         _ <- addLight scene light
-        return ()
+        if BV.null animations
+            then return Nothing
+            else return (Just (BV.head animations, st))
 
     loadScene path scene extension = do
         geometry <- case extension of
@@ -62,11 +72,28 @@ main = do
             mesh = Mesh geometry material Nothing
         meshId <- addMesh scene mesh
         void $ addNode scene newNode{ nodeMesh = Just meshId } True
+        return Nothing
 
-    onDisplay (s, c) w = do
+    onDisplay (s, c, Just (animation, st)) w = do
         render
+        threadDelay 100000
         GLFW.pollEvents
-        onDisplay (s, c) w
+        t <- Time.now
+        let duration = Animation.animationDuration animation
+            t' = realToFrac $ diffTime t st `mod'` realToFrac duration
+        Animation.applyAnimation s animation t'
+        onDisplay (s, c, Just (animation, st)) w
+
+        where
+        render = do
+            renderScene s c
+            GLFW.swapBuffers w
+
+    onDisplay (s, c, Nothing) w = do
+        render
+        threadDelay 100000
+        GLFW.pollEvents
+        onDisplay (s, c, Nothing) w
 
         where
         render = do
@@ -83,3 +110,9 @@ main = do
     updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
         PerspectiveProjection $ Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
+
+diffTime :: Time.Time -> Time.Time -> Double
+diffTime ta tb =
+    let nsa = Time.getTime ta
+        nsb = Time.getTime tb
+    in fromIntegral (nsa - nsb) * 1.0E-9
