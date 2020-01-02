@@ -56,24 +56,28 @@ import qualified Data.List as List (groupBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (fromList, toList)
 import Data.Maybe (fromMaybe, maybe)
-import Data.Proxy (Proxy(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
 import qualified Data.Vector as BV (Vector, empty, foldM', head, imapM_, length,
-                                    map, mapM, toList, unsafeFreeze, unzip, (!),
-                                    (!?))
+                                    map, mapM, maximum, toList, unsafeFreeze,
+                                    unzip, (!), (!?))
 import qualified Data.Vector.Mutable as MBV (read, replicate, write)
-import qualified Data.Vector.Storable as SV (Vector, empty, generate, generateM,
+import qualified Data.Vector.Storable as SV (empty, generate, generateM,
                                              unsafeWith)
-import qualified Data.Vector.Unboxed as UV (Vector, length, unsafeFreeze, (!))
+import qualified Data.Vector.Unboxed as UV (Vector, generateM, length,
+                                            unsafeFreeze, (!))
 import qualified Data.Vector.Unboxed.Mutable as MUV (read, replicate, write)
 import Data.Word (Word16, Word8)
 import qualified Foreign (Ptr, Storable(..), castPtr, peekByteOff)
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree.Animation as Hree (Animation)
+import qualified Graphics.Hree.Animation as Hree (Animation, Channel,
+                                                  Interpolation(..),
+                                                  KeyFrames(..), Track(..),
+                                                  animation, channelDuration,
+                                                  singleChannel)
 import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
 import qualified Graphics.Hree.GL as Hree (attribFormat, attribIFormat)
 import qualified Graphics.Hree.GL.Types as Hree (AttributeFormat(..),
@@ -320,6 +324,11 @@ data GLTF = GLTF
     , gltfMaterials   :: !(BV.Vector Material)
     , gltfAnimations  :: !(BV.Vector Animation)
     , gltfSkins       :: !(BV.Vector Skin)
+    } deriving (Show, Eq)
+
+data Supplement = Supplement
+    { supplementNodeIds    :: !(BV.Vector Hree.NodeId)
+    , supplementAnimations :: !(BV.Vector Hree.Animation)
     } deriving (Show, Eq)
 
 instance Aeson.FromJSON Buffer where
@@ -681,7 +690,7 @@ fromVectorToMat4 v
 loadGLTFFile :: FilePath -> IO GLTF
 loadGLTFFile filepath = either error return =<< Aeson.eitherDecodeFileStrict' filepath
 
-loadSceneFromFile :: FilePath -> Hree.Scene -> IO GLTF
+loadSceneFromFile :: FilePath -> Hree.Scene -> IO (GLTF, Supplement)
 loadSceneFromFile path scene = do
     gltf <- loadGLTFFile path
     let buffers_ = gltfBuffers gltf
@@ -708,8 +717,10 @@ loadSceneFromFile path scene = do
     nodeIds <- createNodes scene nodes_ rootNodes
     skinIds <- createSkins scene nodes_ nodeIds bss bufferViews_ accessors_ skins_
     meshes <- createGLTFMeshes buffers bufferViews_ accessors_ materials meshes_
+    animations <- createAnimations nodeIds bss bufferViews_ accessors_ animations_
     BV.imapM_ (createMeshNodes scene nodeIds meshes skinIds) nodes_
-    return gltf
+    let sup = Supplement nodeIds animations
+    return (gltf, sup)
 
 parseUri :: FilePath -> Int -> ByteString -> IO ByteString
 parseUri cd byteLength uri =
@@ -907,14 +918,60 @@ createSkins scene nodes nodeIds buffers bufferViews accessors =
 createSkin :: Hree.Scene -> BV.Vector Node -> BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Skin -> IO Hree.SkinId
 createSkin scene nodes nodeIds buffers bufferViews accessors skin = do
     let joints = skinJoints skin
-    invMats <- maybe (return SV.empty) (createMat4VectorFromBuffer buffers bufferViews accessors) $ skinInverseBindMatrices skin
+    invMats <- maybe (return SV.empty) (createMat4VectorFromBuffer SV.generateM buffers bufferViews accessors) $ skinInverseBindMatrices skin
     skeleton <- maybe (searchCommonRoot nodes joints) return . skinSkeleton $ skin
     let skeletonNodeId = nodeIds BV.! skeleton
         jointNodeIds = SV.generate (BV.length joints) (nodeIds BV.!)
     Hree.addSkin scene skeletonNodeId jointNodeIds invMats
 
-createVectorFromBuffer :: forall a. Foreign.Storable a => Proxy a -> (Foreign.Ptr () -> Int -> IO a) -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector a)
-createVectorFromBuffer _ peekByteOff buffers bufferViews accessors i = do
+createAnimations :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Animation -> IO (BV.Vector Hree.Animation)
+createAnimations nodeIds buffers bufferViews accessors = BV.mapM (createAnimation nodeIds buffers bufferViews accessors)
+
+createAnimation :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Animation -> IO Hree.Animation
+createAnimation nodeIds buffers bufferViews accessors animation = do
+    channels <- BV.mapM (createChannel nodeIds buffers bufferViews accessors (animationSamplers animation)) (animationChannels animation)
+    let duration = BV.maximum . BV.map Hree.channelDuration $ channels
+    return $ Hree.animation channels duration
+
+createChannel :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector AnimationSampler -> Channel -> IO Hree.Channel
+createChannel nodeIds buffers bufferViews accessors samplers channel = do
+    let AnimationSampler input interpolation output = samplers BV.! channelSampler channel
+        ChannelTarget targetNode path = channelTarget channel
+        nodeId = nodeIds BV.! targetNode
+    keyFrames <- createKeyFrames path interpolation buffers bufferViews accessors input output
+    return $ Hree.singleChannel nodeId keyFrames
+
+createKeyFrames :: ChannelTargetPath -> AnimationInterpolation -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> Int -> IO Hree.KeyFrames
+createKeyFrames ChannelTargetPathTranslation interpolation buffers bufferViews accessors input output = do
+    timePoints <- createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
+    values <- createVec3VectorFromBuffer UV.generateM buffers bufferViews accessors output
+    let track = Hree.TrackNodeTranslation values
+        interpolation' = convertInterpolation interpolation
+    return $ Hree.KeyFrames interpolation' timePoints track
+createKeyFrames ChannelTargetPathRotation interpolation buffers bufferViews accessors input output = do
+    timePoints <- createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
+    values <- createQuaternionVectorFromBuffer UV.generateM buffers bufferViews accessors output
+    let track = Hree.TrackNodeRotation values
+        interpolation' = convertInterpolation interpolation
+    return $ Hree.KeyFrames interpolation' timePoints track
+createKeyFrames ChannelTargetPathScale interpolation buffers bufferViews accessors input output = do
+    timePoints <- createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
+    values <- createVec3VectorFromBuffer UV.generateM buffers bufferViews accessors output
+    let track = Hree.TrackNodeScale values
+        interpolation' = convertInterpolation interpolation
+    return $ Hree.KeyFrames interpolation' timePoints track
+
+convertInterpolation :: AnimationInterpolation -> Hree.Interpolation
+convertInterpolation AnimationInterpolationLinear = Hree.InterpolationLinear
+convertInterpolation AnimationInterpolationStep = Hree.InterpolationStep
+convertInterpolation AnimationInterpolationCubicSpline = Hree.InterpolationLinear
+
+createVectorFromBuffer ::
+    forall a v. Foreign.Storable a =>
+    (Foreign.Ptr () -> Int -> IO a) ->
+    (Int -> (Int -> IO a) -> IO v) ->
+    BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO v
+createVectorFromBuffer peekByteOff generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
         view = bufferViews BV.! accessorBufferView accessor
         buffer = buffers BV.! bufferViewBuffer view
@@ -928,29 +985,44 @@ createVectorFromBuffer _ peekByteOff buffers bufferViews accessors i = do
     unless (stride - aoffset >= elemByteSize) . throwIO . userError $ "bad stride"
     unless (byteLen >= stride * count) . throwIO . userError $ "bad bufferView byte length"
     ByteString.useAsCString slice $ \ptr ->
-        SV.generateM count (\j -> peekByteOff (Foreign.castPtr ptr) (aoffset + stride * j))
+        generateM count (\j -> peekByteOff (Foreign.castPtr ptr) (aoffset + stride * j))
 
-createMat4VectorFromBuffer :: BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector Hree.Mat4)
-createMat4VectorFromBuffer buffers bufferViews accessors i = do
+createFloatVectorFromBuffer ::
+    (Int -> (Int -> IO Float) -> IO v) ->
+    BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO v
+createFloatVectorFromBuffer generateM buffers bufferViews accessors i = do
+    let accessor = accessors BV.! i
+    unless (accessorType accessor == Scalar) . throwIO . userError $ "bad valueType"
+    unless (accessorComponentType accessor == Float') . throwIO . userError $ "bad componentType"
+    createVectorFromBuffer Foreign.peekByteOff generateM buffers bufferViews accessors i
+
+createMat4VectorFromBuffer ::
+    (Int -> (Int -> IO Hree.Mat4) -> IO v) ->
+    BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO v
+createMat4VectorFromBuffer generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
     unless (accessorType accessor == Mat4) . throwIO . userError $ "bad valueType"
     unless (accessorComponentType accessor == Float') . throwIO . userError $ "bad componentType"
-    createVectorFromBuffer Proxy Foreign.peekByteOff buffers bufferViews accessors i
+    createVectorFromBuffer Foreign.peekByteOff generateM buffers bufferViews accessors i
 
-createVec3VectorFromBuffer :: BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector Hree.Vec3)
-createVec3VectorFromBuffer buffers bufferViews accessors i = do
+createVec3VectorFromBuffer ::
+    (Int -> (Int -> IO Hree.Vec3) -> IO v) ->
+    BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO v
+createVec3VectorFromBuffer generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
     unless (accessorType accessor == Vec3) . throwIO . userError $ "bad valueType"
     unless (accessorComponentType accessor == Float') . throwIO . userError $ "bad componentType"
-    createVectorFromBuffer Proxy Foreign.peekByteOff buffers bufferViews accessors i
+    createVectorFromBuffer Foreign.peekByteOff generateM buffers bufferViews accessors i
 
-createQuaternionVectorFromBuffer :: BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO (SV.Vector Hree.Quaternion)
-createQuaternionVectorFromBuffer buffers bufferViews accessors i = do
+createQuaternionVectorFromBuffer ::
+    (Int -> (Int -> IO Hree.Quaternion) -> IO v) ->
+    BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> IO v
+createQuaternionVectorFromBuffer generateM buffers bufferViews accessors i = do
     let accessor = accessors BV.! i
         valueType = accessorType accessor
         componentType = accessorComponentType accessor
     peekByteOff <- maybe (throwIO . userError $ "bad accessor") return $ mkQuaternionPeekByteOff valueType componentType
-    createVectorFromBuffer Proxy peekByteOff buffers bufferViews accessors i
+    createVectorFromBuffer peekByteOff generateM buffers bufferViews accessors i
 
 mkQuaternionPeekByteOff :: ValueType -> ComponentType -> Maybe (Foreign.Ptr () -> Int -> IO (Linear.Quaternion Float))
 mkQuaternionPeekByteOff Vec4 Float' = Just Foreign.peekByteOff
