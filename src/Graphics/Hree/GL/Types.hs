@@ -84,10 +84,8 @@ data UniformInfo = UniformInfo
     } deriving (Show, Eq)
 
 data UniformBlockInfo = UniformBlockInfo
-    { ubiUniformBlockName     :: !ByteString
-    , ubiUniformBlockIndex    :: !GL.GLuint
-    , ubiUniformBlockDataSize :: !GL.GLsizei
-    , ubiUniformBlockUniforms :: !(BV.Vector UniformInfo)
+    { ubiUniformBlockName  :: !ByteString
+    , ubiUniformBlockIndex :: !GL.GLuint
     } deriving (Show, Eq)
 
 data AttributeFormat =

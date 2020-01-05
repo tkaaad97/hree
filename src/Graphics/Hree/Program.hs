@@ -51,9 +51,12 @@ import qualified Data.Text.Lazy as Text (toStrict)
 import qualified Data.Text.Lazy.Builder as Text.Builder (fromText, singleton,
                                                          toLazyText)
 import qualified Data.Text.Lazy.Builder.Int as Text.Builder (decimal)
-import qualified Data.Vector as BV (Vector, fromList, generateM, map, mapM,
-                                    mapMaybe, toList, zip, zipWith, (!))
-import qualified Foreign (alloca, allocaArray, peek, peekArray, poke, with)
+import qualified Data.Vector as BV (Vector, generateM, map, mapM, mapMaybe,
+                                    toList, zip, zipWith, (!))
+import qualified Data.Vector.Storable as SV (generateM, imapMaybe, length,
+                                             unsafeWith, (!))
+import qualified Foreign (alloca, allocaArray, copyArray, peek, peekElemOff,
+                          pokeArray, with)
 import qualified Foreign.C.String as Foreign (peekCStringLen)
 import GHC.Generics (Generic)
 import qualified GLW
@@ -221,7 +224,7 @@ mkProgram' vsource fsource = do
     uniformLocations <- BV.mapM (getUniformLocation program) uniformNames
     let uniformLocationMap = Map.fromList . BV.toList . BV.mapMaybe id $ BV.zipWith (fmap . (,)) uniformNames uniformLocations
 
-    uniformBlocks <- getActiveUniformBlockInfos program uniforms
+    uniformBlocks <- getActiveUniformBlockInfos program
     let uniformBlockMap = Map.fromList . BV.toList $ BV.zip (BV.map ubiUniformBlockName uniformBlocks) uniformBlocks
 
     return $ ProgramInfo program attribMap uniformMap uniformLocationMap uniformBlockMap
@@ -307,82 +310,82 @@ getActiveAttribs program =
 
 getActiveUniformInfos :: GLW.Program -> IO (BV.Vector UniformInfo)
 getActiveUniformInfos program =
-    Foreign.alloca $ \p ->
-    Foreign.alloca $ \lp ->
-    Foreign.alloca $ \sp ->
-    Foreign.alloca $ \tp ->
-    Foreign.allocaArray maxNameBytes $ \np ->
-    Foreign.alloca $ \ip ->
-    Foreign.alloca $ \op -> do
+    Foreign.alloca $ \p -> do
         GLW.glGetProgramiv program GL.GL_ACTIVE_UNIFORMS p
-        len <- Foreign.peek p
-        BV.generateM (fromIntegral len) (getUniformInfo lp sp tp np ip op)
+        Foreign.peek p >>= getUniformInfos . fromIntegral
 
     where
     maxNameBytes = 128
 
-    getUniformInfo lp sp tp np ip op index = do
-        GLW.glGetActiveUniform program (fromIntegral index) (fromIntegral maxNameBytes) lp sp tp np
-        nameLen <- Foreign.peek lp
-        size <- Foreign.peek sp
-        dataType <- Foreign.peek tp
-        name <- ByteString.packCStringLen (np, fromIntegral nameLen)
+    getUniformInfos uniformCount =
+        Foreign.allocaArray uniformCount $ \indices ->
+        Foreign.allocaArray uniformCount $ \params -> do
+            -- get uniform block indices
+            Foreign.pokeArray indices [0..(fromIntegral uniformCount - 1)]
+            GLW.glGetActiveUniformsiv program (fromIntegral uniformCount) indices GL.GL_UNIFORM_BLOCK_INDEX params
+            blockIndices <- SV.generateM uniformCount (Foreign.peekElemOff params)
 
-        Foreign.poke ip (fromIntegral index)
-        GLW.glGetActiveUniformsiv program 1 ip GL.GL_UNIFORM_OFFSET op
-        offset <- Foreign.peek op
+            -- get uniform informations (other than inside uniform blocks)
+            let targetIndices = SV.imapMaybe (\i a -> if a < 0 then Just (fromIntegral i :: GL.GLuint) else Nothing) blockIndices
+                targetCount = SV.length targetIndices
+            uniformInfos <-
+                Foreign.alloca $ \lp ->
+                Foreign.alloca $ \sp ->
+                Foreign.alloca $ \tp ->
+                Foreign.allocaArray maxNameBytes $ \np ->
+                BV.generateM targetCount $ \i -> do
+                    GLW.glGetActiveUniform program (targetIndices SV.! i) (fromIntegral maxNameBytes) lp sp tp np
+                    nameLen <- Foreign.peek lp
+                    size <- Foreign.peek sp
+                    dataType <- Foreign.peek tp
+                    name <- ByteString.packCStringLen (np, fromIntegral nameLen)
+                    return $ UniformInfo name dataType (fromIntegral size) (-1) (-1) (-1) False
 
-        GLW.glGetActiveUniformsiv program 1 ip GL.GL_UNIFORM_ARRAY_STRIDE op
-        astride <- Foreign.peek op
+            SV.unsafeWith targetIndices $ \source -> Foreign.copyArray source indices targetCount
 
-        GLW.glGetActiveUniformsiv program 1 ip GL.GL_UNIFORM_MATRIX_STRIDE op
-        mstride <- Foreign.peek op
+            GLW.glGetActiveUniformsiv program (fromIntegral targetCount) indices GL.GL_UNIFORM_OFFSET params
+            offsets <- SV.generateM targetCount (Foreign.peekElemOff params)
 
-        GLW.glGetActiveUniformsiv program 1 ip GL.GL_UNIFORM_IS_ROW_MAJOR op
-        isRowMajor <- Foreign.peek op
+            GLW.glGetActiveUniformsiv program (fromIntegral targetCount) indices GL.GL_UNIFORM_ARRAY_STRIDE params
+            astrides <- SV.generateM targetCount (Foreign.peekElemOff params)
 
-        let uniformInfo = UniformInfo name dataType (fromIntegral size) offset astride mstride (isRowMajor /= 0)
+            GLW.glGetActiveUniformsiv program (fromIntegral targetCount) indices GL.GL_UNIFORM_MATRIX_STRIDE params
+            mstrides <- SV.generateM targetCount (Foreign.peekElemOff params)
 
-        return uniformInfo
+            GLW.glGetActiveUniformsiv program (fromIntegral targetCount) indices GL.GL_UNIFORM_IS_ROW_MAJOR params
+            isRowMajors <- SV.generateM targetCount (Foreign.peekElemOff params)
+
+            BV.generateM targetCount $ \i -> do
+                let uinfo = uniformInfos BV.! i
+                    uinfo' = uinfo
+                        { uiUniformOffset = offsets SV.! i
+                        , uiUniformArrayStride = astrides SV.! i
+                        , uiUniformMatrixStride = mstrides SV.! i
+                        , uiUniformIsRowMajor = (isRowMajors SV.! i) /= 0
+                        }
+                return uinfo'
 
 getUniformLocation :: GLW.Program -> ByteString -> IO (Maybe GLW.UniformLocation)
 getUniformLocation program =
     flip ByteString.useAsCString $ GLW.glGetUniformLocation program
 
-getActiveUniformBlockInfos :: GLW.Program -> BV.Vector UniformInfo -> IO (BV.Vector UniformBlockInfo)
-getActiveUniformBlockInfos program uniformInfos =
+getActiveUniformBlockInfos :: GLW.Program -> IO (BV.Vector UniformBlockInfo)
+getActiveUniformBlockInfos program =
     Foreign.alloca $ \p ->
     Foreign.alloca $ \lp ->
-    Foreign.allocaArray maxNameBytes $ \np ->
-    Foreign.alloca $ \op -> do
+    Foreign.allocaArray maxNameBytes $ \np -> do
         GLW.glGetProgramiv program GL.GL_ACTIVE_UNIFORM_BLOCKS p
         len <- Foreign.peek p
-        BV.generateM (fromIntegral len) (getUniformBlockInfo lp np op)
+        BV.generateM (fromIntegral len) (getUniformBlockInfo lp np)
 
     where
     maxNameBytes = 128
 
-    getUniformBlockInfo lp np op index = do
+    getUniformBlockInfo lp np index = do
         GLW.glGetActiveUniformBlockName program (fromIntegral index) (fromIntegral maxNameBytes) lp np
         nameLen <- Foreign.peek lp
         name <- ByteString.packCStringLen (np, fromIntegral nameLen)
-
-        GLW.glGetActiveUniformBlockiv program (fromIntegral index) GL.GL_UNIFORM_BLOCK_DATA_SIZE op
-        dataSize <- Foreign.peek op
-
-        GLW.glGetActiveUniformBlockiv program (fromIntegral index) GL.GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS op
-        num <- Foreign.peek op
-
-        indices <- Foreign.allocaArray (fromIntegral num) $ \ids -> do
-            GLW.glGetActiveUniformBlockiv program (fromIntegral index) GL.GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES ids
-            BV.fromList <$> Foreign.peekArray (fromIntegral num) ids
-
-        let uniforms = BV.map ((uniformInfos BV.!) . fromIntegral) indices
-            uniformBlockInfo = UniformBlockInfo name (fromIntegral index) dataSize uniforms
-
-        return uniformBlockInfo
-
-
+        return $ UniformBlockInfo name (fromIntegral index)
 
 throwIfProgramErrorStatus
     :: GLW.Program
