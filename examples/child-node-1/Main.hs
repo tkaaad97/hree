@@ -36,6 +36,7 @@ main =
     init w = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
+        renderer <- newRenderer
         scene <- newScene
         (geometry, _) <- createBoxGeometry 0.5 0.1 0.1 scene
         let material = Material.flatColorMaterial (V4 0.1 0.1 0.95 1)
@@ -73,20 +74,20 @@ main =
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
         st <- Time.now
-        return (scene, camera, animation, st)
+        return (renderer, scene, camera, animation, st)
 
-    onDisplay (s, c, animation, st) w = do
+    onDisplay (r, s, c, animation, st) w = do
         render
         GLFW.pollEvents
         t <- Time.now
         let duration = Animation.animationDuration animation
             t' = realToFrac $ diffTime t st `mod'` realToFrac duration
         Animation.applyAnimation s animation t'
-        onDisplay (s, c, animation, st) w
+        onDisplay (r, s, c, animation, st) w
 
         where
         render = do
-            renderScene s c
+            renderScene r s c
             GLFW.swapBuffers w
 
     resizeWindow' camera _ w h = do

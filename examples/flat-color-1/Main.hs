@@ -39,6 +39,7 @@ main =
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     init w = do
+        renderer <- newRenderer
         scene <- newScene
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry vs GL.GL_STREAM_DRAW scene
         let mesh = Mesh geometry material Nothing
@@ -46,14 +47,14 @@ main =
         _ <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
-        return (scene, camera)
+        return (renderer, scene, camera)
 
-    onDisplay (s, c) w = do
+    onDisplay (r, s, c) w = do
         render
         GLFW.pollEvents
-        onDisplay (s, c) w
+        onDisplay (r, s, c) w
 
         where
         render = do
-            renderScene s c
+            renderScene r s c
             GLFW.swapBuffers w

@@ -29,6 +29,7 @@ main =
     init w = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
+        renderer <- newRenderer
         scene <- newScene
         (geometry, _) <- createBoxGeometry 0.5 0.5 0.5 scene
         let material = Material.flatColorMaterial (V4 0.2 0.4 0.6 1)
@@ -39,19 +40,19 @@ main =
         _ <- setCameraMouseControl w camera
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
-        return (scene, camera, nodeId)
+        return (renderer, scene, camera, nodeId)
 
     deltaAngle = pi / 300
 
-    onDisplay (s, c, n) w = do
+    onDisplay (r, s, c, n) w = do
         render
         GLFW.pollEvents
         rotateNode s n (V3 0 0 1) deltaAngle
-        onDisplay (s, c, n) w
+        onDisplay (r, s, c, n) w
 
         where
         render = do
-            renderScene s c
+            renderScene r s c
             GLFW.swapBuffers w
 
     resizeWindow' camera _ w h = do

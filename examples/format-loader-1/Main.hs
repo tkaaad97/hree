@@ -44,13 +44,14 @@ main = do
     init path w = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
+        renderer <- newRenderer
         scene <- newScene
         a <- loadScene path scene (FilePath.takeExtension path)
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
-        return (scene, camera, a)
+        return (renderer, scene, camera, a)
 
     loadScene path scene ".gltf" = do
         (_, sup) <- GLTF.loadSceneFromFile path scene
@@ -74,7 +75,7 @@ main = do
         void $ addNode scene newNode{ nodeMesh = Just meshId } True
         return Nothing
 
-    onDisplay (s, c, Just (animation, st)) w = do
+    onDisplay (r, s, c, Just (animation, st)) w = do
         render
         threadDelay 20000
         GLFW.pollEvents
@@ -82,22 +83,22 @@ main = do
         let duration = Animation.animationDuration animation
             t' = realToFrac $ diffTime t st `mod'` realToFrac duration
         Animation.applyAnimation s animation t'
-        onDisplay (s, c, Just (animation, st)) w
+        onDisplay (r, s, c, Just (animation, st)) w
 
         where
         render = do
-            renderScene s c
+            renderScene r s c
             GLFW.swapBuffers w
 
-    onDisplay (s, c, Nothing) w = do
+    onDisplay (r, s, c, Nothing) w = do
         render
         threadDelay 20000
         GLFW.pollEvents
-        onDisplay (s, c, Nothing) w
+        onDisplay (r, s, c, Nothing) w
 
         where
         render = do
-            renderScene s c
+            renderScene r s c
             GLFW.swapBuffers w
 
     resizeWindow' camera _ w h = do

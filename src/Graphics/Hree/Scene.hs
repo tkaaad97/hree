@@ -19,9 +19,11 @@ module Graphics.Hree.Scene
     , addSkinnedMesh
     , addTexture
     , applyTransformToNode
+    , deleteRenderer
     , deleteScene
     , mkDefaultTextureIfNotExists
     , newNode
+    , newRenderer
     , newScene
     , readNodeTransform
     , removeLight
@@ -83,8 +85,8 @@ import qualified Linear
 import qualified System.Random.MWC as Random (asGenIO, uniformR,
                                               withSystemRandom)
 
-renderScene :: Scene -> Camera -> IO ()
-renderScene scene camera = do
+renderScene :: Renderer -> Scene -> Camera -> IO ()
+renderScene renderer scene camera = do
     t <- Time.now
     GLW.glClearColor 1 1 1 1
     GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
@@ -94,6 +96,7 @@ renderScene scene camera = do
     renderNodes
         t
         ubbs
+        renderer
         scene
         state
     where
@@ -118,12 +121,12 @@ lightBlockBindingIndex = BufferBindingIndex 2
 skinJointMatricesBlockBindingIndex = BufferBindingIndex 3
 skinJointInverseMatricesBlockBindingIndex = BufferBindingIndex 4
 
-renderNodes :: Time.Time -> BV.Vector (ByteString, BufferBindingIndex) -> Scene -> SceneState -> IO ()
-renderNodes t ubbs scene state = do
+renderNodes :: Time.Time -> BV.Vector (ByteString, BufferBindingIndex) -> Renderer -> Scene -> SceneState -> IO ()
+renderNodes t ubbs renderer scene state = do
     _ <- runMaybeT $ updateNodeMatrices t scene state
     skins <- Component.getComponentSlice (sceneSkinStore scene)
     BV.mapM_ (updateSkinJoints scene) =<< BV.unsafeFreeze skins
-    maybe (return ()) (renderMany ubbs) =<< runMaybeT (nodeToRenderInfos scene state)
+    maybe (return ()) (renderMany ubbs) =<< runMaybeT (nodeToRenderInfos renderer scene state)
     return ()
 
 foldNodes :: Scene -> SceneState -> (NodeInfo -> a -> b -> MaybeT IO (a, b)) -> a -> b -> MaybeT IO b
@@ -173,8 +176,8 @@ updateNodeMatrices t scene state = foldNodes scene state go (Linear.identity, Fa
 
         return ((globalMatrix, globalUpdated), ())
 
-nodeToRenderInfos :: Scene -> SceneState -> MaybeT IO [RenderInfo]
-nodeToRenderInfos scene state =
+nodeToRenderInfos :: Renderer -> Scene -> SceneState -> MaybeT IO [RenderInfo]
+nodeToRenderInfos renderer scene state =
     catMaybes <$> foldNodes scene state go () []
     where
     meshStore = sceneMeshStore scene
@@ -193,7 +196,7 @@ nodeToRenderInfos scene state =
         let (pspec, pname) = meshInfoProgram meshInfo
             maybeVao = meshInfoVertexArray meshInfo
             maybeSkinId = meshInfoSkin meshInfo
-        (program, _) <- lift $ mkProgramIfNotExists scene pspec pname
+        (program, _) <- lift $ mkProgramIfNotExists renderer pspec pname
         vao <- maybe (lift $ mkMeshVertexArray scene meshInfo program) return maybeVao
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent globalMatrixStore nodeId
         defaultTexture <- lift $ mkDefaultTextureIfNotExists scene
@@ -571,23 +574,21 @@ getLightBlock :: LightStore -> IO LightBlock
 getLightBlock store =
     LightBlock . LimitedVector <$> (SV.unsafeFreeze =<< Component.getComponentSlice store)
 
-mkProgramIfNotExists :: Scene -> ProgramSpec -> ProgramName -> IO (ProgramInfo, Bool)
-mkProgramIfNotExists scene pspec pname = do
-    programs <- fmap ssPrograms . readIORef . sceneState $ scene
+mkProgramIfNotExists :: Renderer -> ProgramSpec -> ProgramName -> IO (ProgramInfo, Bool)
+mkProgramIfNotExists renderer pspec pname = do
+    programs <- fmap rendererStatePrograms . readIORef . rendererState $ renderer
     let maybeProgram = Map.lookup pname programs
-    maybe (flip (,) True <$> mkProgramAndInsert scene pspec) (return . flip (,) False) maybeProgram
+    maybe (flip (,) True <$> mkProgramAndInsert renderer pspec pname) (return . flip (,) False) maybeProgram
 
-mkProgramAndInsert :: Scene -> ProgramSpec -> IO ProgramInfo
-mkProgramAndInsert scene pspec = do
+mkProgramAndInsert :: Renderer -> ProgramSpec -> ProgramName -> IO ProgramInfo
+mkProgramAndInsert renderer pspec pname = do
     program <- mkProgram pspec
-    atomicModifyIORef' (sceneState scene) (insertProgram program)
-    _ <- mkDefaultTextureIfNotExists scene
+    atomicModifyIORef' (rendererState renderer) (insertProgram program)
     return program
     where
     insertProgram program state =
-        let pname = getProgramName pspec
-            programs = Map.insert pname program (ssPrograms state)
-            newState = state { ssPrograms = programs }
+        let programs = Map.insert pname program (rendererStatePrograms state)
+            newState = state { rendererStatePrograms = programs }
         in (newState, ())
 
 mkDefaultTextureIfNotExists :: Scene -> IO Texture
@@ -679,8 +680,7 @@ initialSceneState =
         defaultTexture = Nothing
         cameraBlockBinder = Nothing
         lightBlockBinder = Nothing
-        programs = mempty
-    in SceneState meshCounter nodeCounter lightCounter skinCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder programs
+    in SceneState meshCounter nodeCounter lightCounter skinCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
@@ -710,6 +710,18 @@ deleteScene scene = do
         let buffers = ssBuffers state
             textures = Map.elems . ssTextures $ state
         in (initialSceneState, (buffers, textures))
+
+newRenderer :: IO Renderer
+newRenderer =
+    newIORef initialRendererState >>= return . Renderer
+
+initialRendererState :: RendererState
+initialRendererState = RendererState mempty
+
+deleteRenderer :: Renderer -> IO ()
+deleteRenderer renderer = do
+    programs <- fmap rendererStatePrograms . readIORef . rendererState $ renderer
+    GLW.deleteObjects . map programInfoProgram . Map.elems $ programs
 
 genRandomName :: ByteString -> Int -> IO ByteString
 genRandomName prefix len = do

@@ -121,6 +121,7 @@ main =
     init w = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
+        renderer <- Scene.newRenderer
         scene <- Scene.newScene
 
         indexBuffer <- Scene.addIndexBufferUInt scene indices
@@ -151,9 +152,9 @@ main =
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
         st <- Time.now
-        return (scene, camera, animation, st)
+        return (renderer, scene, camera, animation, st)
 
-    onDisplay (s, c, animation, st) w = do
+    onDisplay (r, s, c, animation, st) w = do
         render
         threadDelay 100000
         GLFW.pollEvents
@@ -161,11 +162,11 @@ main =
         let duration = Animation.animationDuration animation
             t' = realToFrac $ diffTime t st `mod'` realToFrac duration
         Animation.applyAnimation s animation t'
-        onDisplay (s, c, animation, st) w
+        onDisplay (r, s, c, animation, st) w
 
         where
         render = do
-            Scene.renderScene s c
+            Scene.renderScene r s c
             GLFW.swapBuffers w
 
     resizeWindow' camera _ w h = do

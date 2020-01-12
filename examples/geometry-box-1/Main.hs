@@ -48,6 +48,7 @@ main =
     init w = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
+        renderer <- newRenderer
         scene <- newScene
         (geometry, _) <- createBoxGeometry 0.5 0.5 0.5 scene
         geometry' <- Geometry.addVerticesToGeometry geometry vs GL.GL_STATIC_READ scene
@@ -62,16 +63,16 @@ main =
         _ <- setCameraMouseControl w camera
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
-        return (scene, camera)
+        return (renderer, scene, camera)
 
-    onDisplay (s, c) w = do
+    onDisplay (r, s, c) w = do
         render
         GLFW.pollEvents
-        onDisplay (s, c) w
+        onDisplay (r, s, c) w
 
         where
         render = do
-            renderScene s c
+            renderScene r s c
             GLFW.swapBuffers w
 
     resizeWindow' camera _ w h = do

@@ -13,6 +13,8 @@ module Graphics.Hree.Types
     , NodeId(..)
     , Node(..)
     , NodeInfo(..)
+    , Renderer(..)
+    , RendererState(..)
     , Scene(..)
     , SceneState(..)
     , Skin(..)
@@ -134,7 +136,14 @@ data SceneState = SceneState
     , ssDefaultTexture    :: !(Maybe Texture)
     , ssCameraBlockBinder :: !(Maybe (UniformBlockBinder CameraBlock))
     , ssLightBlockBinder  :: !(Maybe (UniformBlockBinder LightBlock))
-    , ssPrograms          :: !(Map ProgramName ProgramInfo)
+    } deriving (Show)
+
+newtype Renderer = Renderer
+    { rendererState :: IORef RendererState
+    }
+
+newtype RendererState = RendererState
+    { rendererStatePrograms :: Map ProgramName ProgramInfo
     } deriving (Show)
 
 data MatricesBlockBinder = forall n. KnownNat n => MatricesBlockBinder
