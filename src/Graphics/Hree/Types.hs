@@ -78,8 +78,8 @@ data MeshInfo = MeshInfo
     , meshInfoMesh        :: !Mesh
     , meshInfoSkin        :: !(Maybe SkinId)
     , meshInfoBuffers     :: ![GLW.Buffer]
-    , meshInfoProgram     :: !(Either ProgramSpec ProgramInfo)
-    , meshInfoVertexArray :: !GLW.VertexArray
+    , meshInfoProgram     :: !(ProgramSpec, ProgramName)
+    , meshInfoVertexArray :: !(Maybe GLW.VertexArray)
     } deriving (Show)
 
 newtype NodeId = NodeId

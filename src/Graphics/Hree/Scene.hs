@@ -47,7 +47,6 @@ import qualified Data.ByteString.Char8 as ByteString (pack)
 import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
 import qualified Data.Component as Component
-import Data.Either (either)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.Map.Strict as Map
@@ -191,17 +190,20 @@ nodeToRenderInfos scene state =
             inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
         meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
         meshInfo <- MaybeT $ Component.readComponent meshId meshStore
-        let maybeSkinId = meshInfoSkin meshInfo
-        program <- either (lift . fmap fst . mkProgramIfNotExists scene) return $ meshInfoProgram meshInfo
+        let (pspec, pname) = meshInfoProgram meshInfo
+            maybeVao = meshInfoVertexArray meshInfo
+            maybeSkinId = meshInfoSkin meshInfo
+        (program, _) <- lift $ mkProgramIfNotExists scene pspec pname
+        vao <- maybe (lift $ mkMeshVertexArray scene meshInfo program) return maybeVao
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
         defaultTexture <- lift $ mkDefaultTextureIfNotExists scene
-        skin <- maybe (return Nothing) (lift . flip Component.readComponent skinStore) maybeSkinId
+        maybeSkin <- maybe (return Nothing) (lift . flip Component.readComponent skinStore) $ maybeSkinId
         let matrix = globalMatrix !*! inverseBindMatrix
-        let renderInfo = toRenderInfo program defaultTexture meshInfo skin matrix
+        let renderInfo = toRenderInfo program defaultTexture meshInfo vao maybeSkin matrix
         return renderInfo
 
-toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> Maybe Skin -> Mat4 -> RenderInfo
-toRenderInfo program defaultTexture meshInfo skin matrix =
+toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> GLW.VertexArray -> Maybe Skin -> Mat4 -> RenderInfo
+toRenderInfo program defaultTexture meshInfo vao skin matrix =
     let maybeUniform = toUniformEntry ("modelMatrix", Uniform matrix)
         uniforms = BV.mapMaybe toUniformEntry $ (BV.fromList . Map.toList $ materialUniforms material) `mappend` textureUniforms
         uniforms' = maybe uniforms (BV.snoc uniforms) maybeUniform
@@ -211,7 +213,6 @@ toRenderInfo program defaultTexture meshInfo skin matrix =
     where
     mesh = meshInfoMesh meshInfo
     material = meshMaterial mesh
-    vao = meshInfoVertexArray meshInfo
     dm = resolveDrawMethod mesh
     uniformLocations = programInfoUniformLocations program
     toUniformEntry (uniformName, uniform) = do
@@ -255,22 +256,19 @@ addMesh_ :: Scene -> Mesh -> Maybe SkinId -> IO MeshId
 addMesh_ scene mesh maybeSkinId = do
     maybeSkin <- maybe (return Nothing) (`Component.readComponent` sceneSkinStore scene) maybeSkinId
     let pspec = resolveProgramSpec mesh maybeSkin
-    (program, _) <- mkProgramIfNotExists scene pspec
-    GLW.glUseProgram (programInfoProgram program)
-    vao <- mkVertexArray (geometryAttribBindings geo) buffers maybeIndexBuffer program
-    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc program vao)
+        pname = getProgramName pspec
+    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc (pspec, pname))
     let meshId = meshInfoId minfo
     Component.addComponent meshId minfo (sceneMeshStore scene)
     return meshId
 
     where
-    addMeshFunc program vao state =
+    addMeshFunc p state =
         let meshId = ssMeshCounter state
             meshIdNext = meshId + 1
             bos = map fst . IntMap.elems $ buffers
             bos' = maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
-            programInfo = Right program
-            minfo = MeshInfo meshId mesh maybeSkinId bos' programInfo vao
+            minfo = MeshInfo meshId mesh maybeSkinId bos' p Nothing
             newState = state
                 { ssMeshCounter = meshIdNext
                 }
@@ -280,9 +278,22 @@ addMesh_ scene mesh maybeSkinId = do
     buffers = geometryBuffers geo
     maybeIndexBuffer = geometryIndexBuffer geo
 
+mkMeshVertexArray :: Scene -> MeshInfo -> ProgramInfo -> IO GLW.VertexArray
+mkMeshVertexArray scene meshInfo program =
+    maybe f return (meshInfoVertexArray meshInfo)
+    where
+    meshId = meshInfoId meshInfo
+    geo = meshGeometry . meshInfoMesh $ meshInfo
+    meshStore = sceneMeshStore scene
+    setVao vao a = a { meshInfoVertexArray = Just vao }
+    f = do
+        vao <- mkVertexArray (geometryAttribBindings geo) (geometryBuffers geo) (geometryIndexBuffer geo) program
+        void $ Component.modifyComponent meshId (setVao vao) meshStore
+        return vao
+
 removeMesh :: Scene -> MeshId -> IO ()
 removeMesh scene meshId = do
-    vao <- fmap meshInfoVertexArray <$> Component.readComponent meshId (sceneMeshStore scene)
+    vao <- ((id =<<) . fmap meshInfoVertexArray) <$> Component.readComponent meshId (sceneMeshStore scene)
     maybe (return ()) GLW.deleteObject vao
     void $ Component.removeComponent meshId (sceneMeshStore scene)
 
@@ -560,11 +571,10 @@ getLightBlock :: LightStore -> IO LightBlock
 getLightBlock store =
     LightBlock . LimitedVector <$> (SV.unsafeFreeze =<< Component.getComponentSlice store)
 
-mkProgramIfNotExists :: Scene -> ProgramSpec -> IO (ProgramInfo, Bool)
-mkProgramIfNotExists scene pspec = do
+mkProgramIfNotExists :: Scene -> ProgramSpec -> ProgramName -> IO (ProgramInfo, Bool)
+mkProgramIfNotExists scene pspec pname = do
     programs <- fmap ssPrograms . readIORef . sceneState $ scene
-    let pname = getProgramName pspec
-        maybeProgram = Map.lookup pname programs
+    let maybeProgram = Map.lookup pname programs
     maybe (flip (,) True <$> mkProgramAndInsert scene pspec) (return . flip (,) False) maybeProgram
 
 mkProgramAndInsert :: Scene -> ProgramSpec -> IO ProgramInfo
@@ -676,7 +686,7 @@ deleteScene :: Scene -> IO ()
 deleteScene scene = do
     (buffers, textures) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
     meshes <- Component.getComponentSlice (sceneMeshStore scene)
-    vaos <- BV.map meshInfoVertexArray <$> BV.unsafeFreeze meshes
+    vaos <- BV.mapMaybe meshInfoVertexArray <$> BV.unsafeFreeze meshes
     BV.mapM_ GLW.deleteObject vaos
     GLW.deleteObjects buffers
     GLW.deleteObjects textures
