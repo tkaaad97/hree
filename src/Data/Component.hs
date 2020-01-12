@@ -50,11 +50,11 @@ componentSize :: ComponentStore v e a -> IO Int
 componentSize =
     fmap componentStoreSize . readIORef . unComponentStore
 
-addComponent :: (MV.MVector v a, MV.MVector v e, Eq e, Hashable e) => e -> a -> ComponentStore v e a -> IO ()
-addComponent e a store = do
+addComponent :: (MV.MVector v a, MV.MVector v e, Eq e, Hashable e) => ComponentStore v e a -> e -> a -> IO ()
+addComponent store e a = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
-    maybe addNewEntity (\i -> writeComponentAt i a store) maybeIndex
+    maybe addNewEntity (\i -> writeComponentAt store i a) maybeIndex
     where
     addNewEntity = do
         (i, s) <- genComponentIndex store
@@ -87,8 +87,8 @@ addComponent e a store = do
             then limit
             else current * 2
 
-removeComponent :: (MV.MVector v a, MV.MVector v e, Eq e, Hashable e) => e -> ComponentStore v e a -> IO Bool
-removeComponent e store = do
+removeComponent :: (MV.MVector v a, MV.MVector v e, Eq e, Hashable e) => ComponentStore v e a -> e -> IO Bool
+removeComponent store e = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
     maybe (return False) relocate maybeIndex
@@ -112,8 +112,8 @@ removeComponent e store = do
         HT.delete emap e
         return True
 
-readComponent :: (MV.MVector v a, Eq e, Hashable e) => e -> ComponentStore v e a -> IO (Maybe a)
-readComponent e store = do
+readComponent :: (MV.MVector v a, Eq e, Hashable e) => ComponentStore v e a -> e -> IO (Maybe a)
+readComponent store e = do
     s <- readIORef (unComponentStore store)
     let vec = componentStoreVec s
         emap = componentStoreEntityMap s
@@ -121,21 +121,21 @@ readComponent e store = do
     maybe (return Nothing)
         (fmap Just . MV.unsafeRead vec) maybeIndex
 
-writeComponent :: (MV.MVector v a, Eq e, Hashable e) => e -> a -> ComponentStore v e a -> IO Bool
-writeComponent e a store = do
+writeComponent :: (MV.MVector v a, Eq e, Hashable e) => ComponentStore v e a -> e -> a -> IO Bool
+writeComponent store e a = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
     maybe (return False)
         (\i -> MV.unsafeWrite (componentStoreVec s) i a >> return True)
         maybeIndex
 
-writeComponentAt :: (MV.MVector v a) => Int -> a -> ComponentStore v e a -> IO ()
-writeComponentAt i a store = do
+writeComponentAt :: (MV.MVector v a) => ComponentStore v e a -> Int -> a -> IO ()
+writeComponentAt store i a = do
     vec <- componentStoreVec <$> readIORef (unComponentStore store)
     MV.unsafeWrite vec i a
 
-modifyComponent :: (MV.MVector v a, Eq e, Hashable e) => e -> (a -> a) -> ComponentStore v e a -> IO Bool
-modifyComponent e f store = do
+modifyComponent :: (MV.MVector v a, Eq e, Hashable e) => ComponentStore v e a -> e -> (a -> a) -> IO Bool
+modifyComponent store e f = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
     maybe (return False)

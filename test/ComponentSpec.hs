@@ -29,11 +29,11 @@ spec = do
                 entity2 = 2
                 component2 = V3 4 5 6
             store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double))) :: IO (ComponentStore MV.MVector Int (V3 Double))
-            addComponent entity1 component1 store
-            addComponent entity2 component2 store
-            c1 <- readComponent entity1 store
+            addComponent store entity1 component1
+            addComponent store entity2 component2
+            c1 <- readComponent store entity1
             c1 `shouldBe` Just component1
-            c2 <- readComponent entity2 store
+            c2 <- readComponent store entity2
             c2 `shouldBe` Just component2
             size <- componentSize store
             size `shouldBe` 2
@@ -46,16 +46,16 @@ spec = do
                 component2 = V3 4 5 6
             store <- newComponentStore preserve (Proxy :: (Proxy (MV.IOVector (V3 Double)))) :: IO (ComponentStore MV.MVector Int (V3 Double))
 
-            addComponent entity1 component1 store
-            c1 <- readComponent entity1 store
+            addComponent store entity1 component1
+            c1 <- readComponent store entity1
             c1 `shouldBe` Just component1
             state1 <- readIORef (unComponentStore store)
             MV.length (componentStoreVec state1) `shouldBe` preserve
 
-            addComponent entity2 component2 store
+            addComponent store entity2 component2
             state2 <- readIORef (unComponentStore store)
             MV.length (componentStoreVec state2) `shouldSatisfy` (> preserve)
-            c2 <- readComponent entity2 store
+            c2 <- readComponent store entity2
             c2 `shouldBe` Just component2
 
     describe "removeComponent" $ do
@@ -64,10 +64,10 @@ spec = do
                 entity1 = 1
                 component1 = V3 1 2 3
             store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double))) :: IO (ComponentStore MV.MVector Int (V3 Double))
-            addComponent entity1 component1 store
-            c1 <- readComponent entity1 store
+            addComponent store entity1 component1
+            c1 <- readComponent store entity1
             c1 `shouldBe` Just component1
-            removed <- removeComponent entity1 store
+            removed <- removeComponent store entity1
             removed `shouldBe` True
             size <- componentSize store
             size `shouldBe` 0
@@ -82,10 +82,10 @@ spec = do
                 component3 = V3 7 8 9
             store <- newComponentStore preserve (Proxy :: Proxy (MV.IOVector (V3 Double))) :: IO (ComponentStore MV.MVector Int (V3 Double))
 
-            addComponent entity1 component1 store
-            addComponent entity2 component2 store
-            addComponent entity3 component3 store
-            _ <- removeComponent entity1 store
+            addComponent store entity1 component1
+            addComponent store entity2 component2
+            addComponent store entity3 component3
+            _ <- removeComponent store entity1
 
             state <- readIORef (unComponentStore store)
             let size = componentStoreSize state

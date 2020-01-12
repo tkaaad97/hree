@@ -129,14 +129,14 @@ renderNodes t ubbs scene state = do
 foldNodes :: Scene -> SceneState -> (NodeInfo -> a -> b -> MaybeT IO (a, b)) -> a -> b -> MaybeT IO b
 foldNodes scene state f a b = do
     let nodeIds = ssRootNodes state
-    nodes <- BV.mapM (MaybeT . flip Component.readComponent nodeStore) nodeIds
+    nodes <- BV.mapM (MaybeT . Component.readComponent nodeStore) nodeIds
     BV.foldM' (go a) b nodes
     where
     nodeStore = sceneNodeStore scene
     go x0 y0 node = do
         (x1, y1) <- f node x0 y0
         let nodeIds = nodeChildren . nodeInfoNode $ node
-        nodes <- BV.mapM (MaybeT . flip Component.readComponent nodeStore) nodeIds
+        nodes <- BV.mapM (MaybeT . Component.readComponent nodeStore) nodeIds
         BV.foldM' (go x1) y1 nodes
 
 updateNodeMatrices :: Time.Time -> Scene -> SceneState -> MaybeT IO ()
@@ -148,7 +148,7 @@ updateNodeMatrices t scene state = foldNodes scene state go (Linear.identity, Fa
 
     go node (parentGlobalMatrix, parentGlobalUpdated) _ = do
         let nodeId = nodeInfoId node
-        transformInfo <- MaybeT $ Component.readComponent nodeId transformStore
+        transformInfo <- MaybeT $ Component.readComponent transformStore nodeId
         let transform = transformInfoTransform transformInfo
             updated = transformInfoUpdated transformInfo
 
@@ -157,19 +157,19 @@ updateNodeMatrices t scene state = foldNodes scene state go (Linear.identity, Fa
                 then do
                     let matrix = transformMatrix transform
                         tinfo = transformInfo { transformInfoUpdated = False, transformInfoSyncedAt = t }
-                    _ <- Component.writeComponent nodeId matrix matrixStore
-                    _ <- Component.writeComponent nodeId tinfo transformStore
+                    _ <- Component.writeComponent matrixStore nodeId matrix
+                    _ <- Component.writeComponent transformStore nodeId tinfo
                     return matrix
-                else fromMaybe Linear.identity <$> Component.readComponent nodeId matrixStore
+                else fromMaybe Linear.identity <$> Component.readComponent matrixStore nodeId
 
         let globalUpdated = parentGlobalUpdated || updated
         globalMatrix <- lift $
             if globalUpdated
                 then do
                     let matrix = parentGlobalMatrix !*! localMatrix
-                    _ <- Component.writeComponent nodeId matrix globalMatrixStore
+                    _ <- Component.writeComponent globalMatrixStore nodeId matrix
                     return matrix
-                else fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
+                else fromMaybe Linear.identity <$> Component.readComponent globalMatrixStore nodeId
 
         return ((globalMatrix, globalUpdated), ())
 
@@ -189,15 +189,15 @@ nodeToRenderInfos scene state =
         let nodeId = nodeInfoId node
             inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
         meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
-        meshInfo <- MaybeT $ Component.readComponent meshId meshStore
+        meshInfo <- MaybeT $ Component.readComponent meshStore meshId
         let (pspec, pname) = meshInfoProgram meshInfo
             maybeVao = meshInfoVertexArray meshInfo
             maybeSkinId = meshInfoSkin meshInfo
         (program, _) <- lift $ mkProgramIfNotExists scene pspec pname
         vao <- maybe (lift $ mkMeshVertexArray scene meshInfo program) return maybeVao
-        globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent nodeId globalMatrixStore
+        globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent globalMatrixStore nodeId
         defaultTexture <- lift $ mkDefaultTextureIfNotExists scene
-        maybeSkin <- maybe (return Nothing) (lift . flip Component.readComponent skinStore) $ maybeSkinId
+        maybeSkin <- maybe (return Nothing) (lift . Component.readComponent skinStore) $ maybeSkinId
         let matrix = globalMatrix !*! inverseBindMatrix
         let renderInfo = toRenderInfo program defaultTexture meshInfo vao maybeSkin matrix
         return renderInfo
@@ -254,12 +254,12 @@ addSkinnedMesh scene mesh skin = addMesh_ scene mesh (Just skin)
 
 addMesh_ :: Scene -> Mesh -> Maybe SkinId -> IO MeshId
 addMesh_ scene mesh maybeSkinId = do
-    maybeSkin <- maybe (return Nothing) (`Component.readComponent` sceneSkinStore scene) maybeSkinId
+    maybeSkin <- maybe (return Nothing) (Component.readComponent (sceneSkinStore scene)) maybeSkinId
     let pspec = resolveProgramSpec mesh maybeSkin
         pname = getProgramName pspec
     minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc (pspec, pname))
     let meshId = meshInfoId minfo
-    Component.addComponent meshId minfo (sceneMeshStore scene)
+    Component.addComponent (sceneMeshStore scene) meshId minfo
     return meshId
 
     where
@@ -288,14 +288,14 @@ mkMeshVertexArray scene meshInfo program =
     setVao vao a = a { meshInfoVertexArray = Just vao }
     f = do
         vao <- mkVertexArray (geometryAttribBindings geo) (geometryBuffers geo) (geometryIndexBuffer geo) program
-        void $ Component.modifyComponent meshId (setVao vao) meshStore
+        void $ Component.modifyComponent meshStore meshId (setVao vao)
         return vao
 
 removeMesh :: Scene -> MeshId -> IO ()
 removeMesh scene meshId = do
-    vao <- ((id =<<) . fmap meshInfoVertexArray) <$> Component.readComponent meshId (sceneMeshStore scene)
+    vao <- ((id =<<) . fmap meshInfoVertexArray) <$> Component.readComponent (sceneMeshStore scene) meshId
     maybe (return ()) GLW.deleteObject vao
-    void $ Component.removeComponent meshId (sceneMeshStore scene)
+    void $ Component.removeComponent (sceneMeshStore scene) meshId
 
 addNode :: Scene -> Node -> Bool -> IO NodeId
 addNode scene node isRoot = do
@@ -305,10 +305,10 @@ addNode scene node isRoot = do
         transformInfo = TransformInfo transform True Time.epoch
         matrix = transformMatrix transform
         globalMatrix = Linear.identity
-    Component.addComponent nodeId nodeInfo (sceneNodeStore scene)
-    Component.addComponent nodeId transformInfo (sceneNodeTransformStore scene)
-    Component.addComponent nodeId matrix (sceneNodeTransformMatrixStore scene)
-    Component.addComponent nodeId globalMatrix (sceneNodeGlobalTransformMatrixStore scene)
+    Component.addComponent (sceneNodeStore scene) nodeId nodeInfo
+    Component.addComponent (sceneNodeTransformStore scene) nodeId transformInfo
+    Component.addComponent (sceneNodeTransformMatrixStore scene) nodeId matrix
+    Component.addComponent (sceneNodeGlobalTransformMatrixStore scene) nodeId globalMatrix
     return nodeId
     where
     addNodeFunc state =
@@ -326,19 +326,19 @@ addNode scene node isRoot = do
 
 readNodeTransform :: Scene -> NodeId -> IO (Maybe Transform)
 readNodeTransform scene nodeId =
-    fmap transformInfoTransform <$> Component.readComponent nodeId store
+    fmap transformInfoTransform <$> Component.readComponent store nodeId
     where
     store = sceneNodeTransformStore scene
 
 removeNode :: Scene -> NodeId -> IO ()
 removeNode scene nodeId = do
-    void $ Component.removeComponent nodeId (sceneNodeStore scene)
-    void $ Component.removeComponent nodeId (sceneNodeTransformStore scene)
-    void $ Component.removeComponent nodeId (sceneNodeTransformMatrixStore scene)
+    void $ Component.removeComponent (sceneNodeStore scene) nodeId
+    void $ Component.removeComponent (sceneNodeTransformStore scene) nodeId
+    void $ Component.removeComponent (sceneNodeTransformMatrixStore scene) nodeId
 
 updateNode :: Scene -> NodeId -> (Node -> Node) -> IO Bool
 updateNode scene nodeId f =
-    Component.modifyComponent nodeId g nodeStore
+    Component.modifyComponent nodeStore nodeId g
     where
     nodeStore = sceneNodeStore scene
     g a = a { nodeInfoNode = f (nodeInfoNode a) }
@@ -370,14 +370,14 @@ rotateNode scene nodeId axis angle = applyTransformToNode scene nodeId f
 
 applyTransformToNode :: Scene -> NodeId -> (Transform -> Transform) -> IO ()
 applyTransformToNode scene nodeId f =
-    void $ Component.modifyComponent nodeId g transformStore
+    void $ Component.modifyComponent transformStore nodeId g
     where
     transformStore = sceneNodeTransformStore scene
     g tinfo @ (TransformInfo transform _ _) = tinfo { transformInfoTransform = f transform, transformInfoUpdated = True }
 
 updateMeshInstanceCount :: Scene -> MeshId -> Maybe Int -> IO ()
 updateMeshInstanceCount scene meshId c =
-    void $ Component.modifyComponent meshId f meshStore
+    void $ Component.modifyComponent meshStore meshId f
     where
     f m = m { meshInfoMesh = (meshInfoMesh m) { meshInstanceCount = c } }
     meshStore = sceneMeshStore scene
@@ -512,7 +512,7 @@ addLight :: Scene -> Light -> IO LightId
 addLight scene light = do
     lightId <- atomicModifyIORef' (sceneState scene) addLightFunc
     let lightElem = Elem . marshalLight $ light
-    Component.addComponent lightId lightElem (sceneLightStore scene)
+    Component.addComponent (sceneLightStore scene) lightId lightElem
     return lightId
     where
     addLightFunc state =
@@ -523,11 +523,11 @@ addLight scene light = do
 
 removeLight :: Scene -> LightId -> IO ()
 removeLight scene lightId =
-    void $ Component.removeComponent lightId (sceneLightStore scene)
+    void $ Component.removeComponent (sceneLightStore scene) lightId
 
 updateLight :: Scene -> LightId -> (Light -> Light) -> IO Bool
 updateLight scene lightId f =
-    Component.modifyComponent lightId g (sceneLightStore scene)
+    Component.modifyComponent (sceneLightStore scene) lightId g
     where
     g = Elem . marshalLight . f . unmarshalLight . unElem
 
@@ -544,7 +544,7 @@ addSkin scene nodeId joints inverseBindMatrices = do
     jointMatBinder <- mkMatricesBlockBinder scene jointMats
     invMatBinder <- mkMatricesBlockBinder scene invMats
     let skin = Skin nodeId inverseBindMatrices joints jointMatBinder invMatBinder
-    Component.addComponent skinId skin (sceneSkinStore scene)
+    Component.addComponent (sceneSkinStore scene) skinId skin
     return skinId
 
     where
@@ -564,7 +564,7 @@ updateSkinJoints scene skin = go . skinJointMatricesBinder $ skin
     go (MatricesBlockBinder binder) =
         updateUniformBlockWith binder $ \p ->
         flip GV.imapM_ joints $ \i nodeId -> runMaybeT $ do
-            mat <- MaybeT $ Component.readComponent nodeId store
+            mat <- MaybeT $ Component.readComponent store nodeId
             lift $ pokeByteOffStd140 (Foreign.castPtr p) (off + stride * i) mat
 
 getLightBlock :: LightStore -> IO LightBlock
