@@ -9,7 +9,8 @@ import qualified Data.Aeson as DA (FromJSON(..), ToJSON(..), Value(..), decode,
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Map as DM (Map, empty, singleton)
 import Data.Text (Text)
-import qualified Data.Vector as Vector (fromList)
+import qualified Data.Vector as BV (fromList)
+import qualified Data.Vector.Unboxed as UV (fromList)
 import Graphics.Format.Tiled
 import qualified Test.Hspec as Hspec (Spec, it, shouldBe)
 
@@ -47,17 +48,17 @@ spec = do
 
     testJSON "Object Polygon"
         "{\"height\":0,\"id\":15,\"name\":\"polygon3\",\"properties\":{},\"polygon\":[{\"x\":0,\"y\":0},{\"x\":152,\"y\":88},{\"x\":136,\"y\":-128},{\"x\":80,\"y\":-280},{\"x\":16,\"y\":-288}],\"rotation\":0,\"type\":\"shape\",\"visible\":true,\"width\":0,\"x\":-176,\"y\":432}"
-        (ObjectPolygon (Polygon (ObjectCommon 15 "shape" 0 0 "polygon3" DM.empty True (-176) 432 0) (Vector.fromList [Coord 0 0, Coord 152 88, Coord 136 (-128), Coord 80 (-280), Coord 16 (-288)])))
-        (DA.object ["id" .= (15 :: Int), "type" .= ("shape" :: Text), "width" .= (0 :: Int), "height" .= (0 :: Int), "name" .= ("polygon3" :: Text), "properties" .= (DM.empty :: DM.Map Text Text), "visible" .= True, "x" .= (-176 :: Int), "y" .= (432 :: Int), "rotation" .= (0 :: Double), "polygon" .= Vector.fromList [Coord 0 0, Coord 152 88, Coord 136 (-128), Coord 80 (-280), Coord 16 (-288)]])
+        (ObjectPolygon (Polygon (ObjectCommon 15 "shape" 0 0 "polygon3" DM.empty True (-176) 432 0) (BV.fromList [Coord 0 0, Coord 152 88, Coord 136 (-128), Coord 80 (-280), Coord 16 (-288)])))
+        (DA.object ["id" .= (15 :: Int), "type" .= ("shape" :: Text), "width" .= (0 :: Int), "height" .= (0 :: Int), "name" .= ("polygon3" :: Text), "properties" .= (DM.empty :: DM.Map Text Text), "visible" .= True, "x" .= (-176 :: Int), "y" .= (432 :: Int), "rotation" .= (0 :: Double), "polygon" .= BV.fromList [Coord 0 0, Coord 152 88, Coord 136 (-128), Coord 80 (-280), Coord 16 (-288)]])
 
     testJSON "Object Polyline"
         "{\"height\":0,\"id\":15,\"name\":\"polyline4\",\"properties\":{},\"polyline\":[{\"x\":0,\"y\":0},{\"x\":152,\"y\":88},{\"x\":136,\"y\":-128},{\"x\":80,\"y\":-280},{\"x\":16,\"y\":-288}],\"rotation\":0,\"type\":\"shape\",\"visible\":true,\"width\":0,\"x\":-176,\"y\":432}"
-        (ObjectPolyline (Polyline (ObjectCommon 15 "shape" 0 0 "polyline4" DM.empty True (-176) 432 0) (Vector.fromList [Coord 0 0, Coord 152 88, Coord 136 (-128), Coord 80 (-280), Coord 16 (-288)])))
-        (DA.object ["id" .= (15 :: Int), "type" .= ("shape" :: Text), "width" .= (0 :: Int), "height" .= (0 :: Int), "name" .= ("polyline4" :: Text), "properties" .= (DM.empty :: DM.Map Text Text), "visible" .= True, "x" .= (-176 :: Int), "y" .= (432 :: Int), "rotation" .= (0 :: Double), "polyline" .= Vector.fromList [Coord 0 0, Coord 152 88, Coord 136 (-128), Coord 80 (-280), Coord 16 (-288)]])
+        (ObjectPolyline (Polyline (ObjectCommon 15 "shape" 0 0 "polyline4" DM.empty True (-176) 432 0) (BV.fromList [Coord 0 0, Coord 152 88, Coord 136 (-128), Coord 80 (-280), Coord 16 (-288)])))
+        (DA.object ["id" .= (15 :: Int), "type" .= ("shape" :: Text), "width" .= (0 :: Int), "height" .= (0 :: Int), "name" .= ("polyline4" :: Text), "properties" .= (DM.empty :: DM.Map Text Text), "visible" .= True, "x" .= (-176 :: Int), "y" .= (432 :: Int), "rotation" .= (0 :: Double), "polyline" .= BV.fromList [Coord 0 0, Coord 152 88, Coord 136 (-128), Coord 80 (-280), Coord 16 (-288)]])
 
     testJSON "Layer TileLayer"
         "{\"data\":[1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1],\"height\":8,\"name\":\"ground\",\"opacity\":1,\"properties\":{\"tileLayerProp\":\"1\"},\"type\":\"tilelayer\",\"visible\":true,\"width\":4,\"x\":0,\"y\":0}"
-        (LayerTileLayer (TileLayer (LayerCommon 4 8 "ground" 1 True 0 0 (DM.singleton "tileLayerProp" "1")) (Vector.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1])))
+        (LayerTileLayer (TileLayer (LayerCommon 4 8 "ground" 1 True 0 0 (DM.singleton "tileLayerProp" "1")) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1])))
         (DA.object ["type" .= ("tilelayer" :: Text), "width" .= (4 :: Int), "height" .= (8 :: Int), "name" .= ("ground" :: Text), "opacity" .= (1 :: Double), "visible" .= True, "x" .= (0 :: Int), "y" .= (0 :: Int), "properties" .= (DM.singleton "tileLayerProp" "1" :: DM.Map Text Text), "data" .= ([1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1] :: [Int])])
 
     testJSON "Layer ImageLayer"
@@ -67,13 +68,13 @@ spec = do
 
     testJSON "Layer ObjectGroup"
         "{\"draworder\":\"topdown\",\"height\":0,\"name\":\"objects\",\"objects\":[{\"height\":161,\"id\":1,\"name\":\"rect1\",\"properties\":{},\"rotation\":0,\"type\":\"shape\",\"visible\":true,\"width\":136,\"x\":38,\"y\":39},{\"ellipse\":true,\"height\":212,\"id\":2,\"name\":\"ellipse1\",\"properties\":{},\"rotation\":0,\"type\":\"\",\"visible\":true,\"width\":384,\"x\":81,\"y\":100}],\"opacity\":1,\"type\":\"objectgroup\",\"visible\":true,\"width\":0,\"x\":0,\"y\":0}"
-        (LayerObjectGroup (ObjectGroup (LayerCommon 0 0 "objects" 1 True 0 0 DM.empty) (Vector.fromList [ObjectRectangle (Rectangle (ObjectCommon 1 "shape" 136 161 "rect1" DM.empty True 38 39 0)), ObjectEllipse (Ellipse (ObjectCommon 2 "" 384 212 "ellipse1" DM.empty True 81 100 0))])))
+        (LayerObjectGroup (ObjectGroup (LayerCommon 0 0 "objects" 1 True 0 0 DM.empty) (BV.fromList [ObjectRectangle (Rectangle (ObjectCommon 1 "shape" 136 161 "rect1" DM.empty True 38 39 0)), ObjectEllipse (Ellipse (ObjectCommon 2 "" 384 212 "ellipse1" DM.empty True 81 100 0))])))
         (DA.object ["type" .= ("objectgroup" :: Text), "width" .= (0 :: Int), "height" .= (0 :: Int), "name" .= ("objects" :: Text), "opacity" .= (1 :: Double), "x" .= (0 :: Int), "y" .= (0 :: Int), "properties" .= (DM.empty :: DM.Map Text Text), "visible" .= True, "objects" .= [ObjectRectangle (Rectangle (ObjectCommon 1 "shape" 136 161 "rect1" DM.empty True 38 39 0)), ObjectEllipse (Ellipse (ObjectCommon 2 "" 384 212 "ellipse1" DM.empty True 81 100 0))]])
 
     testJSON "Map"
         "{\"height\":100,\"layers\":[{\"data\":[1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1],\"height\":8,\"name\":\"ground\",\"opacity\":1,\"properties\":{\"tileLayerProp\":\"1\"},\"type\":\"tilelayer\",\"visible\":true,\"width\":4,\"x\":0,\"y\":0}],\"nextobjectid\":17,\"orientation\":\"orthogonal\",\"properties\":{},\"renderorder\":\"right-down\",\"tileheight\":32,\"tilesets\":[],\"tilewidth\":32,\"version\":1,\"width\":100}"
-        (Map 1 100 100 32 32 OrientationOrthogonal (Vector.fromList [(LayerTileLayer (TileLayer (LayerCommon 4 8 "ground" 1 True 0 0 (DM.singleton "tileLayerProp" "1")) (Vector.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1])))]) (Vector.fromList []) Nothing RenderOrderRightDown DM.empty 17)
-        (DA.object ["version" .= (1 :: Double), "width" .= (100 :: Int), "height" .= (100 :: Int), "tilewidth" .= (32 :: Int), "tileheight" .= (32 :: Int), "orientation" .= OrientationOrthogonal, "layers" .= [LayerTileLayer (TileLayer (LayerCommon 4 8 "ground" 1 True 0 0 (DM.singleton "tileLayerProp" "1")) (Vector.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))], "tilesets" .= ([] :: [Tileset]), "renderorder" .= ("right-down" :: Text), "nextobjectid" .= (17 :: Int), "backgroundcolor" .= (Nothing :: Maybe Color), "properties" .= (DM.empty :: DM.Map Text Text)])
+        (Map 1 100 100 32 32 OrientationOrthogonal (BV.fromList [(LayerTileLayer (TileLayer (LayerCommon 4 8 "ground" 1 True 0 0 (DM.singleton "tileLayerProp" "1")) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1])))]) (BV.fromList []) Nothing RenderOrderRightDown DM.empty 17)
+        (DA.object ["version" .= (1 :: Double), "width" .= (100 :: Int), "height" .= (100 :: Int), "tilewidth" .= (32 :: Int), "tileheight" .= (32 :: Int), "orientation" .= OrientationOrthogonal, "layers" .= [LayerTileLayer (TileLayer (LayerCommon 4 8 "ground" 1 True 0 0 (DM.singleton "tileLayerProp" "1")) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))], "tilesets" .= ([] :: [Tileset]), "renderorder" .= ("right-down" :: Text), "nextobjectid" .= (17 :: Int), "backgroundcolor" .= (Nothing :: Maybe Color), "properties" .= (DM.empty :: DM.Map Text Text)])
 
 testJSON :: (DA.FromJSON a, DA.ToJSON a, Show a, Eq a) => String -> ByteString -> a -> DA.Value -> Hspec.Spec
 testJSON name str x json = do

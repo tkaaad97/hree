@@ -22,27 +22,30 @@ module Graphics.Format.Tiled
     , Terrain(..)
     , Tile(..)
     , TileLayer(..)
+    , TileLayerData(..)
     , Tileset(..)
     ) where
 
 import Control.Monad (mzero)
-import Data.Aeson ((.:), (.:?), (.=))
+import Data.Aeson ((.!=), (.:), (.:?), (.=))
 import qualified Data.Aeson as DA (FromJSON, ToJSON, Value(..), object,
-                                   parseJSON, toJSON)
+                                   parseJSON, toJSON, withText)
 import qualified Data.Aeson.TH as DA (Options(..), defaultOptions, deriveJSON)
-import qualified Data.Aeson.Types as DAT (Object, Parser, typeMismatch)
-import qualified Data.HashMap.Lazy as HML (toList)
+import qualified Data.Aeson.Types as DA (Object, Parser, typeMismatch)
+import qualified Data.HashMap.Lazy as HML (lookup, toList)
 import qualified Data.Map as DM (Map, empty)
 import Data.Maybe (fromMaybe)
-import qualified Data.Text (Text)
+import Data.Text (Text)
 import Data.Vector (Vector)
+import qualified Data.Vector.Unboxed as UV (Vector)
+import Data.Word (Word32)
 import Graphics.Format.Tiled.Internal
 
 type Gid = Int
 
-type Properties = DM.Map Data.Text.Text Data.Text.Text
+type Properties = DM.Map Text Text
 
-withDefault :: (DA.FromJSON b) => DAT.Object -> Data.Text.Text -> b -> DAT.Parser b
+withDefault :: (DA.FromJSON b) => DA.Object -> Text -> b -> DA.Parser b
 withDefault a label b =
     a .:? label >>= return . fromMaybe b
 
@@ -52,7 +55,7 @@ data Coord = Coord
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 5 }) ''Coord)
 
-type Color = Data.Text.Text
+type Color = Text
 
 data Orientation
     = OrientationOrthogonal
@@ -71,10 +74,10 @@ $(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = renderOrderTagM
 
 data ObjectCommon = ObjectCommon
     { objectCommonId         :: !Int
-    , objectCommonType       :: !Data.Text.Text
+    , objectCommonType       :: !Text
     , objectCommonWidth      :: !Int
     , objectCommonHeight     :: !Int
-    , objectCommonName       :: !Data.Text.Text
+    , objectCommonName       :: !Text
     , objectCommonProperties :: !Properties
     , objectCommonVisible    :: !Bool
     , objectCommonX          :: !Int
@@ -144,7 +147,7 @@ instance DA.FromJSON Object where
 
         parseObject c False False Nothing Nothing     = ObjectRectangle $ Rectangle c
 
-    parseJSON invalid = DAT.typeMismatch "Object" invalid
+    parseJSON invalid = DA.typeMismatch "Object" invalid
 
 instance DA.ToJSON Object where
     toJSON (ObjectRectangle (Rectangle common)) = DA.toJSON common
@@ -165,7 +168,7 @@ instance DA.ToJSON Object where
         let fields = objectCommonFields common
         in DA.object $ fields ++ ["polyline" .= coords]
 
-objectCommonFields :: ObjectCommon -> [(Data.Text.Text, DA.Value)]
+objectCommonFields :: ObjectCommon -> [(Text, DA.Value)]
 objectCommonFields = fields . DA.toJSON
     where
     fields (DA.Object v) = HML.toList v
@@ -177,15 +180,15 @@ data Tile = Tile
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 4 }) ''Tile)
 
 data Terrain = Terrain
-    { terrainName :: !Data.Text.Text
+    { terrainName :: !Text
     , terrainTile :: !Int
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 7 }) ''Terrain)
 
 data Tileset = Tileset
     { tilesetFirstGid          :: !(Maybe Gid)
-    , tilesetImage             :: !Data.Text.Text
-    , tilesetName              :: !Data.Text.Text
+    , tilesetImage             :: !Text
+    , tilesetName              :: !Text
     , tilesetTileWidth         :: !Int
     , tilesetTileHeight        :: !Int
     , tilesetImageWidth        :: !Int
@@ -224,7 +227,7 @@ instance DA.FromJSON Tileset where
         <*> v .: "tilecount"
         <*> v .:? "tiles"
 
-    parseJSON invalid = DAT.typeMismatch "Tileset" invalid
+    parseJSON invalid = DA.typeMismatch "Tileset" invalid
 
 instance DA.ToJSON Tileset where
     toJSON (Tileset firstgid image name tilewidth tileheight imagewidth imageheight tileoffset properties propertytypes margin spacing tileproperties tilepropertytypes terrains columns tilecount tiles) = DA.object
@@ -251,7 +254,7 @@ instance DA.ToJSON Tileset where
 data LayerCommon = LayerCommon
     { layerCommonWidth      :: !Int
     , layerCommonHeight     :: !Int
-    , layerCommonName       :: !Data.Text.Text
+    , layerCommonName       :: !Text
     , layerCommonOpacity    :: !Double
     , layerCommonVisible    :: !Bool
     , layerCommonX          :: !Int
@@ -266,7 +269,25 @@ data Layer
     | LayerImageLayer !ImageLayer
     deriving (Show, Eq)
 
-data TileLayer = TileLayer !LayerCommon !(Vector Int)
+data TileLayer = TileLayer
+    { tileLayerCommon :: !LayerCommon
+    , tileLayerData   :: !TileLayerData
+    } deriving (Show, Eq)
+
+data TileLayerData =
+    TileLayerDataCsv !(UV.Vector Word32) |
+    TileLayerDataBase64 !CompressionType !Text
+    deriving (Show, Eq)
+
+data CompressionType =
+    NoCompression |
+    ZlibCompression |
+    GZipCompression
+    deriving (Show, Eq)
+
+data EncodingType =
+    CsvEncoding |
+    Base64Encoding
     deriving (Show, Eq)
 
 data ObjectGroup = ObjectGroup
@@ -276,7 +297,7 @@ data ObjectGroup = ObjectGroup
 
 data ImageLayer = ImageLayer
     { imageLayerCommon :: !LayerCommon
-    , imageLayerImage  :: !Data.Text.Text
+    , imageLayerImage  :: !Text
     } deriving (Show, Eq)
 
 data Map = Map
@@ -311,9 +332,12 @@ instance DA.FromJSON Layer where
             <*> v .: "y"
             <*> withDefault v "properties" DM.empty
 
-        parseLayer :: Data.Text.Text -> LayerCommon -> DAT.Parser Layer
-        parseLayer "tilelayer" common =
-            LayerTileLayer . TileLayer common <$> v .: "data"
+        parseLayer :: Text -> LayerCommon -> DA.Parser Layer
+        parseLayer "tilelayer" common = do
+            encoding <- v .:? "encoding" .!= CsvEncoding
+            compression <- v .:? "compression" .!= NoCompression
+            data_ <- maybe (fail "tilelayer needs data field.") (parseTileLayerData encoding compression) $ HML.lookup "data" v
+            return (LayerTileLayer (TileLayer common data_))
 
         parseLayer "objectgroup" common = LayerObjectGroup . ObjectGroup common
             <$> v .: "objects"
@@ -323,26 +347,66 @@ instance DA.FromJSON Layer where
 
         parseLayer _ _ = mzero
 
-    parseJSON invalid = DAT.typeMismatch "Layer" invalid
+    parseJSON invalid = DA.typeMismatch "Layer" invalid
+
+parseTileLayerData :: EncodingType -> CompressionType -> DA.Value -> DA.Parser TileLayerData
+parseTileLayerData CsvEncoding _ = fmap TileLayerDataCsv . DA.parseJSON
+parseTileLayerData Base64Encoding compression = DA.withText "tilelayer.data" (return . TileLayerDataBase64 compression)
 
 instance DA.ToJSON Layer where
-    toJSON (LayerTileLayer (TileLayer common d)) =
+    toJSON (LayerTileLayer (TileLayer common (TileLayerDataCsv d))) =
         let fields = layerCommonFields common
-        in DA.object $ fields ++ ["data" .= d, "type" .= ("tilelayer" :: String)]
+        in DA.object $ fields ++ ["data" .= d, "type" .= ("tilelayer" :: Text)]
+
+    toJSON (LayerTileLayer (TileLayer common (TileLayerDataBase64 c d))) =
+        let fields = layerCommonFields common
+            otherFields =
+                [ "encoding" .= Base64Encoding
+                , "data" .= d
+                , "type" .= ("tilelayer" :: Text)
+                ]
+            compressionFields = case c of
+                NoCompression -> []
+                _             -> [ "compression" .= c ]
+
+        in DA.object $ fields ++ compressionFields ++ otherFields
 
     toJSON (LayerObjectGroup (ObjectGroup common objects)) =
         let fields = layerCommonFields common
-        in DA.object $ fields ++ ["objects" .= objects, "type" .= ("objectgroup" :: String)]
+        in DA.object $ fields ++ ["objects" .= objects, "type" .= ("objectgroup" :: Text)]
 
     toJSON (LayerImageLayer (ImageLayer common image)) =
         let fields = layerCommonFields common
-        in DA.object $ fields ++ ["type" .= ("imagelayer" :: Data.Text.Text), "image" .= image]
+        in DA.object $ fields ++ ["type" .= ("imagelayer" :: Text), "image" .= image]
 
-layerCommonFields :: LayerCommon -> [(Data.Text.Text, DA.Value)]
+layerCommonFields :: LayerCommon -> [(Text, DA.Value)]
 layerCommonFields = fields . DA.toJSON
     where
     fields (DA.Object v) = HML.toList v
     fields _             = []
+
+instance DA.FromJSON EncodingType where
+    parseJSON = DA.withText "EncodingType" $ \t ->
+        case t of
+            "csv"    -> return CsvEncoding
+            "base64" -> return Base64Encoding
+            _        -> fail "unknown encoding"
+
+instance DA.ToJSON EncodingType where
+    toJSON CsvEncoding    = DA.String "csv"
+    toJSON Base64Encoding = DA.String "base64"
+
+instance DA.FromJSON CompressionType where
+    parseJSON = DA.withText "CompressionType" $ \t ->
+        case t of
+            "gzip" -> return GZipCompression
+            "zlib" -> return ZlibCompression
+            _      -> fail "unknown compression"
+
+instance DA.ToJSON CompressionType where
+    toJSON NoCompression   = DA.String "nocompression"
+    toJSON GZipCompression = DA.String "gzip"
+    toJSON ZlibCompression = DA.String "zlib"
 
 instance DA.FromJSON Map where
     parseJSON (DA.Object v) = Map
@@ -359,7 +423,7 @@ instance DA.FromJSON Map where
         <*> withDefault v "properties" DM.empty
         <*> v .: "nextobjectid"
 
-    parseJSON invalid = DAT.typeMismatch "Map" invalid
+    parseJSON invalid = DA.typeMismatch "Map" invalid
 
 instance DA.ToJSON Map where
     toJSON (Map version width height tilewidth tileheight orientation layers tilesets backgroundcolor renderorder properties nextobjectid) = DA.object
