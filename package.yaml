@@ -41,6 +41,7 @@ dependencies:
 - template-haskell
 - text
 - transformers
+- unordered-containers
 - vector
 - vector-sized
 
