@@ -11,7 +11,7 @@ import qualified Data.Map.Strict as Map (Map, empty, singleton)
 import Data.Text (Text)
 import qualified Data.Vector as BV (fromList)
 import qualified Data.Vector.Unboxed as UV (fromList)
-import Graphics.Format.Tiled
+import Graphics.Format.Tiled.Types
 import qualified Test.Hspec as Hspec (Spec, it, shouldBe)
 
 spec :: Hspec.Spec
