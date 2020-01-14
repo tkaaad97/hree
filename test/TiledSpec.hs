@@ -5,7 +5,7 @@ module TiledSpec
 
 import Data.Aeson ((.=))
 import qualified Data.Aeson as DA (FromJSON(..), ToJSON(..), Value(..), decode,
-                                   encode, object)
+                                   object)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Map as DM (Map, empty, singleton)
 import Data.Text (Text)
@@ -74,7 +74,7 @@ spec = do
     testJSON "Map"
         "{\"height\":100,\"layers\":[{\"data\":[1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1],\"height\":8,\"name\":\"ground\",\"opacity\":1,\"properties\":{\"tileLayerProp\":\"1\"},\"type\":\"tilelayer\",\"visible\":true,\"width\":4,\"x\":0,\"y\":0}],\"nextobjectid\":17,\"orientation\":\"orthogonal\",\"properties\":{},\"renderorder\":\"right-down\",\"tileheight\":32,\"tilesets\":[],\"tilewidth\":32,\"version\":1,\"width\":100}"
         (Map 1 100 100 32 32 OrientationOrthogonal (BV.fromList [(LayerTileLayer (TileLayer (LayerCommon 4 8 "ground" 1 True 0 0 (DM.singleton "tileLayerProp" "1")) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1])))]) (BV.fromList []) Nothing RenderOrderRightDown DM.empty 17)
-        (DA.object ["version" .= (1 :: Double), "width" .= (100 :: Int), "height" .= (100 :: Int), "tilewidth" .= (32 :: Int), "tileheight" .= (32 :: Int), "orientation" .= OrientationOrthogonal, "layers" .= [LayerTileLayer (TileLayer (LayerCommon 4 8 "ground" 1 True 0 0 (DM.singleton "tileLayerProp" "1")) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))], "tilesets" .= ([] :: [Tileset]), "renderorder" .= ("right-down" :: Text), "nextobjectid" .= (17 :: Int), "backgroundcolor" .= (Nothing :: Maybe Color), "properties" .= (DM.empty :: DM.Map Text Text)])
+        (DA.object ["version" .= (1 :: Double), "width" .= (100 :: Int), "height" .= (100 :: Int), "tilewidth" .= (32 :: Int), "tileheight" .= (32 :: Int), "orientation" .= OrientationOrthogonal, "layers" .= [LayerTileLayer (TileLayer (LayerCommon 4 8 "ground" 1 True 0 0 (DM.singleton "tileLayerProp" "1")) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))], "tilesets" .= ([] :: [TilesetSource]), "renderorder" .= ("right-down" :: Text), "nextobjectid" .= (17 :: Int), "backgroundcolor" .= (Nothing :: Maybe Color), "properties" .= (DM.empty :: DM.Map Text Text)])
 
 testJSON :: (DA.FromJSON a, DA.ToJSON a, Show a, Eq a) => String -> ByteString -> a -> DA.Value -> Hspec.Spec
 testJSON name str x json = do

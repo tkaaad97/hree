@@ -24,6 +24,7 @@ module Graphics.Format.Tiled
     , TileLayer(..)
     , TileLayerData(..)
     , Tileset(..)
+    , TilesetSource(..)
     ) where
 
 import Control.Monad (mzero)
@@ -185,6 +186,11 @@ data Terrain = Terrain
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 7 }) ''Terrain)
 
+data TilesetSource =
+    TilesetSourceFile !(Maybe Gid) !Text |
+    TilesetSourceInplace !Tileset
+    deriving (Show, Eq)
+
 data Tileset = Tileset
     { tilesetFirstGid          :: !(Maybe Gid)
     , tilesetImage             :: !Text
@@ -205,6 +211,23 @@ data Tileset = Tileset
     , tilesetTileCount         :: !Int
     , tilesetTiles             :: !(Maybe (DM.Map Gid Tile))
     } deriving (Show, Eq)
+
+instance DA.FromJSON TilesetSource where
+    parseJSON o @ (DA.Object v) = do
+        firstgid <- v .:? "firstgid"
+        source <- v .: "source"
+        case source of
+            Just sourcePath -> return (TilesetSourceFile firstgid sourcePath)
+            Nothing         -> TilesetSourceInplace <$> DA.parseJSON o
+
+    parseJSON invalid = DA.typeMismatch "TilesetSource" invalid
+
+instance DA.ToJSON TilesetSource where
+    toJSON (TilesetSourceFile firstgid sourcePath) = DA.object
+        [ "firstgid" .= firstgid
+        , "source" .= sourcePath
+        ]
+    toJSON (TilesetSourceInplace tileset) = DA.toJSON tileset
 
 instance DA.FromJSON Tileset where
     parseJSON (DA.Object v) = Tileset
@@ -308,7 +331,7 @@ data Map = Map
     , mapTileHeight      :: !Int
     , mapOrientation     :: !Orientation
     , mapLayers          :: !(Vector Layer)
-    , mapTilesets        :: !(Vector Tileset)
+    , mapTilesets        :: !(Vector TilesetSource)
     , mapBackgroundColor :: !(Maybe Color)
     , mapRenderOrder     :: !RenderOrder
     , mapProperties      :: !Properties
