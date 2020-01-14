@@ -28,22 +28,37 @@ module Graphics.Format.Tiled
     , TileLayerData(..)
     , Tileset(..)
     , TilesetSource(..)
+    , loadTiledMap
     ) where
 
+import qualified Codec.Compression.GZip as GZip (decompress)
+import qualified Codec.Compression.Zlib as Zlib (decompress)
+import Control.Exception (throwIO)
 import Control.Monad (mzero)
 import Data.Aeson ((.!=), (.:), (.:?), (.=))
-import qualified Data.Aeson as DA (FromJSON, ToJSON, Value(..), object,
-                                   parseJSON, toJSON, withText)
+import qualified Data.Aeson as DA (FromJSON, ToJSON, Value(..),
+                                   eitherDecodeFileStrict', object, parseJSON,
+                                   toJSON, withText)
 import qualified Data.Aeson.TH as DA (Options(..), defaultOptions, deriveJSON)
 import qualified Data.Aeson.Types as DA (Object, Parser, typeMismatch)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString (length, useAsCString)
+import qualified Data.ByteString.Base64 as Base64 (decode)
+import qualified Data.ByteString.Lazy as ByteString (fromStrict, toStrict)
+import Data.Either (either)
 import qualified Data.HashMap.Lazy as HML (lookup, toList)
 import qualified Data.Map.Strict as Map (Map, empty)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import Data.Vector (Vector)
-import qualified Data.Vector.Unboxed as UV (Vector)
+import qualified Data.Text as Text (unpack)
+import qualified Data.Text.Encoding as Text (encodeUtf8)
+import qualified Data.Vector as BV (Vector, mapM)
+import qualified Data.Vector.Unboxed as UV (Vector, generateM)
 import Data.Word (Word32)
+import qualified Foreign (castPtr, peekByteOff)
 import Graphics.Format.Tiled.Internal
+import System.Directory (canonicalizePath)
+import System.FilePath (dropFileName, (</>))
 
 type Gid = Int
 
@@ -109,12 +124,12 @@ newtype Point = Point ObjectCommon
 
 data Polygon = Polygon
     { polygonCommon :: !ObjectCommon
-    , polygonCoords :: !(Vector Coord)
+    , polygonCoords :: !(BV.Vector Coord)
     } deriving (Show, Eq)
 
 data Polyline = Polyline
     { polylineCommon :: !ObjectCommon
-    , polylineCoords :: !(Vector Coord)
+    , polylineCoords :: !(BV.Vector Coord)
     } deriving (Show, Eq)
 
 instance DA.FromJSON Object where
@@ -331,7 +346,7 @@ data EncodingType =
 
 data ObjectGroup = ObjectGroup
     { objectGroupCommon  :: !LayerCommon
-    , objectGroupObjects :: !(Vector Object)
+    , objectGroupObjects :: !(BV.Vector Object)
     } deriving (Show, Eq)
 
 data ImageLayer = ImageLayer
@@ -346,8 +361,8 @@ data MapMid = MapMid
     , mapMidTileWidth       :: !Int
     , mapMidTileHeight      :: !Int
     , mapMidOrientation     :: !Orientation
-    , mapMidLayers          :: !(Vector LayerMid)
-    , mapMidTilesets        :: !(Vector TilesetSource)
+    , mapMidLayers          :: !(BV.Vector LayerMid)
+    , mapMidTilesets        :: !(BV.Vector TilesetSource)
     , mapMidBackgroundColor :: !(Maybe Color)
     , mapMidRenderOrder     :: !RenderOrder
     , mapMidProperties      :: !Properties
@@ -361,8 +376,8 @@ data Map = Map
     , mapTileWidth       :: !Int
     , mapTileHeight      :: !Int
     , mapOrientation     :: !Orientation
-    , mapLayers          :: !(Vector Layer)
-    , mapTilesets        :: !(Vector Tileset)
+    , mapLayers          :: !(BV.Vector Layer)
+    , mapTilesets        :: !(BV.Vector Tileset)
     , mapBackgroundColor :: !(Maybe Color)
     , mapRenderOrder     :: !RenderOrder
     , mapProperties      :: !Properties
@@ -494,3 +509,64 @@ instance DA.ToJSON MapMid where
         , "properties" .= properties
         , "nextobjectid" .= nextobjectid
         ]
+
+loadTiledMap :: FilePath -> IO Map
+loadTiledMap path = do
+    mid <- either (throwIO . userError) return =<< DA.eitherDecodeFileStrict' path
+    let basepath = dropFileName path
+    completeMap basepath mid
+
+completeMap :: FilePath -> MapMid -> IO Map
+completeMap basepath m = do
+    let layerMids = mapMidLayers m
+        tilesetMids = mapMidTilesets m
+    layers <- BV.mapM completeLayer layerMids
+    tilesets <- BV.mapM (completeTileset basepath) tilesetMids
+    return Map
+        { mapVersion = mapMidVersion m
+        , mapWidth = mapMidWidth m
+        , mapHeight = mapMidHeight m
+        , mapTileWidth = mapMidTileWidth m
+        , mapTileHeight = mapMidTileHeight m
+        , mapOrientation = mapMidOrientation m
+        , mapLayers = layers
+        , mapTilesets = tilesets
+        , mapBackgroundColor = mapMidBackgroundColor m
+        , mapRenderOrder = mapMidRenderOrder m
+        , mapProperties = mapMidProperties m
+        , mapNextObjectId = mapMidNextObjectId m
+        }
+
+completeTileset :: FilePath -> TilesetSource -> IO Tileset
+completeTileset basepath (TilesetSourceFile firstgid sourcePath) = do
+    path <- canonicalizePath $ basepath </> Text.unpack sourcePath
+    tileset <- either (throwIO . userError) return =<< DA.eitherDecodeFileStrict' path
+    return tileset { tilesetFirstGid = firstgid }
+completeTileset _ (TilesetSourceInplace tileset) = return tileset
+
+completeLayer :: LayerMid -> IO Layer
+completeLayer (LayerMidTileLayer a)   = LayerTileLayer <$> completeTileLayer a
+completeLayer (LayerMidObjectGroup a) = return (LayerObjectGroup a)
+completeLayer (LayerMidImageLayer a)  = return (LayerImageLayer a)
+
+completeTileLayer :: TileLayerMid -> IO TileLayer
+completeTileLayer (TileLayerMid common (TileLayerDataCsv d)) = return (TileLayer common d CsvEncoding NoCompression)
+completeTileLayer (TileLayerMid common (TileLayerDataBase64 c d)) = do
+    data_ <- bytestringToVector =<< decompress c d
+    return (TileLayer common data_ Base64Encoding c)
+
+decompress :: CompressionType -> Text -> IO ByteString
+decompress NoCompression =
+    either (throwIO . userError) return . Base64.decode . Text.encodeUtf8
+decompress GZipCompression =
+    fmap (ByteString.toStrict . GZip.decompress . ByteString.fromStrict) . either (throwIO . userError) return . Base64.decode . Text.encodeUtf8
+decompress ZlibCompression =
+    fmap (ByteString.toStrict . Zlib.decompress . ByteString.fromStrict) . either (throwIO . userError) return . Base64.decode . Text.encodeUtf8
+
+bytestringToVector :: ByteString -> IO (UV.Vector Word32)
+bytestringToVector a =
+    ByteString.useAsCString a $ \ptr ->
+        UV.generateM count (\i -> Foreign.peekByteOff (Foreign.castPtr ptr) (stride * i))
+    where
+    stride = 32
+    count = ByteString.length a `div` stride
