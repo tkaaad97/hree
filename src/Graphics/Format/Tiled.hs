@@ -7,8 +7,10 @@ module Graphics.Format.Tiled
     , Gid
     , ImageLayer(..)
     , Layer(..)
+    , LayerMid(..)
     , LayerCommon(..)
     , Map(..)
+    , MapMid(..)
     , Object(..)
     , ObjectCommon(..)
     , ObjectGroup(..)
@@ -22,6 +24,7 @@ module Graphics.Format.Tiled
     , Terrain(..)
     , Tile(..)
     , TileLayer(..)
+    , TileLayerMid(..)
     , TileLayerData(..)
     , Tileset(..)
     , TilesetSource(..)
@@ -34,7 +37,7 @@ import qualified Data.Aeson as DA (FromJSON, ToJSON, Value(..), object,
 import qualified Data.Aeson.TH as DA (Options(..), defaultOptions, deriveJSON)
 import qualified Data.Aeson.Types as DA (Object, Parser, typeMismatch)
 import qualified Data.HashMap.Lazy as HML (lookup, toList)
-import qualified Data.Map as DM (Map, empty)
+import qualified Data.Map.Strict as Map (Map, empty)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Vector (Vector)
@@ -44,7 +47,7 @@ import Graphics.Format.Tiled.Internal
 
 type Gid = Int
 
-type Properties = DM.Map Text Text
+type Properties = Map.Map Text Text
 
 withDefault :: (DA.FromJSON b) => DA.Object -> Text -> b -> DA.Parser b
 withDefault a label b =
@@ -132,7 +135,7 @@ instance DA.FromJSON Object where
             <*> v .: "width"
             <*> v .: "height"
             <*> v .: "name"
-            <*> withDefault v "properties" DM.empty
+            <*> withDefault v "properties" Map.empty
             <*> v .: "visible"
             <*> v .: "x"
             <*> v .: "y"
@@ -204,12 +207,12 @@ data Tileset = Tileset
     , tilesetPropertyTypes     :: !Properties
     , tilesetMargin            :: !Int
     , tilesetSpacing           :: !Int
-    , tilesetTileProperties    :: !(Maybe (DM.Map Gid Properties))
-    , tilesetTilePropertyTypes :: !(Maybe (DM.Map Gid Properties))
+    , tilesetTileProperties    :: !(Maybe (Map.Map Gid Properties))
+    , tilesetTilePropertyTypes :: !(Maybe (Map.Map Gid Properties))
     , tilesetTerrains          :: !(Maybe [Terrain])
     , tilesetColumns           :: !Int
     , tilesetTileCount         :: !Int
-    , tilesetTiles             :: !(Maybe (DM.Map Gid Tile))
+    , tilesetTiles             :: !(Maybe (Map.Map Gid Tile))
     } deriving (Show, Eq)
 
 instance DA.FromJSON TilesetSource where
@@ -239,8 +242,8 @@ instance DA.FromJSON Tileset where
         <*> v .: "imagewidth"
         <*> v .: "imageheight"
         <*> withDefault v "tileoffset" (Coord 0 0)
-        <*> withDefault v "properties" DM.empty
-        <*> withDefault v "propertytypes" DM.empty
+        <*> withDefault v "properties" Map.empty
+        <*> withDefault v "propertytypes" Map.empty
         <*> v .: "margin"
         <*> v .: "spacing"
         <*> v .:? "tileproperties"
@@ -286,15 +289,28 @@ data LayerCommon = LayerCommon
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 11 }) ''LayerCommon)
 
+data LayerMid
+    = LayerMidTileLayer !TileLayerMid
+    | LayerMidObjectGroup !ObjectGroup
+    | LayerMidImageLayer !ImageLayer
+    deriving (Show, Eq)
+
 data Layer
     = LayerTileLayer !TileLayer
     | LayerObjectGroup !ObjectGroup
     | LayerImageLayer !ImageLayer
     deriving (Show, Eq)
 
+data TileLayerMid = TileLayerMid
+    { tileLayerMidCommon :: !LayerCommon
+    , tileLayerMidData   :: !TileLayerData
+    } deriving (Show, Eq)
+
 data TileLayer = TileLayer
-    { tileLayerCommon :: !LayerCommon
-    , tileLayerData   :: !TileLayerData
+    { tileLayerCommon      :: !LayerCommon
+    , tileLayerData        :: !(UV.Vector Word32)
+    , tileLayerEncoding    :: !EncodingType
+    , tileLayerCompression :: !CompressionType
     } deriving (Show, Eq)
 
 data TileLayerData =
@@ -323,6 +339,21 @@ data ImageLayer = ImageLayer
     , imageLayerImage  :: !Text
     } deriving (Show, Eq)
 
+data MapMid = MapMid
+    { mapMidVersion         :: !Double
+    , mapMidWidth           :: !Int
+    , mapMidHeight          :: !Int
+    , mapMidTileWidth       :: !Int
+    , mapMidTileHeight      :: !Int
+    , mapMidOrientation     :: !Orientation
+    , mapMidLayers          :: !(Vector LayerMid)
+    , mapMidTilesets        :: !(Vector TilesetSource)
+    , mapMidBackgroundColor :: !(Maybe Color)
+    , mapMidRenderOrder     :: !RenderOrder
+    , mapMidProperties      :: !Properties
+    , mapMidNextObjectId    :: !Int
+    } deriving (Show, Eq)
+
 data Map = Map
     { mapVersion         :: !Double
     , mapWidth           :: !Int
@@ -331,14 +362,14 @@ data Map = Map
     , mapTileHeight      :: !Int
     , mapOrientation     :: !Orientation
     , mapLayers          :: !(Vector Layer)
-    , mapTilesets        :: !(Vector TilesetSource)
+    , mapTilesets        :: !(Vector Tileset)
     , mapBackgroundColor :: !(Maybe Color)
     , mapRenderOrder     :: !RenderOrder
     , mapProperties      :: !Properties
     , mapNextObjectId    :: !Int
     } deriving (Show, Eq)
 
-instance DA.FromJSON Layer where
+instance DA.FromJSON LayerMid where
     parseJSON (DA.Object v) = do
         layerType <- v .: "type"
         common <- parseLayerCommon
@@ -353,35 +384,35 @@ instance DA.FromJSON Layer where
             <*> v .: "visible"
             <*> v .: "x"
             <*> v .: "y"
-            <*> withDefault v "properties" DM.empty
+            <*> withDefault v "properties" Map.empty
 
-        parseLayer :: Text -> LayerCommon -> DA.Parser Layer
+        parseLayer :: Text -> LayerCommon -> DA.Parser LayerMid
         parseLayer "tilelayer" common = do
             encoding <- v .:? "encoding" .!= CsvEncoding
             compression <- v .:? "compression" .!= NoCompression
             data_ <- maybe (fail "tilelayer needs data field.") (parseTileLayerData encoding compression) $ HML.lookup "data" v
-            return (LayerTileLayer (TileLayer common data_))
+            return (LayerMidTileLayer (TileLayerMid common data_))
 
-        parseLayer "objectgroup" common = LayerObjectGroup . ObjectGroup common
+        parseLayer "objectgroup" common = LayerMidObjectGroup . ObjectGroup common
             <$> v .: "objects"
 
-        parseLayer "imagelayer" common = LayerImageLayer . ImageLayer common
+        parseLayer "imagelayer" common = LayerMidImageLayer . ImageLayer common
             <$> v .: "image"
 
         parseLayer _ _ = mzero
 
-    parseJSON invalid = DA.typeMismatch "Layer" invalid
+    parseJSON invalid = DA.typeMismatch "LayerMid" invalid
 
 parseTileLayerData :: EncodingType -> CompressionType -> DA.Value -> DA.Parser TileLayerData
 parseTileLayerData CsvEncoding _ = fmap TileLayerDataCsv . DA.parseJSON
 parseTileLayerData Base64Encoding compression = DA.withText "tilelayer.data" (return . TileLayerDataBase64 compression)
 
-instance DA.ToJSON Layer where
-    toJSON (LayerTileLayer (TileLayer common (TileLayerDataCsv d))) =
+instance DA.ToJSON LayerMid where
+    toJSON (LayerMidTileLayer (TileLayerMid common (TileLayerDataCsv d))) =
         let fields = layerCommonFields common
         in DA.object $ fields ++ ["data" .= d, "type" .= ("tilelayer" :: Text)]
 
-    toJSON (LayerTileLayer (TileLayer common (TileLayerDataBase64 c d))) =
+    toJSON (LayerMidTileLayer (TileLayerMid common (TileLayerDataBase64 c d))) =
         let fields = layerCommonFields common
             otherFields =
                 [ "encoding" .= Base64Encoding
@@ -394,11 +425,11 @@ instance DA.ToJSON Layer where
 
         in DA.object $ fields ++ compressionFields ++ otherFields
 
-    toJSON (LayerObjectGroup (ObjectGroup common objects)) =
+    toJSON (LayerMidObjectGroup (ObjectGroup common objects)) =
         let fields = layerCommonFields common
         in DA.object $ fields ++ ["objects" .= objects, "type" .= ("objectgroup" :: Text)]
 
-    toJSON (LayerImageLayer (ImageLayer common image)) =
+    toJSON (LayerMidImageLayer (ImageLayer common image)) =
         let fields = layerCommonFields common
         in DA.object $ fields ++ ["type" .= ("imagelayer" :: Text), "image" .= image]
 
@@ -431,8 +462,8 @@ instance DA.ToJSON CompressionType where
     toJSON GZipCompression = DA.String "gzip"
     toJSON ZlibCompression = DA.String "zlib"
 
-instance DA.FromJSON Map where
-    parseJSON (DA.Object v) = Map
+instance DA.FromJSON MapMid where
+    parseJSON (DA.Object v) = MapMid
         <$> v .: "version"
         <*> v .: "width"
         <*> v .: "height"
@@ -443,13 +474,13 @@ instance DA.FromJSON Map where
         <*> v .: "tilesets"
         <*> v .:? "backgroundcolor"
         <*> v .: "renderorder"
-        <*> withDefault v "properties" DM.empty
+        <*> withDefault v "properties" Map.empty
         <*> v .: "nextobjectid"
 
-    parseJSON invalid = DA.typeMismatch "Map" invalid
+    parseJSON invalid = DA.typeMismatch "MapMid" invalid
 
-instance DA.ToJSON Map where
-    toJSON (Map version width height tilewidth tileheight orientation layers tilesets backgroundcolor renderorder properties nextobjectid) = DA.object
+instance DA.ToJSON MapMid where
+    toJSON (MapMid version width height tilewidth tileheight orientation layers tilesets backgroundcolor renderorder properties nextobjectid) = DA.object
         [ "version" .= version
         , "width" .= width
         , "height" .= height
