@@ -20,7 +20,8 @@ module Graphics.Format.Tiled.Types
     , Point(..)
     , Polygon(..)
     , Polyline(..)
-    , Properties
+    , Properties(..)
+    , PropertyValue(..)
     , Rectangle(..)
     , RenderOrder(..)
     , Terrain(..)
@@ -35,21 +36,21 @@ module Graphics.Format.Tiled.Types
 import Control.Monad (mzero)
 import Data.Aeson ((.!=), (.:), (.:?), (.=))
 import qualified Data.Aeson as DA (FromJSON, ToJSON, Value(..), object,
-                                   parseJSON, toJSON, withText)
+                                   parseJSON, toJSON, withArray, withObject,
+                                   withText)
 import qualified Data.Aeson.TH as DA (Options(..), defaultOptions, deriveJSON)
 import qualified Data.Aeson.Types as DA (Object, Parser, typeMismatch)
 import qualified Data.HashMap.Lazy as HML (lookup, toList)
-import qualified Data.Map.Strict as Map (Map, empty)
+import qualified Data.Map.Strict as Map (Map, empty, fromList, toList)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Vector as BV (Vector)
+import qualified Data.Text as Text (unpack)
+import qualified Data.Vector as BV (Vector, fromList, mapM, toList)
 import qualified Data.Vector.Unboxed as UV (Vector)
 import Data.Word (Word32)
 import Graphics.Format.Tiled.Internal
 
 type Gid = Int
-
-type Properties = Map.Map Text Text
 
 withDefault :: (DA.FromJSON b) => DA.Object -> Text -> b -> DA.Parser b
 withDefault a label b =
@@ -77,6 +78,46 @@ data RenderOrder
     | RenderOrderLeftUp
     deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = renderOrderTagModifier }) ''RenderOrder)
+
+data PropertyValue =
+    PropertyString !Text |
+    PropertyFloat !Double |
+    PropertyBool !Bool |
+    PropertyColor !Color |
+    PropertyFile !Text
+    deriving (Show, Eq)
+
+newtype Properties = Properties (Map.Map Text PropertyValue)
+    deriving (Show, Eq)
+
+instance DA.FromJSON Properties where
+    parseJSON = DA.withArray "Properties" $
+        fmap (Properties . Map.fromList . BV.toList) . BV.mapM parseProperty
+
+parseProperty :: DA.Value -> DA.Parser (Text, PropertyValue)
+parseProperty = DA.withObject "Property" $ \v -> do
+    propertyName <- v .: "name"
+    propertyType <- v .:? "type" .!= "string"
+    propertyValue <- parsePropertyValue propertyType =<< v .: "value"
+    return (propertyName, propertyValue)
+
+parsePropertyValue :: Text -> DA.Value -> DA.Parser PropertyValue
+parsePropertyValue "string" = fmap PropertyString . DA.parseJSON
+parsePropertyValue "float" = fmap PropertyFloat . DA.parseJSON
+parsePropertyValue "bool" = fmap PropertyBool . DA.parseJSON
+parsePropertyValue "color" = fmap PropertyString . DA.parseJSON
+parsePropertyValue "file" = fmap PropertyFile . DA.parseJSON
+parsePropertyValue invalid = fail $ "unknown property type:" ++ Text.unpack invalid
+
+instance DA.ToJSON Properties where
+    toJSON (Properties props) = DA.Array . BV.fromList . map propertyToJSON . Map.toList $ props
+
+propertyToJSON :: (Text, PropertyValue) -> DA.Value
+propertyToJSON (name, PropertyString v) = DA.object ["name" .= name, "type" .= ("string" :: Text), "value" .= v]
+propertyToJSON (name, PropertyFloat v) = DA.object ["name" .= name, "type" .= ("float" :: Text), "value" .= v]
+propertyToJSON (name, PropertyBool v) = DA.object ["name" .= name, "type" .= ("bool" :: Text), "value" .= v]
+propertyToJSON (name, PropertyColor v) = DA.object ["name" .= name, "type" .= ("color" :: Text), "value" .= v]
+propertyToJSON (name, PropertyFile v) = DA.object ["name" .= name, "type" .= ("file" :: Text), "value" .= v]
 
 data ObjectCommon = ObjectCommon
     { objectCommonId         :: !Int
@@ -137,7 +178,7 @@ instance DA.FromJSON Object where
             <*> v .: "width"
             <*> v .: "height"
             <*> v .: "name"
-            <*> withDefault v "properties" Map.empty
+            <*> withDefault v "properties" (Properties Map.empty)
             <*> v .: "visible"
             <*> v .: "x"
             <*> v .: "y"
@@ -181,7 +222,9 @@ objectCommonFields = fields . DA.toJSON
     fields _             = []
 
 data Tile = Tile
-    { tileTerrain :: ![Int]
+    { tileTerrain     :: ![Int]
+    , tileProbability :: !(Maybe Double)
+    , tileProperties  :: !(Maybe Properties)
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 4 }) ''Tile)
 
@@ -197,24 +240,21 @@ data TilesetSource =
     deriving (Show, Eq)
 
 data Tileset = Tileset
-    { tilesetFirstGid          :: !(Maybe Gid)
-    , tilesetImage             :: !Text
-    , tilesetName              :: !Text
-    , tilesetTileWidth         :: !Int
-    , tilesetTileHeight        :: !Int
-    , tilesetImageWidth        :: !Int
-    , tilesetImageHeight       :: !Int
-    , tilesetTileOffset        :: !Coord
-    , tilesetProperties        :: !Properties
-    , tilesetPropertyTypes     :: !Properties
-    , tilesetMargin            :: !Int
-    , tilesetSpacing           :: !Int
-    , tilesetTileProperties    :: !(Maybe (Map.Map Gid Properties))
-    , tilesetTilePropertyTypes :: !(Maybe (Map.Map Gid Properties))
-    , tilesetTerrains          :: !(Maybe [Terrain])
-    , tilesetColumns           :: !Int
-    , tilesetTileCount         :: !Int
-    , tilesetTiles             :: !(Maybe (Map.Map Gid Tile))
+    { tilesetFirstGid    :: !(Maybe Gid)
+    , tilesetImage       :: !Text
+    , tilesetName        :: !Text
+    , tilesetTileWidth   :: !Int
+    , tilesetTileHeight  :: !Int
+    , tilesetImageWidth  :: !Int
+    , tilesetImageHeight :: !Int
+    , tilesetTileOffset  :: !Coord
+    , tilesetProperties  :: !Properties
+    , tilesetMargin      :: !Int
+    , tilesetSpacing     :: !Int
+    , tilesetTerrains    :: !(Maybe [Terrain])
+    , tilesetColumns     :: !Int
+    , tilesetTileCount   :: !Int
+    , tilesetTiles       :: !(Maybe (Map.Map Gid Tile))
     } deriving (Show, Eq)
 
 instance DA.FromJSON TilesetSource where
@@ -244,12 +284,9 @@ instance DA.FromJSON Tileset where
         <*> v .: "imagewidth"
         <*> v .: "imageheight"
         <*> withDefault v "tileoffset" (Coord 0 0)
-        <*> withDefault v "properties" Map.empty
-        <*> withDefault v "propertytypes" Map.empty
+        <*> withDefault v "properties" (Properties Map.empty)
         <*> v .: "margin"
         <*> v .: "spacing"
-        <*> v .:? "tileproperties"
-        <*> v .:? "tilepropertytypes"
         <*> v .:? "terrains"
         <*> v .: "columns"
         <*> v .: "tilecount"
@@ -258,7 +295,7 @@ instance DA.FromJSON Tileset where
     parseJSON invalid = DA.typeMismatch "Tileset" invalid
 
 instance DA.ToJSON Tileset where
-    toJSON (Tileset firstgid image name tilewidth tileheight imagewidth imageheight tileoffset properties propertytypes margin spacing tileproperties tilepropertytypes terrains columns tilecount tiles) = DA.object
+    toJSON (Tileset firstgid image name tilewidth tileheight imagewidth imageheight tileoffset properties margin spacing terrains columns tilecount tiles) = DA.object
         [ "firstgid" .= firstgid
         , "image" .= image
         , "name" .= name
@@ -268,11 +305,8 @@ instance DA.ToJSON Tileset where
         , "imageheight" .= imageheight
         , "tileoffset" .= tileoffset
         , "properties" .= properties
-        , "propertytypes" .= propertytypes
         , "margin" .= margin
         , "spacing" .= spacing
-        , "tileproperties" .= tileproperties
-        , "tilepropertytypes" .= tilepropertytypes
         , "terrains" .= terrains
         , "columns" .= columns
         , "tilecount" .= tilecount
@@ -386,7 +420,7 @@ instance DA.FromJSON LayerMid where
             <*> v .: "visible"
             <*> v .: "x"
             <*> v .: "y"
-            <*> withDefault v "properties" Map.empty
+            <*> withDefault v "properties" (Properties Map.empty)
 
         parseLayer :: Text -> LayerCommon -> DA.Parser LayerMid
         parseLayer "tilelayer" common = do
@@ -476,7 +510,7 @@ instance DA.FromJSON MapMid where
         <*> v .: "tilesets"
         <*> v .:? "backgroundcolor"
         <*> v .: "renderorder"
-        <*> withDefault v "properties" Map.empty
+        <*> withDefault v "properties" (Properties Map.empty)
         <*> v .: "nextobjectid"
 
     parseJSON invalid = DA.typeMismatch "MapMid" invalid
