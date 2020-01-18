@@ -7,6 +7,7 @@ module Graphics.Format.Tiled.Types
     , Ellipse(..)
     , EncodingType(..)
     , Gid
+    , Image(..)
     , ImageLayer(..)
     , Layer(..)
     , LayerMid(..)
@@ -31,6 +32,9 @@ module Graphics.Format.Tiled.Types
     , TileLayerData(..)
     , Tileset(..)
     , TilesetSource(..)
+    , Wangcolor(..)
+    , Wangset(..)
+    , Wangtile(..)
     ) where
 
 import Control.Monad (mzero)
@@ -41,11 +45,11 @@ import qualified Data.Aeson as DA (FromJSON, ToJSON, Value(..), object,
 import qualified Data.Aeson.TH as DA (Options(..), defaultOptions, deriveJSON)
 import qualified Data.Aeson.Types as DA (Object, Parser, typeMismatch)
 import qualified Data.HashMap.Lazy as HML (lookup, toList)
-import qualified Data.Map.Strict as Map (Map, empty, fromList, toList)
+import qualified Data.Map.Strict as Map (Map, empty, fromList, null, toList)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
-import qualified Data.Vector as BV (Vector, fromList, mapM, toList)
+import qualified Data.Vector as BV (Vector, fromList, mapM, null, toList)
 import qualified Data.Vector.Unboxed as UV (Vector)
 import Data.Word (Word32)
 import Graphics.Format.Tiled.Internal
@@ -234,27 +238,59 @@ data Terrain = Terrain
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 7 }) ''Terrain)
 
+data Wangcolor = Wangcolor
+    { wangcolorColor       :: !Color
+    , wangcolorName        :: !Text
+    , wangcolorProbability :: !Double
+    , wangcolorTile        :: !Int
+    } deriving (Show, Eq)
+$(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 9 }) ''Wangcolor)
+
+data Wangtile = Wangtile
+    { wangtileTileId :: !Int
+    , wangtileWangId :: !Text
+    , wangtileDflip  :: !Bool
+    , wangtileHflip  :: !Bool
+    , wangtileVflip  :: !Int
+    } deriving (Show, Eq)
+$(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 8 }) ''Wangtile)
+
+data Wangset = Wangset
+    { wangsetName         :: !Text
+    , wangsetTile         :: !Int
+    , wangsetCornerColors :: !(BV.Vector Wangcolor)
+    , wangsetEdgeColors   :: !(BV.Vector Wangcolor)
+    , wangsetWangtiles    :: !(BV.Vector Wangtile)
+    , wangsetProperties   :: !Properties
+    } deriving (Show, Eq)
+$(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 7 }) ''Wangset)
+
+data Image = Image
+    { imageSource :: !Text
+    , imageWidth  :: !Int
+    , imageHeight :: !Int
+    } deriving (Show, Eq)
+
 data TilesetSource =
     TilesetSourceFile !(Maybe Gid) !Text |
     TilesetSourceInplace !Tileset
     deriving (Show, Eq)
 
 data Tileset = Tileset
-    { tilesetFirstGid    :: !(Maybe Gid)
-    , tilesetImage       :: !Text
-    , tilesetName        :: !Text
-    , tilesetTileWidth   :: !Int
-    , tilesetTileHeight  :: !Int
-    , tilesetImageWidth  :: !Int
-    , tilesetImageHeight :: !Int
-    , tilesetTileOffset  :: !Coord
-    , tilesetProperties  :: !Properties
-    , tilesetMargin      :: !Int
-    , tilesetSpacing     :: !Int
-    , tilesetTerrains    :: !(Maybe [Terrain])
-    , tilesetColumns     :: !Int
-    , tilesetTileCount   :: !Int
-    , tilesetTiles       :: !(Maybe (Map.Map Gid Tile))
+    { tilesetFirstGid   :: !(Maybe Gid)
+    , tilesetName       :: !Text
+    , tilesetTileWidth  :: !Int
+    , tilesetTileHeight :: !Int
+    , tilesetSpacing    :: !Int
+    , tilesetTileCount  :: !Int
+    , tilesetMargin     :: !Int
+    , tilesetColumns    :: !Int
+    , tilesetImage      :: !(Maybe Image)
+    , tilesetTileOffset :: !Coord
+    , tilesetTerrains   :: !(BV.Vector Terrain)
+    , tilesetTiles      :: !(Map.Map Gid Tile)
+    , tilesetWangsets   :: !(BV.Vector Wangset)
+    , tilesetProperties :: !Properties
     } deriving (Show, Eq)
 
 instance DA.FromJSON TilesetSource where
@@ -275,43 +311,52 @@ instance DA.ToJSON TilesetSource where
     toJSON (TilesetSourceInplace tileset) = DA.toJSON tileset
 
 instance DA.FromJSON Tileset where
-    parseJSON (DA.Object v) = Tileset
-        <$> v .:? "firstgid"
-        <*> v .: "image"
-        <*> v .: "name"
-        <*> v .: "tilewidth"
-        <*> v .: "tileheight"
-        <*> v .: "imagewidth"
-        <*> v .: "imageheight"
-        <*> withDefault v "tileoffset" (Coord 0 0)
-        <*> withDefault v "properties" (Properties Map.empty)
-        <*> v .: "margin"
-        <*> v .: "spacing"
-        <*> v .:? "terrains"
-        <*> v .: "columns"
-        <*> v .: "tilecount"
-        <*> v .:? "tiles"
+    parseJSON (DA.Object v) = do
+        imgSource <- v .:? "image"
+        imgWidth <- v .:? "imagewidth"
+        imgHeight <- v .:? "imageheight"
+        let image = Image <$> imgSource <*> imgWidth <*> imgHeight
+        Tileset
+            <$> v .:? "firstgid"
+            <*> v .: "name"
+            <*> v .: "tilewidth"
+            <*> v .: "tileheight"
+            <*> v .: "spacing"
+            <*> v .: "tilecount"
+            <*> v .: "margin"
+            <*> v .: "columns"
+            <*> return image
+            <*> withDefault v "tileoffset" (Coord 0 0)
+            <*> withDefault v "terrains" mempty
+            <*> withDefault v "tiles" mempty
+            <*> withDefault v "wangsets" mempty
+            <*> withDefault v "properties" (Properties Map.empty)
 
     parseJSON invalid = DA.typeMismatch "Tileset" invalid
 
 instance DA.ToJSON Tileset where
-    toJSON (Tileset firstgid image name tilewidth tileheight imagewidth imageheight tileoffset properties margin spacing terrains columns tilecount tiles) = DA.object
-        [ "firstgid" .= firstgid
-        , "image" .= image
-        , "name" .= name
-        , "tilewidth" .= tilewidth
-        , "tileheight" .= tileheight
-        , "imagewidth" .= imagewidth
-        , "imageheight" .= imageheight
-        , "tileoffset" .= tileoffset
-        , "properties" .= properties
-        , "margin" .= margin
-        , "spacing" .= spacing
-        , "terrains" .= terrains
-        , "columns" .= columns
-        , "tilecount" .= tilecount
-        , "tiles" .= tiles
-        ]
+    toJSON (Tileset firstgid name tilewidth tileheight spacing tilecount margin columns image tileoffset terrains tiles wangsets properties) =
+        let terrains' = if BV.null terrains then Nothing else Just terrains
+            tiles' = if Map.null tiles then Nothing else Just tiles
+            wangsets' = if BV.null wangsets then Nothing else Just wangsets
+        in DA.object
+            [ "firstgid" .= firstgid
+            , "name" .= name
+            , "tilewidth" .= tilewidth
+            , "tileheight" .= tileheight
+            , "spacing" .= spacing
+            , "tilecount" .= tilecount
+            , "margin" .= margin
+            , "columns" .= columns
+            , "image" .= (imageSource <$> image)
+            , "imagewidth" .= (imageWidth <$> image)
+            , "imageheight" .= (imageHeight <$> image)
+            , "tileoffset" .= tileoffset
+            , "terrains" .= terrains'
+            , "tiles" .= tiles'
+            , "wangsets" .= wangsets'
+            , "properties" .= properties
+            ]
 
 data LayerCommon = LayerCommon
     { layerCommonWidth      :: !Int
