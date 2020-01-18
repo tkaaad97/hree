@@ -11,7 +11,9 @@ import qualified Data.Map.Strict as Map (empty, singleton)
 import Data.Text (Text)
 import qualified Data.Vector as BV (fromList)
 import qualified Data.Vector.Unboxed as UV (fromList)
+import Data.Word (Word32)
 import Graphics.Format.Tiled.Types
+import qualified Linear (V4(..))
 import qualified Test.Hspec as Hspec (Spec, it, shouldBe)
 
 spec :: Hspec.Spec
@@ -22,7 +24,10 @@ spec = do
     testJSON "Orientation2" "\"isometric\"" OrientationIsometric (DA.String "isometric")
     testJSON "Orientation3" "\"staggered\"" OrientationStaggered (DA.String "staggered")
 
-    testJSON "Tile" "{\"terrain\":[0, 1, 0, 1]}" (Tile [0, 1, 0, 1] Nothing Nothing) (DA.object ["terrain" .= ([0, 1, 0, 1] :: [Int]), ("probability", DA.Null),("properties", DA.Null)])
+    testJSON "Tile"
+        "{\"id\":1,\"terrain\":[0, 1, 0, 1]}"
+        (Tile 1 Nothing Nothing Nothing (Just $ Linear.V4 0 1 0 1) Nothing (Properties mempty))
+        (DA.object [("image", DA.Null), "terrain" .= ([0, 1, 0, 1] :: [Word32]), ("objectgroup", DA.Null), ("probability", DA.Null), ("imageheight", DA.Null), ("imagewidth", DA.Null), "id" .= (1 :: Word32), ("type", DA.Null), ("properties", DA.Null)])
 
     testJSON "Terrain" "{\"name\":\"ground\",\"tile\":12}" (Terrain "ground" 12) (DA.object ["name" .= ("ground" :: Text), "tile" .= (12 :: Int)])
 

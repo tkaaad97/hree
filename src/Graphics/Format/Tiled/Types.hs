@@ -44,15 +44,17 @@ import qualified Data.Aeson as DA (FromJSON, ToJSON, Value(..), object,
                                    withText)
 import qualified Data.Aeson.TH as DA (Options(..), defaultOptions, deriveJSON)
 import qualified Data.Aeson.Types as DA (Object, Parser, typeMismatch)
+import qualified Data.Foldable (toList)
 import qualified Data.HashMap.Lazy as HML (lookup, toList)
 import qualified Data.Map.Strict as Map (Map, empty, fromList, null, toList)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Vector as BV (Vector, fromList, mapM, null, toList)
-import qualified Data.Vector.Unboxed as UV (Vector)
+import qualified Data.Vector.Unboxed as UV (Vector, length, (!))
 import Data.Word (Word32)
 import Graphics.Format.Tiled.Internal
+import qualified Linear (V4(..))
 
 type Gid = Int
 
@@ -225,13 +227,6 @@ objectCommonFields = fields . DA.toJSON
     fields (DA.Object v) = HML.toList v
     fields _             = []
 
-data Tile = Tile
-    { tileTerrain     :: ![Int]
-    , tileProbability :: !(Maybe Double)
-    , tileProperties  :: !(Maybe Properties)
-    } deriving (Show, Eq)
-$(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 4 }) ''Tile)
-
 data Terrain = Terrain
     { terrainName :: !Text
     , terrainTile :: !Int
@@ -269,6 +264,21 @@ data Image = Image
     { imageSource :: !Text
     , imageWidth  :: !Int
     , imageHeight :: !Int
+    } deriving (Show, Eq)
+
+data ObjectGroup = ObjectGroup
+    { objectGroupCommon  :: !LayerCommon
+    , objectGroupObjects :: !(BV.Vector Object)
+    } deriving (Show, Eq)
+
+data Tile = Tile
+    { tileId          :: !Word32
+    , tileImage       :: !(Maybe Image)
+    , tileObjectGroup :: !(Maybe ObjectGroup)
+    , tileProbability :: !(Maybe Double)
+    , tileTerrain     :: !(Maybe (Linear.V4 Word32))
+    , tileType        :: !(Maybe Text)
+    , tileProperties  :: !Properties
     } deriving (Show, Eq)
 
 data TilesetSource =
@@ -410,11 +420,6 @@ data EncodingType =
     Base64Encoding
     deriving (Show, Eq)
 
-data ObjectGroup = ObjectGroup
-    { objectGroupCommon  :: !LayerCommon
-    , objectGroupObjects :: !(BV.Vector Object)
-    } deriving (Show, Eq)
-
 data ImageLayer = ImageLayer
     { imageLayerCommon :: !LayerCommon
     , imageLayerImage  :: !Text
@@ -453,36 +458,33 @@ data Map = Map
 instance DA.FromJSON LayerMid where
     parseJSON (DA.Object v) = do
         layerType <- v .: "type"
-        common <- parseLayerCommon
-        parseLayer layerType common
-
-        where
-        parseLayerCommon = LayerCommon
-            <$> v .: "width"
-            <*> v .: "height"
-            <*> v .: "name"
-            <*> v .: "opacity"
-            <*> v .: "visible"
-            <*> v .: "x"
-            <*> v .: "y"
-            <*> withDefault v "properties" (Properties Map.empty)
-
-        parseLayer :: Text -> LayerCommon -> DA.Parser LayerMid
-        parseLayer "tilelayer" common = do
-            encoding <- v .:? "encoding" .!= CsvEncoding
-            compression <- v .:? "compression" .!= NoCompression
-            data_ <- maybe (fail "tilelayer needs data field.") (parseTileLayerData encoding compression) $ HML.lookup "data" v
-            return (LayerMidTileLayer (TileLayerMid common data_))
-
-        parseLayer "objectgroup" common = LayerMidObjectGroup . ObjectGroup common
-            <$> v .: "objects"
-
-        parseLayer "imagelayer" common = LayerMidImageLayer . ImageLayer common
-            <$> v .: "image"
-
-        parseLayer _ _ = mzero
+        common <- parseLayerCommon v
+        parseLayer layerType common v
 
     parseJSON invalid = DA.typeMismatch "LayerMid" invalid
+
+parseLayerCommon :: DA.Object -> DA.Parser LayerCommon
+parseLayerCommon v = LayerCommon
+    <$> v .: "width"
+    <*> v .: "height"
+    <*> v .: "name"
+    <*> v .: "opacity"
+    <*> v .: "visible"
+    <*> v .: "x"
+    <*> v .: "y"
+    <*> withDefault v "properties" (Properties Map.empty)
+
+parseLayer :: Text -> LayerCommon -> DA.Object -> DA.Parser LayerMid
+parseLayer "tilelayer" common v = do
+    encoding <- v .:? "encoding" .!= CsvEncoding
+    compression <- v .:? "compression" .!= NoCompression
+    data_ <- maybe (fail "tilelayer needs data field.") (parseTileLayerData encoding compression) $ HML.lookup "data" v
+    return (LayerMidTileLayer (TileLayerMid common data_))
+parseLayer "objectgroup" common v = LayerMidObjectGroup . ObjectGroup common
+    <$> v .: "objects"
+parseLayer "imagelayer" common v = LayerMidImageLayer . ImageLayer common
+    <$> v .: "image"
+parseLayer _ _ _ = mzero
 
 parseTileLayerData :: EncodingType -> CompressionType -> DA.Value -> DA.Parser TileLayerData
 parseTileLayerData CsvEncoding _ = fmap TileLayerDataCsv . DA.parseJSON
@@ -519,6 +521,15 @@ layerCommonFields = fields . DA.toJSON
     where
     fields (DA.Object v) = HML.toList v
     fields _             = []
+
+instance DA.FromJSON ObjectGroup where
+    parseJSON (DA.Object v) = do
+        common <- parseLayerCommon v
+        ObjectGroup common <$> v .: "objects"
+    parseJSON invalid = DA.typeMismatch "ObjectGroup" invalid
+
+instance DA.ToJSON ObjectGroup where
+    toJSON = DA.toJSON . LayerMidObjectGroup
 
 instance DA.FromJSON EncodingType where
     parseJSON = DA.withText "EncodingType" $ \t ->
@@ -576,4 +587,45 @@ instance DA.ToJSON MapMid where
         , "nextobjectid" .= nextobjectid
         ]
 
+instance DA.FromJSON Tile where
+    parseJSON (DA.Object v) = do
+        imgSource <- v .:? "image"
+        imgWidth <- v .:? "imagewidth"
+        imgHeight <- v .:? "imageheight"
+        let image = Image <$> imgSource <*> imgWidth <*> imgHeight
+        terrain <- maybe (return Nothing) (fmap Just . fromVectorToV4) =<< v .:? "terrain"
+        Tile
+            <$> v .: "id"
+            <*> return image
+            <*> v .:? "objectgroup"
+            <*> v .:? "probability"
+            <*> return terrain
+            <*> v .:? "type"
+            <*> withDefault v "properties" (Properties Map.empty)
 
+    parseJSON invalid = DA.typeMismatch "Tile" invalid
+
+instance DA.ToJSON Tile where
+    toJSON (Tile tid image objectgroup probability terrain type' p @ (Properties props)) =
+        let p' = if Map.null props then Nothing else Just p
+        in DA.object
+            [ "id" .= tid
+            , "image" .= (imageSource <$> image)
+            , "imagewidth" .= (imageWidth <$> image)
+            , "imageheight" .= (imageHeight <$> image)
+            , "objectgroup" .= objectgroup
+            , "probability" .= probability
+            , "terrain" .= (Data.Foldable.toList <$> terrain)
+            , "type" .= type'
+            , "properties" .= p'
+            ]
+
+fromVectorToV4 :: UV.Vector Word32 -> DA.Parser (Linear.V4 Word32)
+fromVectorToV4 v
+    | UV.length v == 4 =
+        let a0 = v UV.! 0
+            a1 = v UV.! 1
+            a2 = v UV.! 2
+            a3 = v UV.! 3
+        in return $ Linear.V4 a0 a1 a2 a3
+    | otherwise = fail "bad array size"
