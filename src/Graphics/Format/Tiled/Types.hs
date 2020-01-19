@@ -74,6 +74,7 @@ data Orientation
     = OrientationOrthogonal
     | OrientationIsometric
     | OrientationStaggered
+    | OrientationHexagonal
     deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = constructorTagModifier 11 }) ''Orientation)
 
