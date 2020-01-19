@@ -77,22 +77,29 @@ spec = do
         (DA.object ["type" .= ("objectgroup" :: Text), "width" .= (0 :: Int), "height" .= (0 :: Int), "name" .= ("objects" :: Text), "opacity" .= (1 :: Double), "x" .= (0 :: Int), "y" .= (0 :: Int), "properties" .= ([] :: [DA.Value]), "visible" .= True, "objects" .= [ObjectRectangle (Rectangle (ObjectCommon 1 "shape" 136 161 "rect1" (Properties Map.empty) True 38 39 0)), ObjectEllipse (Ellipse (ObjectCommon 2 "" 384 212 "ellipse1" (Properties Map.empty) True 81 100 0))]])
 
     testJSON "MapMid"
-        "{\"height\":100,\"layers\":[{\"data\":[1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1],\"height\":8,\"name\":\"ground\",\"opacity\":1,\"properties\":[{\"name\":\"tileLayerProp\",\"type\":\"string\",\"value\":\"1\"}],\"type\":\"tilelayer\",\"visible\":true,\"width\":4,\"x\":0,\"y\":0}],\"nextobjectid\":17,\"orientation\":\"orthogonal\",\"properties\":[],\"renderorder\":\"right-down\",\"tileheight\":32,\"tilesets\":[],\"tilewidth\":32,\"version\":1,\"width\":100}"
-        (MapMid 1 100 100 32 32 OrientationOrthogonal
+        "{\"height\":100,\"layers\":[{\"data\":[1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1],\"height\":8,\"name\":\"ground\",\"opacity\":1,\"properties\":[{\"name\":\"tileLayerProp\",\"type\":\"string\",\"value\":\"1\"}],\"type\":\"tilelayer\",\"visible\":true,\"width\":4,\"x\":0,\"y\":0}],\"nextlayerid\":2,\"nextobjectid\":17,\"orientation\":\"orthogonal\",\"properties\":[],\"renderorder\":\"right-down\",\"tileheight\":32,\"tilesets\":[],\"tilewidth\":32,\"version\":1,\"tiledversion\":\"1.2\",\"width\":100}"
+        (MapMid 1 "1.2" OrientationOrthogonal RenderOrderRightDown 100 100 32 32 0 Nothing Nothing Nothing 2 17
             (BV.fromList [LayerMidTileLayer (TileLayerMid (LayerCommon 4 8 "ground" 1 True 0 0 (Properties (Map.singleton "tileLayerProp" (PropertyString "1")))) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))])
             (BV.fromList [])
-            Nothing
-            RenderOrderRightDown
-            (Properties Map.empty)
-            17)
+            (Properties Map.empty))
         (DA.object
             [ "version" .= (1 :: Double)
+            , "tiledversion" .= ("1.2" :: Text)
+            , "orientation" .= OrientationOrthogonal
+            , "renderorder" .= ("right-down" :: Text)
             , "width" .= (100 :: Int)
             , "height" .= (100 :: Int)
             , "tilewidth" .= (32 :: Int)
             , "tileheight" .= (32 :: Int)
-            , "orientation" .= OrientationOrthogonal
-            , "layers" .= [LayerMidTileLayer (TileLayerMid (LayerCommon 4 8 "ground" 1 True 0 0 (Properties (Map.singleton "tileLayerProp" (PropertyString "1")))) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))], "tilesets" .= ([] :: [TilesetSource]), "renderorder" .= ("right-down" :: Text), "nextobjectid" .= (17 :: Int), "backgroundcolor" .= (Nothing :: Maybe Color), "properties" .= ([] :: [DA.Value])])
+            , "hexsidelength" .= DA.Null
+            , "staggeraxis" .= DA.Null
+            , "staggerindex" .= DA.Null
+            , "nextlayerid" .= (2 :: Int)
+            , "nextobjectid" .= (17 :: Int)
+            , "backgroundcolor" .= (Nothing :: Maybe Color)
+            , "layers" .= [LayerMidTileLayer (TileLayerMid (LayerCommon 4 8 "ground" 1 True 0 0 (Properties (Map.singleton "tileLayerProp" (PropertyString "1")))) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))]
+            , "tilesets" .= ([] :: [DA.Value])
+            , "properties" .= ([] :: [DA.Value])])
 
 testJSON :: (DA.FromJSON a, DA.ToJSON a, Show a, Eq a) => String -> ByteString -> a -> DA.Value -> Hspec.Spec
 testJSON name str x json = do

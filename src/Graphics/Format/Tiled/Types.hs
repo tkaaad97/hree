@@ -85,6 +85,18 @@ data RenderOrder
     deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = renderOrderTagModifier }) ''RenderOrder)
 
+data StaggerAxis
+    = StaggerAxisX
+    | StaggerAxisY
+    deriving (Show, Eq)
+$(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = constructorTagModifier 11 }) ''StaggerAxis)
+
+data StaggerIndex
+    = StaggerIndexEven
+    | StaggerIndexOdd
+    deriving (Show, Eq)
+$(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = constructorTagModifier 12 }) ''StaggerIndex)
+
 data PropertyValue =
     PropertyString !Text |
     PropertyFloat !Double |
@@ -427,32 +439,42 @@ data ImageLayer = ImageLayer
 
 data MapMid = MapMid
     { mapMidVersion         :: !Double
+    , mapMidTiledVersion    :: !Text
+    , mapMidOrientation     :: !Orientation
+    , mapMidRenderOrder     :: !RenderOrder
     , mapMidWidth           :: !Int
     , mapMidHeight          :: !Int
     , mapMidTileWidth       :: !Int
     , mapMidTileHeight      :: !Int
-    , mapMidOrientation     :: !Orientation
+    , mapMidHexSideLength   :: !Int
+    , mapMidStaggerAxis     :: !(Maybe StaggerAxis)
+    , mapMidStaggerIndex    :: !(Maybe StaggerIndex)
+    , mapMidBackgroundColor :: !(Maybe Color)
+    , mapMidNextLayerId     :: !Int
+    , mapMidNextObjectId    :: !Int
     , mapMidLayers          :: !(BV.Vector LayerMid)
     , mapMidTilesets        :: !(BV.Vector TilesetSource)
-    , mapMidBackgroundColor :: !(Maybe Color)
-    , mapMidRenderOrder     :: !RenderOrder
     , mapMidProperties      :: !Properties
-    , mapMidNextObjectId    :: !Int
     } deriving (Show, Eq)
 
 data Map = Map
     { mapVersion         :: !Double
+    , mapTiledVersion    :: !Text
+    , mapOrientation     :: !Orientation
+    , mapRenderOrder     :: !RenderOrder
     , mapWidth           :: !Int
     , mapHeight          :: !Int
     , mapTileWidth       :: !Int
     , mapTileHeight      :: !Int
-    , mapOrientation     :: !Orientation
+    , mapHexSideLength   :: !Int
+    , mapStaggerAxis     :: !(Maybe StaggerAxis)
+    , mapStaggerIndex    :: !(Maybe StaggerIndex)
+    , mapBackgroundColor :: !(Maybe Color)
+    , mapNextLayerId     :: !Int
+    , mapNextObjectId    :: !Int
     , mapLayers          :: !(BV.Vector Layer)
     , mapTilesets        :: !(BV.Vector Tileset)
-    , mapBackgroundColor :: !(Maybe Color)
-    , mapRenderOrder     :: !RenderOrder
     , mapProperties      :: !Properties
-    , mapNextObjectId    :: !Int
     } deriving (Show, Eq)
 
 instance DA.FromJSON LayerMid where
@@ -557,34 +579,44 @@ instance DA.ToJSON CompressionType where
 instance DA.FromJSON MapMid where
     parseJSON (DA.Object v) = MapMid
         <$> v .: "version"
+        <*> v .: "tiledversion"
+        <*> v .: "orientation"
+        <*> v .: "renderorder"
         <*> v .: "width"
         <*> v .: "height"
         <*> v .: "tilewidth"
         <*> v .: "tileheight"
-        <*> v .: "orientation"
+        <*> v .:? "hexsidelength" .!= 0
+        <*> v .:? "staggeraxis"
+        <*> v .:? "staggerindex"
+        <*> v .:? "backgroundcolor"
+        <*> v .: "nextlayerid"
+        <*> v .: "nextobjectid"
         <*> v .: "layers"
         <*> v .: "tilesets"
-        <*> v .:? "backgroundcolor"
-        <*> v .: "renderorder"
         <*> withDefault v "properties" (Properties Map.empty)
-        <*> v .: "nextobjectid"
 
     parseJSON invalid = DA.typeMismatch "MapMid" invalid
 
 instance DA.ToJSON MapMid where
-    toJSON (MapMid version width height tilewidth tileheight orientation layers tilesets backgroundcolor renderorder properties nextobjectid) = DA.object
-        [ "version" .= version
-        , "width" .= width
-        , "height" .= height
-        , "tilewidth" .= tilewidth
-        , "tileheight" .= tileheight
-        , "orientation" .= orientation
-        , "layers" .= layers
-        , "tilesets" .= tilesets
-        , "backgroundcolor" .= backgroundcolor
-        , "renderorder" .= renderorder
-        , "properties" .= properties
-        , "nextobjectid" .= nextobjectid
+    toJSON a = DA.object
+        [ "version" .= mapMidVersion a
+        , "tiledversion" .= mapMidTiledVersion a
+        , "orientation" .= mapMidOrientation a
+        , "renderorder" .= mapMidRenderOrder a
+        , "width" .= mapMidWidth a
+        , "height" .= mapMidHeight a
+        , "tilewidth" .= mapMidTileWidth a
+        , "tileheight" .= mapMidTileHeight a
+        , "hexsidelength" .= if mapMidHexSideLength a /= 0 then Just $ mapMidHexSideLength a else Nothing
+        , "staggeraxis" .= mapMidStaggerAxis a
+        , "staggerindex" .= mapMidStaggerIndex a
+        , "backgroundcolor" .= mapMidBackgroundColor a
+        , "nextlayerid" .= mapMidNextLayerId a
+        , "nextobjectid" .= mapMidNextObjectId a
+        , "layers" .= mapMidLayers a
+        , "tilesets" .= mapMidTilesets a
+        , "properties" .= mapMidProperties a
         ]
 
 instance DA.FromJSON Tile where

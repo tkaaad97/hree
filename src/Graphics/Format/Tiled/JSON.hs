@@ -35,17 +35,22 @@ completeMap basepath m = do
     tilesets <- BV.mapM (completeTileset basepath) tilesetMids
     return Map
         { mapVersion = mapMidVersion m
+        , mapTiledVersion = mapMidTiledVersion m
+        , mapOrientation = mapMidOrientation m
+        , mapRenderOrder = mapMidRenderOrder m
         , mapWidth = mapMidWidth m
         , mapHeight = mapMidHeight m
         , mapTileWidth = mapMidTileWidth m
         , mapTileHeight = mapMidTileHeight m
-        , mapOrientation = mapMidOrientation m
+        , mapHexSideLength = mapMidHexSideLength m
+        , mapStaggerAxis = mapMidStaggerAxis m
+        , mapStaggerIndex = mapMidStaggerIndex m
+        , mapBackgroundColor = mapMidBackgroundColor m
+        , mapNextLayerId = mapMidNextLayerId m
+        , mapNextObjectId = mapMidNextObjectId m
         , mapLayers = layers
         , mapTilesets = tilesets
-        , mapBackgroundColor = mapMidBackgroundColor m
-        , mapRenderOrder = mapMidRenderOrder m
         , mapProperties = mapMidProperties m
-        , mapNextObjectId = mapMidNextObjectId m
         }
 
 completeTileset :: FilePath -> TilesetSource -> IO Tileset
