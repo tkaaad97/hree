@@ -25,6 +25,8 @@ module Graphics.Format.Tiled.Types
     , PropertyValue(..)
     , Rectangle(..)
     , RenderOrder(..)
+    , StaggerAxis(..)
+    , StaggerIndex(..)
     , Terrain(..)
     , Tile(..)
     , TileLayer(..)
