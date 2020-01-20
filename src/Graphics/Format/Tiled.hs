@@ -1,9 +1,35 @@
 module Graphics.Format.Tiled
-    ( tileBoundingUpLeft
+    ( Rect(..)
+    , tileBoundingUpLeft
+    , tileBoundingRect
+    , tileBoundingSpriteVertex
     ) where
 
 import Graphics.Format.Tiled.Types
-import Linear (V2(..))
+import Graphics.Hree.GL.Vertex (SpriteVertex(..))
+import Linear (V2(..), V3(..), (^-^))
+
+data Rect = Rect
+    { rectBottomLeft :: !(V2 Float)
+    , rectSize       :: !(V2 Float)
+    } deriving (Show, Eq)
+
+tileBoundingRect :: Orientation -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> Int -> StaggerAxis -> StaggerIndex -> Int -> Rect
+tileBoundingRect orientation origin index size offset unit staggerAxis staggerIndex hexSide =
+    let upLeft = tileBoundingUpLeft orientation origin index size offset unit staggerAxis staggerIndex hexSide
+        V2 width height = size
+        w = fromIntegral width / fromIntegral unit
+        h = fromIntegral height / fromIntegral unit
+        bottomLeft = upLeft ^-^ V2 0 h
+    in Rect bottomLeft (V2 w h)
+
+tileBoundingSpriteVertex :: Rect -> Float -> Rect -> SpriteVertex
+tileBoundingSpriteVertex (Rect (V2 x y) (V2 width height)) z (Rect uv uvSize) =
+    let pos = V3 x y z
+        size = V3 width height 0
+        angle = 0
+        vertex = SpriteVertex pos size angle uv uvSize
+    in vertex
 
 tileBoundingUpLeft :: Orientation -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> Int -> StaggerAxis -> StaggerIndex -> Int -> V2 Float
 tileBoundingUpLeft OrientationOrthogonal (V2 ox oy) (V2 ix iy) (V2 width height) (V2 offsetX offsetY) unit _ _ _ =
