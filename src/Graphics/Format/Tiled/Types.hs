@@ -244,7 +244,7 @@ objectCommonFields = fields . DA.toJSON
 
 data Terrain = Terrain
     { terrainName :: !Text
-    , terrainTile :: !Int
+    , terrainTile :: !Word32
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 7 }) ''Terrain)
 
@@ -252,22 +252,22 @@ data Wangcolor = Wangcolor
     { wangcolorColor       :: !Color
     , wangcolorName        :: !Text
     , wangcolorProbability :: !Double
-    , wangcolorTile        :: !Int
+    , wangcolorTile        :: !Word32
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 9 }) ''Wangcolor)
 
 data Wangtile = Wangtile
-    { wangtileTileId :: !Int
+    { wangtileTileId :: !Word32
     , wangtileWangId :: !Text
     , wangtileDflip  :: !Bool
     , wangtileHflip  :: !Bool
-    , wangtileVflip  :: !Int
+    , wangtileVflip  :: !Bool
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 8 }) ''Wangtile)
 
 data Wangset = Wangset
     { wangsetName         :: !Text
-    , wangsetTile         :: !Int
+    , wangsetTile         :: !Word32
     , wangsetCornerColors :: !(BV.Vector Wangcolor)
     , wangsetEdgeColors   :: !(BV.Vector Wangcolor)
     , wangsetWangtiles    :: !(BV.Vector Wangtile)
