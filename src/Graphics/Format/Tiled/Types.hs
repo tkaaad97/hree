@@ -58,7 +58,7 @@ import Data.Word (Word32)
 import Graphics.Format.Tiled.Internal
 import qualified Linear (V4(..))
 
-type Gid = Int
+type Gid = Word32
 
 withDefault :: (DA.FromJSON b) => DA.Object -> Text -> b -> DA.Parser b
 withDefault a label b =
@@ -414,13 +414,13 @@ data TileLayerMid = TileLayerMid
 
 data TileLayer = TileLayer
     { tileLayerCommon      :: !LayerCommon
-    , tileLayerData        :: !(UV.Vector Word32)
+    , tileLayerData        :: !(UV.Vector Gid)
     , tileLayerEncoding    :: !EncodingType
     , tileLayerCompression :: !CompressionType
     } deriving (Show, Eq)
 
 data TileLayerData =
-    TileLayerDataCsv !(UV.Vector Word32) |
+    TileLayerDataCsv !(UV.Vector Gid) |
     TileLayerDataBase64 !CompressionType !Text
     deriving (Show, Eq)
 
