@@ -84,5 +84,5 @@ bytestringToVector a =
     ByteString.useAsCString a $ \ptr ->
         UV.generateM count (\i -> Foreign.peekByteOff (Foreign.castPtr ptr) (stride * i))
     where
-    stride = 32
+    stride = 4
     count = ByteString.length a `div` stride

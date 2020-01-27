@@ -321,7 +321,7 @@ data Tileset = Tileset
 instance DA.FromJSON TilesetSource where
     parseJSON o @ (DA.Object v) = do
         firstgid <- v .:? "firstgid"
-        source <- v .: "source"
+        source <- v .:? "source"
         case source of
             Just sourcePath -> return (TilesetSourceFile firstgid sourcePath)
             Nothing         -> TilesetSourceInplace <$> DA.parseJSON o

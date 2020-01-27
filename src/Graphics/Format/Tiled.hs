@@ -33,6 +33,9 @@ import qualified Graphics.Hree.Geometry as Hree (addVerticesToGeometry,
 import qualified Graphics.Hree.GL.Types as Hree (Texture(..))
 import qualified Graphics.Hree.GL.Vertex as Hree (SpriteVertex(..))
 import qualified Graphics.Hree.Material as Hree (spriteMaterial)
+import qualified Graphics.Hree.Sampler as Hree (glTextureMagFilter,
+                                                glTextureMinFilter,
+                                                setSamplerParameter)
 import qualified Graphics.Hree.Scene as Hree (addMesh, addNode, addSampler,
                                               addTexture, newNode)
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
@@ -124,10 +127,10 @@ createMeshesFromTileLayer scene config map tilesetInfos gidRanges layerIndex til
             Just x | tilesetInfoIndex x == tilesetInfoIndex tileset -> (Just tileset, V2 i0 (n + 1)) : xs
                    | otherwise -> (Just x, V2 i 1) : a
     layerData = tileLayerData tileLayer
-    width = mapWidth map
-    height = mapHeight map
+    columns = mapWidth map
+    rows = mapHeight map
     renderOrder = mapRenderOrder map
-    ordered = UV.generate (width * height) ((layerData UV.!) . renderOrderIndex renderOrder width height)
+    ordered = UV.generate (columns * rows) ((layerData UV.!) . renderOrderIndex renderOrder columns rows)
     groups = BV.reverse . BV.mapMaybe tilesetExists . BV.fromList . UV.ifoldl' go [] $ ordered
     tilesetExists (Just material, a) = Just (material, a)
     tilesetExists (Nothing, _)       = Nothing
@@ -135,10 +138,10 @@ createMeshesFromTileLayer scene config map tilesetInfos gidRanges layerIndex til
     z = tiledConfigStartZ config + tiledConfigLayerDeltaZ config * fromIntegral layerIndex
 
 createMeshFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> V2 Int -> IO Hree.MeshId
-createMeshFromTiles scene config map layerData origin z tilesetInfo tiles = do
+createMeshFromTiles scene config map layerData origin z tilesetInfo tiles @ (V2 _ n) = do
     geometry <- createGeometryFromTiles scene config map layerData origin z tilesetInfo tiles
     let material = tilesetInfoMaterial tilesetInfo
-        mesh = Hree.Mesh geometry material Nothing
+        mesh = Hree.Mesh geometry material (Just n)
     Hree.addMesh scene mesh
 
 createGeometryFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> V2 Int -> IO Hree.Geometry
@@ -183,15 +186,15 @@ uvBoundingRect tilesetInfo gid =
     spacing = tilesetSpacing tileset
     tileWidth = tilesetTileWidth tileset
     tileHeight = tilesetTileHeight tileset
-    tsh = rows * tileHeight + (rows - 1) * spacing + margin * 2
+    tsh = rows * (tileHeight + spacing) - spacing + margin * 2
     go lid =
         let (iy, ix) = divMod lid columns
-            px = margin + (max 0 (ix - 1)) * (tileWidth + spacing)
-            py = tsh - (margin + iy * (tileHeight + spacing))
-            x = fromIntegral px / fromIntegral uvWidth
-            y = fromIntegral py / fromIntegral uvHeight
-            w = fromIntegral tileWidth / fromIntegral uvWidth
-            h = fromIntegral tileHeight / fromIntegral uvHeight
+            px = margin + ix * (tileWidth + spacing)
+            py = margin + iy * (tileHeight + spacing) + tileHeight
+            x = (0.5 + fromIntegral px) / fromIntegral uvWidth
+            y = (- 0.5 + fromIntegral py) / fromIntegral uvHeight
+            w = (fromIntegral tileWidth - 1.0) / fromIntegral uvWidth
+            h = - (fromIntegral tileHeight - 1.0) / fromIntegral uvHeight
         in Rect (V2 x y) (V2 w h)
 
 tileBoundingRect :: Orientation -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> Int -> StaggerAxis -> StaggerIndex -> Int -> Rect
@@ -284,6 +287,8 @@ createTilesetInfo scene cd index (tileset, gidRange) =
             Hree.addTexture scene name settings sourceData
         let sname = Text.encodeUtf8 sourcePath
         (_, sampler) <- Hree.addSampler scene sname
+        Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
+        Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
         let material = Hree.spriteMaterial $ Hree.Texture (texture, sampler)
         return $ TilesetInfo index tileset material (V2 twidth theight) gidRange
     nextPow2 = nextPow2_ 1
