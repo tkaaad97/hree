@@ -83,15 +83,75 @@ resolveTileset tilesets gidRanges gid = do
     index <- BV.findIndex (\(V2 firstGid nextGid) -> firstGid <= gid && gid < nextGid) $ gidRanges
     id =<< tilesets BV.!? index
 
-renderOrderIndex :: RenderOrder -> Int -> Int -> Int -> Int
-renderOrderIndex RenderOrderRightDown _ _ i = i
-renderOrderIndex RenderOrderRightUp w h i =
+renderOrderIndex :: Orientation -> RenderOrder -> StaggerAxis -> StaggerIndex -> V2 Int -> Int -> Int
+renderOrderIndex OrientationOrthogonal renderOrder _ _ size index = nostaggeredRenderOrderIndex renderOrder size index
+renderOrderIndex OrientationIsometric renderOrder _ _ size index = nostaggeredRenderOrderIndex renderOrder size index
+renderOrderIndex _ renderOrder staggerAxis staggerIndex size index = staggeredRenderOrderIndex staggerAxis staggerIndex renderOrder size index
+
+staggeredRenderOrderIndex :: StaggerAxis -> StaggerIndex -> RenderOrder -> V2 Int -> Int -> Int
+staggeredRenderOrderIndex StaggerAxisY _ renderOrder size index = nostaggeredRenderOrderIndex renderOrder size index
+staggeredRenderOrderIndex StaggerAxisX staggerIndex RenderOrderRightDown (V2 w _) i =
+    let (d, m) = divMod i w
+        half = case staggerIndex of
+                StaggerIndexEven -> w `div` 2
+                StaggerIndexOdd  -> (w + 1) `div` 2
+        m' = case staggerIndex of
+                StaggerIndexEven -> if m < half
+                    then 2 * m + 1
+                    else 2 * (m - half)
+                StaggerIndexOdd -> if m < half
+                    then 2 * m
+                    else 2 * (m - half) + 1
+    in w * d + m'
+staggeredRenderOrderIndex StaggerAxisX staggerIndex RenderOrderRightUp (V2 w h) i =
+    let (d, m) = divMod i w
+        half = case staggerIndex of
+                StaggerIndexEven -> (w + 1) `div` 2
+                StaggerIndexOdd  -> w `div` 2
+        m' = case staggerIndex of
+                StaggerIndexEven -> if m < half
+                    then 2 * m
+                    else 2 * (m - half) + 1
+                StaggerIndexOdd -> if m < half
+                    then 2 * m + 1
+                    else 2 * (m - half)
+    in w * (h - 1 - d) + m'
+staggeredRenderOrderIndex StaggerAxisX staggerIndex RenderOrderLeftDown (V2 w _) i =
+    let (d, m) = divMod i w
+        half = case staggerIndex of
+                StaggerIndexEven -> w `div` 2
+                StaggerIndexOdd  -> (w + 1) `div` 2
+        m' = case staggerIndex of
+                StaggerIndexEven -> if m < half
+                    then w - 1 - 2 * m - (w `mod` 2)
+                    else w - 1 - 2 * (m - half) - (w `mod` 2) - 1
+                StaggerIndexOdd -> if m < half
+                    then w - 1 - 2 * m - (w `mod` 2) - 1
+                    else w - 1 - 2 * (m - half) - (w `mod` 2)
+    in w * d + m'
+staggeredRenderOrderIndex StaggerAxisX staggerIndex RenderOrderLeftUp (V2 w h) i =
+    let (d, m) = divMod i w
+        half = case staggerIndex of
+                StaggerIndexEven -> (w + 1) `div` 2
+                StaggerIndexOdd  -> w `div` 2
+        m' = case staggerIndex of
+                StaggerIndexEven -> if m < half
+                    then w - 1 - 2 * m - (w `mod` 2) - 1
+                    else w - 1 - 2 * (m - half) - (w `mod` 2)
+                StaggerIndexOdd -> if m < half
+                    then w - 1 - 2 * m - (w `mod` 2)
+                    else w - 1 - 2 * (m - half) - (w `mod` 2) - 1
+    in w * (h - 1 - d) + m'
+
+nostaggeredRenderOrderIndex :: RenderOrder -> V2 Int -> Int -> Int
+nostaggeredRenderOrderIndex RenderOrderRightDown (V2 _ _) i = i
+nostaggeredRenderOrderIndex RenderOrderRightUp (V2 w h) i =
     let (d, m) = divMod i w
     in w * (h - 1 - d) + m
-renderOrderIndex RenderOrderLeftDown w _ i =
+nostaggeredRenderOrderIndex RenderOrderLeftDown (V2 w _) i =
     let (d, m) = divMod i w
     in w * d + w - 1 - m
-renderOrderIndex RenderOrderLeftUp w h i =
+nostaggeredRenderOrderIndex RenderOrderLeftUp (V2 w h) i =
     let (d, m) = divMod i w
     in w * (h - 1 - d) + w - 1 - m
 
@@ -127,10 +187,13 @@ createMeshesFromTileLayer scene config map tilesetInfos gidRanges layerIndex til
             Just x | tilesetInfoIndex x == tilesetInfoIndex tileset -> (Just tileset, V2 i0 (n + 1)) : xs
                    | otherwise -> (Just x, V2 i 1) : a
     layerData = tileLayerData tileLayer
+    orientation = mapOrientation map
     columns = mapWidth map
     rows = mapHeight map
     renderOrder = mapRenderOrder map
-    ordered = UV.generate (columns * rows) ((layerData UV.!) . renderOrderIndex renderOrder columns rows)
+    staggerAxis = fromMaybe StaggerAxisX $ mapStaggerAxis map
+    staggerIndex = fromMaybe StaggerIndexEven $ mapStaggerIndex map
+    ordered = UV.generate (columns * rows) ((layerData UV.!) . renderOrderIndex orientation renderOrder staggerAxis staggerIndex (V2 columns rows))
     groups = BV.reverse . BV.mapMaybe tilesetExists . BV.fromList . UV.ifoldl' go [] $ ordered
     tilesetExists (Just material, a) = Just (material, a)
     tilesetExists (Nothing, _)       = Nothing
@@ -146,7 +209,7 @@ createMeshFromTiles scene config map layerData origin z tilesetInfo tiles @ (V2 
 
 createGeometryFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> V2 Int -> IO Hree.Geometry
 createGeometryFromTiles scene config map layerData origin z tilesetInfo (V2 i0 n) = do
-    let vertices = SV.mapMaybe mkVertex $ SV.generate n (+ i0)
+    let vertices = SV.mapMaybe mkVertex $ SV.generate n ((renderOrderIndex orientation renderOrder staggerAxis staggerIndex (V2 columns rows)) . (+ i0))
     (geo, _) <- Hree.newSpriteGeometry scene
     Hree.addVerticesToGeometry geo vertices GL.GL_STATIC_READ scene
     where
@@ -154,6 +217,7 @@ createGeometryFromTiles scene config map layerData origin z tilesetInfo (V2 i0 n
     rows = mapHeight map
     mapSize = V2 columns rows
     orientation = mapOrientation map
+    renderOrder = mapRenderOrder map
     mapTileSize = V2 (mapTileWidth map) (mapTileHeight map)
     tileset = tilesetInfoTileset tilesetInfo
     tilesetTileSize = V2 (tilesetTileWidth tileset) (tilesetTileHeight tileset)
@@ -179,14 +243,11 @@ uvBoundingRect tilesetInfo gid =
     tileset = tilesetInfoTileset tilesetInfo
     V2 firstGid nextGid = tilesetInfoGidRange tilesetInfo
     V2 uvWidth uvHeight = tilesetInfoTextureSize tilesetInfo
-    count = tilesetTileCount tileset
     columns = tilesetColumns tileset
-    rows = count `div` columns
     margin = tilesetMargin tileset
     spacing = tilesetSpacing tileset
     tileWidth = tilesetTileWidth tileset
     tileHeight = tilesetTileHeight tileset
-    tsh = rows * (tileHeight + spacing) - spacing + margin * 2
     go lid =
         let (iy, ix) = divMod lid columns
             px = margin + ix * (tileWidth + spacing)
