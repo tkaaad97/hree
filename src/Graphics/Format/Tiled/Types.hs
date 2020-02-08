@@ -102,7 +102,7 @@ $(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = constructorTagM
 
 data PropertyValue =
     PropertyString !Text |
-    PropertyFloat !Int |
+    PropertyInt !Int |
     PropertyFloat !Double |
     PropertyBool !Bool |
     PropertyColor !Color |
@@ -151,8 +151,8 @@ data ObjectCommon = ObjectCommon
     , objectCommonName       :: !Text
     , objectCommonProperties :: !Properties
     , objectCommonVisible    :: !Bool
-    , objectCommonX          :: !Int
-    , objectCommonY          :: !Int
+    , objectCommonX          :: !Double
+    , objectCommonY          :: !Double
     , objectCommonRotation   :: !Double
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 12 }) ''ObjectCommon)
