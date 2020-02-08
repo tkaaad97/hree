@@ -102,6 +102,7 @@ $(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = constructorTagM
 
 data PropertyValue =
     PropertyString !Text |
+    PropertyFloat !Int |
     PropertyFloat !Double |
     PropertyBool !Bool |
     PropertyColor !Color |
@@ -124,6 +125,7 @@ parseProperty = DA.withObject "Property" $ \v -> do
 
 parsePropertyValue :: Text -> DA.Value -> DA.Parser PropertyValue
 parsePropertyValue "string" = fmap PropertyString . DA.parseJSON
+parsePropertyValue "int" = fmap PropertyInt . DA.parseJSON
 parsePropertyValue "float" = fmap PropertyFloat . DA.parseJSON
 parsePropertyValue "bool" = fmap PropertyBool . DA.parseJSON
 parsePropertyValue "color" = fmap PropertyString . DA.parseJSON
@@ -135,6 +137,7 @@ instance DA.ToJSON Properties where
 
 propertyToJSON :: (Text, PropertyValue) -> DA.Value
 propertyToJSON (name, PropertyString v) = DA.object ["name" .= name, "type" .= ("string" :: Text), "value" .= v]
+propertyToJSON (name, PropertyInt v) = DA.object ["name" .= name, "type" .= ("int" :: Text), "value" .= v]
 propertyToJSON (name, PropertyFloat v) = DA.object ["name" .= name, "type" .= ("float" :: Text), "value" .= v]
 propertyToJSON (name, PropertyBool v) = DA.object ["name" .= name, "type" .= ("bool" :: Text), "value" .= v]
 propertyToJSON (name, PropertyColor v) = DA.object ["name" .= name, "type" .= ("color" :: Text), "value" .= v]
