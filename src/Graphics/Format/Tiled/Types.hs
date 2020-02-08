@@ -54,7 +54,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Vector as BV (Vector, fromList, mapM, null, toList)
 import qualified Data.Vector.Unboxed as UV (Vector, length, (!))
-import Data.Word (Word32)
+import Data.Word (Word32, Word8)
 import Graphics.Format.Tiled.Internal
 import qualified Linear (V4(..))
 
@@ -258,7 +258,7 @@ $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModif
 
 data Wangtile = Wangtile
     { wangtileTileId :: !Word32
-    , wangtileWangId :: !Text
+    , wangtileWangId :: !(UV.Vector Word8)
     , wangtileDflip  :: !Bool
     , wangtileHflip  :: !Bool
     , wangtileVflip  :: !Bool
@@ -271,7 +271,7 @@ data Wangset = Wangset
     , wangsetCornerColors :: !(BV.Vector Wangcolor)
     , wangsetEdgeColors   :: !(BV.Vector Wangcolor)
     , wangsetWangtiles    :: !(BV.Vector Wangtile)
-    , wangsetProperties   :: !Properties
+    , wangsetProperties   :: !(Maybe Properties)
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModifier 7 }) ''Wangset)
 
@@ -313,7 +313,7 @@ data Tileset = Tileset
     , tilesetImage      :: !(Maybe Image)
     , tilesetTileOffset :: !Coord
     , tilesetTerrains   :: !(BV.Vector Terrain)
-    , tilesetTiles      :: !(Map.Map Gid Tile)
+    , tilesetTiles      :: !(BV.Vector Tile)
     , tilesetWangsets   :: !(BV.Vector Wangset)
     , tilesetProperties :: !Properties
     } deriving (Show, Eq)
@@ -362,7 +362,7 @@ instance DA.FromJSON Tileset where
 instance DA.ToJSON Tileset where
     toJSON (Tileset firstgid name tilewidth tileheight spacing tilecount margin columns image tileoffset terrains tiles wangsets properties) =
         let terrains' = if BV.null terrains then Nothing else Just terrains
-            tiles' = if Map.null tiles then Nothing else Just tiles
+            tiles' = if BV.null tiles then Nothing else Just tiles
             wangsets' = if BV.null wangsets then Nothing else Just wangsets
         in DA.object
             [ "firstgid" .= firstgid
@@ -384,9 +384,7 @@ instance DA.ToJSON Tileset where
             ]
 
 data LayerCommon = LayerCommon
-    { layerCommonWidth      :: !Int
-    , layerCommonHeight     :: !Int
-    , layerCommonName       :: !Text
+    { layerCommonName       :: !Text
     , layerCommonOpacity    :: !Double
     , layerCommonVisible    :: !Bool
     , layerCommonX          :: !Int
@@ -409,11 +407,15 @@ data Layer
 
 data TileLayerMid = TileLayerMid
     { tileLayerMidCommon :: !LayerCommon
+    , tileLayerMidWidth  :: !Int
+    , tileLayerMidHeight :: !Int
     , tileLayerMidData   :: !TileLayerData
     } deriving (Show, Eq)
 
 data TileLayer = TileLayer
     { tileLayerCommon      :: !LayerCommon
+    , tileLayerWidth       :: !Int
+    , tileLayerHeight      :: !Int
     , tileLayerData        :: !(UV.Vector Gid)
     , tileLayerEncoding    :: !EncodingType
     , tileLayerCompression :: !CompressionType
@@ -490,9 +492,7 @@ instance DA.FromJSON LayerMid where
 
 parseLayerCommon :: DA.Object -> DA.Parser LayerCommon
 parseLayerCommon v = LayerCommon
-    <$> v .: "width"
-    <*> v .: "height"
-    <*> v .: "name"
+    <$> v .: "name"
     <*> v .: "opacity"
     <*> v .: "visible"
     <*> v .: "x"
@@ -501,10 +501,12 @@ parseLayerCommon v = LayerCommon
 
 parseLayer :: Text -> LayerCommon -> DA.Object -> DA.Parser LayerMid
 parseLayer "tilelayer" common v = do
+    width <- v .: "width"
+    height <- v .: "height"
     encoding <- v .:? "encoding" .!= CsvEncoding
     compression <- v .:? "compression" .!= NoCompression
     data_ <- maybe (fail "tilelayer needs data field.") (parseTileLayerData encoding compression) $ HML.lookup "data" v
-    return (LayerMidTileLayer (TileLayerMid common data_))
+    return (LayerMidTileLayer (TileLayerMid common width height data_))
 parseLayer "objectgroup" common v = LayerMidObjectGroup . ObjectGroup common
     <$> v .: "objects"
 parseLayer "imagelayer" common v = LayerMidImageLayer . ImageLayer common
@@ -516,14 +518,16 @@ parseTileLayerData CsvEncoding _ = fmap TileLayerDataCsv . DA.parseJSON
 parseTileLayerData Base64Encoding compression = DA.withText "tilelayer.data" (return . TileLayerDataBase64 compression)
 
 instance DA.ToJSON LayerMid where
-    toJSON (LayerMidTileLayer (TileLayerMid common (TileLayerDataCsv d))) =
+    toJSON (LayerMidTileLayer (TileLayerMid common width height (TileLayerDataCsv d))) =
         let fields = layerCommonFields common
-        in DA.object $ fields ++ ["data" .= d, "type" .= ("tilelayer" :: Text)]
+        in DA.object $ fields ++ ["width" .= width, "height" .= height, "data" .= d, "type" .= ("tilelayer" :: Text)]
 
-    toJSON (LayerMidTileLayer (TileLayerMid common (TileLayerDataBase64 c d))) =
+    toJSON (LayerMidTileLayer (TileLayerMid common width height (TileLayerDataBase64 c d))) =
         let fields = layerCommonFields common
             otherFields =
-                [ "encoding" .= Base64Encoding
+                [ "width" .= width
+                , "height" .= height
+                , "encoding" .= Base64Encoding
                 , "data" .= d
                 , "type" .= ("tilelayer" :: Text)
                 ]

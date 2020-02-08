@@ -2,6 +2,7 @@ in vec3 positionOffset;
 in vec2 uvOffset;
 in vec3 position;
 in vec3 size;
+in vec3 center;
 in float angle;
 in vec2 uv;
 in vec2 uvSize;
@@ -33,7 +34,7 @@ mat3 rotateMatrix(vec3 axis, float angle)
 
 void main()
 {
-    vec3 offset = position + rotateMatrix(rotateAxis, angle) * vec3(size.x * positionOffset.x, size.y * positionOffset.y, size.z * positionOffset.z);
+    vec3 offset = position + center + rotateMatrix(rotateAxis, angle) * vec3(size.x * positionOffset.x - center.x, size.y * positionOffset.y - center.y, size.z * positionOffset.z - center.z);
     gl_Position = cameraBlock.projectionMatrix * cameraBlock.viewMatrix * modelMatrix * vec4(offset, 1.0);
     fragmentUv = uv + vec2(uvOffset.x * uvSize.x, uvOffset.y * uvSize.y);
 }

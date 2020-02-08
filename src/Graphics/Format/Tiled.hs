@@ -16,6 +16,8 @@ import qualified Codec.Picture.Types as Picture (MutableImage(..),
                                                  PixelBaseComponent,
                                                  freezeImage, newMutableImage)
 import Control.Exception (throwIO)
+import Data.Bits (complement, (.&.))
+import Data.Function ((&))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
@@ -24,6 +26,7 @@ import qualified Data.Vector as BV (Vector, findIndex, fromList, imapM, mapM,
 import qualified Data.Vector.Storable as SV (generate, mapMaybe, unsafeWith)
 import qualified Data.Vector.Storable.Mutable as MSV (unsafeWith)
 import qualified Data.Vector.Unboxed as UV (Vector, generate, ifoldl', (!))
+import Data.Word (Word32)
 import qualified Foreign (Ptr, castPtr, copyArray, plusPtr, sizeOf)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import Graphics.Format.Tiled.Types
@@ -69,6 +72,33 @@ data TiledConfig = TiledConfig
 
 defaultTiledConfig :: TiledConfig
 defaultTiledConfig = TiledConfig 1024 0 0 (V2 0 0)
+
+flippedHorizontallyFlag :: Word32
+flippedHorizontallyFlag = 0x80000000
+
+flippedVerticallyFlag :: Word32
+flippedVerticallyFlag = 0x40000000
+
+flippedAntiDiagonallyFlag :: Word32
+flippedAntiDiagonallyFlag = 0x20000000
+
+rotatedHexagonal120Flag :: Word32
+rotatedHexagonal120Flag = 0x10000000
+
+flippedHorizontally :: Word32 -> Bool
+flippedHorizontally gid = flippedHorizontallyFlag .&. gid /= 0
+
+flippedVertically :: Word32 -> Bool
+flippedVertically gid = flippedVerticallyFlag .&. gid /= 0
+
+flippedAntiDiagonally :: Word32 -> Bool
+flippedAntiDiagonally gid = flippedAntiDiagonallyFlag .&. gid /= 0
+
+rotatedHexagonal120 :: Word32 -> Bool
+rotatedHexagonal120 gid = rotatedHexagonal120Flag .&. gid /= 0
+
+unsetGidFlags :: Word32 -> Word32
+unsetGidFlags gid = gid .&. complement flippedHorizontallyFlag .&. complement flippedVerticallyFlag .&. complement flippedAntiDiagonallyFlag .&. complement rotatedHexagonal120Flag
 
 tilesetGidRanges :: BV.Vector Tileset -> BV.Vector (V2 Gid)
 tilesetGidRanges = BV.postscanl' go (V2 0 1)
@@ -227,12 +257,23 @@ createGeometryFromTiles scene config map layerData origin z tilesetInfo (V2 i0 n
     offset = V2 (coordX . tilesetTileOffset $ tileset) (coordY . tilesetTileOffset $ tileset)
     unit = tiledConfigUnitLength config
     mkVertex i = do
-        let gid = layerData UV.! i
+        let gidWithFlags = layerData UV.! i
+            gid = unsetGidFlags gidWithFlags
+            hflip = flippedHorizontally gidWithFlags
+            vflip = flippedVertically gidWithFlags
+            dflip = flippedAntiDiagonally gidWithFlags
+            rotated = rotatedHexagonal120 gidWithFlags
             (iy, ix) = divMod i columns
         uvRect <- uvBoundingRect tilesetInfo gid
         let rect = tileBoundingRect orientation origin mapSize mapTileSize tilesetTileSize offset (V2 ix iy) unit staggerAxis staggerIndex hexSide
-            vertex = tileBoundingSpriteVertex rect z uvRect
+            vertex = tileBoundingSpriteVertex rect z uvRect orientation hflip vflip dflip rotated
         return vertex
+
+flipRectHorizontally :: Rect -> Rect
+flipRectHorizontally (Rect (V2 x y) (V2 w h)) = Rect (V2 (x + w) y) (V2 (-w) h)
+
+flipRectVertically :: Rect -> Rect
+flipRectVertically (Rect (V2 x y) (V2 w h)) = Rect (V2 x (y + h)) (V2 w (-h))
 
 uvBoundingRect :: TilesetInfo -> Gid -> Maybe Rect
 uvBoundingRect tilesetInfo gid =
@@ -267,12 +308,24 @@ tileBoundingRect orientation origin mapSize mapTileSize tilesetTileSize offset i
         bottomLeft = upLeft ^-^ V2 0 h
     in Rect bottomLeft (V2 w h)
 
-tileBoundingSpriteVertex :: Rect -> Float -> Rect -> Hree.SpriteVertex
-tileBoundingSpriteVertex (Rect (V2 x y) (V2 width height)) z (Rect uv uvSize) =
-    let pos = V3 x y z
-        size = V3 width height 0
-        angle = 0
-        vertex = Hree.SpriteVertex pos size angle uv uvSize
+tileBoundingSpriteVertex :: Rect -> Float -> Rect -> Orientation -> Bool -> Bool -> Bool -> Bool -> Hree.SpriteVertex
+tileBoundingSpriteVertex rect z (Rect uv uvSize) orientation hflip vflip dflip rotated =
+    let isHexagonal = orientation == OrientationHexagonal || orientation == OrientationStaggered
+        applyWhen True f = f
+        applyWhen _ _    = id
+        Rect (V2 x y) (V2 width height) =
+            if isHexagonal
+                then rect
+                    & applyWhen hflip flipRectHorizontally
+                    & applyWhen vflip flipRectVertically
+                else rect
+                    & applyWhen ((not dflip && hflip) || (dflip && not vflip)) flipRectHorizontally
+                    & applyWhen ((not dflip && vflip) || (dflip && hflip)) flipRectVertically
+        angle
+            | isHexagonal = (if rotated then 1 else 0) * (- pi * 2 / 3) + (if dflip then 1 else 0) * (- pi / 3)
+            | otherwise = if dflip then pi / 2 else 0
+        center = V3 (0.5 * width) (0.5 * height) 0
+        vertex = Hree.SpriteVertex (V3 x y z) (V3 width height 0) center angle uv uvSize
     in vertex
 
 tileBoundingUpLeft :: Orientation -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> Int -> StaggerAxis -> StaggerIndex -> Int -> V2 Float

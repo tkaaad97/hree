@@ -63,23 +63,23 @@ spec = do
 
     testJSON "LayerMid TileLayerMid"
         "{\"data\":[1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1],\"height\":8,\"name\":\"ground\",\"opacity\":1,\"properties\":[{\"name\":\"tileLayerProp\",\"type\":\"string\",\"value\":\"1\"}],\"type\":\"tilelayer\",\"visible\":true,\"width\":4,\"x\":0,\"y\":0}"
-        (LayerMidTileLayer (TileLayerMid (LayerCommon 4 8 "ground" 1 True 0 0 (Properties (Map.singleton "tileLayerProp" (PropertyString "1")))) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1])))
+        (LayerMidTileLayer (TileLayerMid (LayerCommon "ground" 1 True 0 0 (Properties (Map.singleton "tileLayerProp" (PropertyString "1")))) 4 8 (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1])))
         (DA.object ["type" .= ("tilelayer" :: Text), "width" .= (4 :: Int), "height" .= (8 :: Int), "name" .= ("ground" :: Text), "opacity" .= (1 :: Double), "visible" .= True, "x" .= (0 :: Int), "y" .= (0 :: Int), "properties" .= [DA.object ["name" .= ("tileLayerProp" :: Text), "type" .= ("string" :: Text), "value" .= ("1" :: Text)]], "data" .= ([1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1] :: [Int])])
 
     testJSON "LayerMid ImageLayer"
-        "{\"height\":0,\"image\":\"buch-outdoor.png\",\"name\":\"image01\",\"opacity\":1,\"type\":\"imagelayer\",\"visible\":true,\"width\":0,\"x\":295,\"y\":249}"
-        (LayerMidImageLayer (ImageLayer (LayerCommon 0 0 "image01" 1 True 295 249 (Properties Map.empty)) "buch-outdoor.png"))
-        (DA.object ["type" .= ("imagelayer" :: Text), "width" .= (0 :: Int), "height" .= (0 :: Int), "name" .= ("image01" :: Text), "opacity" .= (1 :: Double), "visible" .= True, "x" .= (295 :: Int), "y" .= (249 :: Int), "properties" .= ([] :: [DA.Value]), "image" .= ("buch-outdoor.png" :: Text)])
+        "{\"image\":\"buch-outdoor.png\",\"name\":\"image01\",\"opacity\":1,\"type\":\"imagelayer\",\"visible\":true,\"x\":295,\"y\":249}"
+        (LayerMidImageLayer (ImageLayer (LayerCommon "image01" 1 True 295 249 (Properties Map.empty)) "buch-outdoor.png"))
+        (DA.object ["type" .= ("imagelayer" :: Text), "name" .= ("image01" :: Text), "opacity" .= (1 :: Double), "visible" .= True, "x" .= (295 :: Int), "y" .= (249 :: Int), "properties" .= ([] :: [DA.Value]), "image" .= ("buch-outdoor.png" :: Text)])
 
     testJSON "Layer ObjectGroup"
-        "{\"draworder\":\"topdown\",\"height\":0,\"name\":\"objects\",\"objects\":[{\"height\":161,\"id\":1,\"name\":\"rect1\",\"properties\":[],\"rotation\":0,\"type\":\"shape\",\"visible\":true,\"width\":136,\"x\":38,\"y\":39},{\"ellipse\":true,\"height\":212,\"id\":2,\"name\":\"ellipse1\",\"properties\":[],\"rotation\":0,\"type\":\"\",\"visible\":true,\"width\":384,\"x\":81,\"y\":100}],\"opacity\":1,\"type\":\"objectgroup\",\"visible\":true,\"width\":0,\"x\":0,\"y\":0}"
-        (LayerMidObjectGroup (ObjectGroup (LayerCommon 0 0 "objects" 1 True 0 0 (Properties Map.empty)) (BV.fromList [ObjectRectangle (Rectangle (ObjectCommon 1 "shape" 136 161 "rect1" (Properties Map.empty) True 38 39 0)), ObjectEllipse (Ellipse (ObjectCommon 2 "" 384 212 "ellipse1" (Properties Map.empty) True 81 100 0))])))
-        (DA.object ["type" .= ("objectgroup" :: Text), "width" .= (0 :: Int), "height" .= (0 :: Int), "name" .= ("objects" :: Text), "opacity" .= (1 :: Double), "x" .= (0 :: Int), "y" .= (0 :: Int), "properties" .= ([] :: [DA.Value]), "visible" .= True, "objects" .= [ObjectRectangle (Rectangle (ObjectCommon 1 "shape" 136 161 "rect1" (Properties Map.empty) True 38 39 0)), ObjectEllipse (Ellipse (ObjectCommon 2 "" 384 212 "ellipse1" (Properties Map.empty) True 81 100 0))]])
+        "{\"draworder\":\"topdown\",\"name\":\"objects\",\"objects\":[{\"height\":161,\"id\":1,\"name\":\"rect1\",\"properties\":[],\"rotation\":0,\"type\":\"shape\",\"visible\":true,\"width\":136,\"x\":38,\"y\":39},{\"ellipse\":true,\"height\":212,\"id\":2,\"name\":\"ellipse1\",\"properties\":[],\"rotation\":0,\"type\":\"\",\"visible\":true,\"width\":384,\"x\":81,\"y\":100}],\"opacity\":1,\"type\":\"objectgroup\",\"visible\":true,\"x\":0,\"y\":0}"
+        (LayerMidObjectGroup (ObjectGroup (LayerCommon "objects" 1 True 0 0 (Properties Map.empty)) (BV.fromList [ObjectRectangle (Rectangle (ObjectCommon 1 "shape" 136 161 "rect1" (Properties Map.empty) True 38 39 0)), ObjectEllipse (Ellipse (ObjectCommon 2 "" 384 212 "ellipse1" (Properties Map.empty) True 81 100 0))])))
+        (DA.object ["type" .= ("objectgroup" :: Text), "name" .= ("objects" :: Text), "opacity" .= (1 :: Double), "x" .= (0 :: Int), "y" .= (0 :: Int), "properties" .= ([] :: [DA.Value]), "visible" .= True, "objects" .= [ObjectRectangle (Rectangle (ObjectCommon 1 "shape" 136 161 "rect1" (Properties Map.empty) True 38 39 0)), ObjectEllipse (Ellipse (ObjectCommon 2 "" 384 212 "ellipse1" (Properties Map.empty) True 81 100 0))]])
 
     testJSON "MapMid"
         "{\"height\":100,\"layers\":[{\"data\":[1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1],\"height\":8,\"name\":\"ground\",\"opacity\":1,\"properties\":[{\"name\":\"tileLayerProp\",\"type\":\"string\",\"value\":\"1\"}],\"type\":\"tilelayer\",\"visible\":true,\"width\":4,\"x\":0,\"y\":0}],\"nextlayerid\":2,\"nextobjectid\":17,\"orientation\":\"orthogonal\",\"properties\":[],\"renderorder\":\"right-down\",\"tileheight\":32,\"tilesets\":[],\"tilewidth\":32,\"version\":1,\"tiledversion\":\"1.2\",\"width\":100}"
         (MapMid 1 "1.2" OrientationOrthogonal RenderOrderRightDown 100 100 32 32 0 Nothing Nothing Nothing 2 17
-            (BV.fromList [LayerMidTileLayer (TileLayerMid (LayerCommon 4 8 "ground" 1 True 0 0 (Properties (Map.singleton "tileLayerProp" (PropertyString "1")))) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))])
+            (BV.fromList [LayerMidTileLayer (TileLayerMid (LayerCommon "ground" 1 True 0 0 (Properties (Map.singleton "tileLayerProp" (PropertyString "1")))) 4 8 (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))])
             (BV.fromList [])
             (Properties Map.empty))
         (DA.object
@@ -97,7 +97,7 @@ spec = do
             , "nextlayerid" .= (2 :: Int)
             , "nextobjectid" .= (17 :: Int)
             , "backgroundcolor" .= (Nothing :: Maybe Color)
-            , "layers" .= [LayerMidTileLayer (TileLayerMid (LayerCommon 4 8 "ground" 1 True 0 0 (Properties (Map.singleton "tileLayerProp" (PropertyString "1")))) (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))]
+            , "layers" .= [LayerMidTileLayer (TileLayerMid (LayerCommon "ground" 1 True 0 0 (Properties (Map.singleton "tileLayerProp" (PropertyString "1")))) 4 8 (TileLayerDataCsv $ UV.fromList [1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1]))]
             , "tilesets" .= ([] :: [DA.Value])
             , "properties" .= ([] :: [DA.Value])])
 

@@ -168,30 +168,33 @@ instance Vertex SpriteOffset where
 data SpriteVertex = SpriteVertex
     { svPosition :: !Vec3
     , svSize     :: !Vec3
+    , svCenter   :: !Vec3
     , svAngle    :: !Float
     , svUv       :: !Vec2
     , svUvSize   :: !Vec2
     } deriving (Show, Eq)
 
 instance Storable SpriteVertex where
-    sizeOf _ = 44
+    sizeOf _ = 56
 
     alignment _ = 4
 
     peek ptr = do
         p <- peek $ castPtr ptr `plusPtr` 0
         s <- peek $ castPtr ptr `plusPtr` 12
-        a <- peek $ castPtr ptr `plusPtr` 24
-        u <- peek $ castPtr ptr `plusPtr` 28
-        us <- peek $ castPtr ptr `plusPtr` 36
-        return $ SpriteVertex p s a u us
+        c <- peek $ castPtr ptr `plusPtr` 24
+        a <- peek $ castPtr ptr `plusPtr` 36
+        u <- peek $ castPtr ptr `plusPtr` 40
+        us <- peek $ castPtr ptr `plusPtr` 48
+        return $ SpriteVertex p s c a u us
 
-    poke ptr (SpriteVertex p s a u us) = do
+    poke ptr (SpriteVertex p s c a u us) = do
         poke (castPtr ptr `plusPtr` 0) p
         poke (castPtr ptr `plusPtr` 12) s
-        poke (castPtr ptr `plusPtr` 24) a
-        poke (castPtr ptr `plusPtr` 28) u
-        poke (castPtr ptr `plusPtr` 36) us
+        poke (castPtr ptr `plusPtr` 24) c
+        poke (castPtr ptr `plusPtr` 36) a
+        poke (castPtr ptr `plusPtr` 40) u
+        poke (castPtr ptr `plusPtr` 48) us
 
 instance Vertex SpriteVertex where
     vertexSpec _ = VertexSpec bbs fields
@@ -199,12 +202,14 @@ instance Vertex SpriteVertex where
         where
         positionField = VertexField "position" (attribFormat 3 GL.GL_FLOAT False 0)
         sizeField = VertexField "size" (attribFormat 3 GL.GL_FLOAT False 12)
-        angleField = VertexField "angle" (attribFormat 1 GL.GL_FLOAT False 24)
-        uvField = VertexField "uv" (attribFormat 2 GL.GL_FLOAT False 28)
-        uvSizeField = VertexField "uvSize" (attribFormat 2 GL.GL_FLOAT False 36)
+        centerField = VertexField "center" (attribFormat 3 GL.GL_FLOAT False 24)
+        angleField = VertexField "angle" (attribFormat 1 GL.GL_FLOAT False 36)
+        uvField = VertexField "uv" (attribFormat 2 GL.GL_FLOAT False 40)
+        uvSizeField = VertexField "uvSize" (attribFormat 2 GL.GL_FLOAT False 48)
         fields =
             [ positionField
             , sizeField
+            , centerField
             , angleField
             , uvField
             , uvSizeField

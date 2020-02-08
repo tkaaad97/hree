@@ -66,10 +66,10 @@ completeLayer (LayerMidObjectGroup a) = return (LayerObjectGroup a)
 completeLayer (LayerMidImageLayer a)  = return (LayerImageLayer a)
 
 completeTileLayer :: TileLayerMid -> IO TileLayer
-completeTileLayer (TileLayerMid common (TileLayerDataCsv d)) = return (TileLayer common d CsvEncoding NoCompression)
-completeTileLayer (TileLayerMid common (TileLayerDataBase64 c d)) = do
+completeTileLayer (TileLayerMid common w h (TileLayerDataCsv d)) = return (TileLayer common w h d CsvEncoding NoCompression)
+completeTileLayer (TileLayerMid common w h (TileLayerDataBase64 c d)) = do
     data_ <- bytestringToVector =<< decompress c d
-    return (TileLayer common data_ Base64Encoding c)
+    return (TileLayer common w h data_ Base64Encoding c)
 
 decompress :: CompressionType -> Text -> IO ByteString
 decompress NoCompression =
