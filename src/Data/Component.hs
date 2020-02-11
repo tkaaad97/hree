@@ -16,7 +16,6 @@ module Data.Component
     ) where
 
 import Control.Exception (throwIO)
-import Control.Monad (when)
 import Control.Monad.ST (RealWorld)
 import Data.Hashable (Hashable(..))
 import qualified Data.HashTable.IO as HT
@@ -57,7 +56,7 @@ addComponent store e a = do
     maybe addNewEntity (\i -> writeComponentAt store i a) maybeIndex
     where
     addNewEntity = do
-        (i, s) <- genComponentIndex store
+        (i, s) <- allocateComponent
         let vec = componentStoreVec s
             evec = componentStoreEntityVec s
             emap = componentStoreEntityMap s
@@ -65,26 +64,28 @@ addComponent store e a = do
         MV.unsafeWrite evec i e
         HT.insert emap e i
 
-    genComponentIndex v = do
+    updateState size vec evec s =
+        let s' = s
+                { componentStoreSize = size + 1
+                , componentStoreVec = vec
+                , componentStoreEntityVec = evec
+                }
+        in (s', (size, s'))
+
+    allocateComponent = do
+        let ref = unComponentStore store
         s <- readIORef ref
         let currentSize = componentStoreSize s
             reservedSize = MV.length $ componentStoreVec s
-        when (reservedSize <= currentSize) $
-            extendComponentStore v =<< decideSize currentSize
-        atomicModifyIORef' ref (genIdentifier currentSize)
-        where
-        ref = unComponentStore store
-        genIdentifier i s =
-            let s' = s { componentStoreSize = i + 1 }
-            in (s', (i, s))
+        (vec, evec) <- extendComponentStore s =<< decideReserveSize reservedSize currentSize
+        atomicModifyIORef' ref (updateState currentSize vec evec)
 
-    decideSize :: Int -> IO Int
-    decideSize current = do
-        let limit = maxBound :: Int
-        when (current >= limit)
-            (throwIO . userError $ "max bound")
-        return $ if current > limit `div` 2
-            then limit
+    decideReserveSize :: Int -> Int -> IO Int
+    decideReserveSize reserved current
+        | reserved > current = return reserved
+        | current == maxBound = throwIO . userError $ "max bound"
+        | otherwise = return $ if current > maxBound `div` 2
+            then maxBound
             else current * 2
 
 removeComponent :: (MV.MVector v a, MV.MVector v e, Eq e, Hashable e) => ComponentStore v e a -> e -> IO Bool
@@ -134,8 +135,8 @@ writeComponentAt store i a = do
     vec <- componentStoreVec <$> readIORef (unComponentStore store)
     MV.unsafeWrite vec i a
 
-modifyComponent :: (MV.MVector v a, Eq e, Hashable e) => ComponentStore v e a -> e -> (a -> a) -> IO Bool
-modifyComponent store e f = do
+modifyComponent :: (MV.MVector v a, Eq e, Hashable e) => ComponentStore v e a -> (a -> a) -> e -> IO Bool
+modifyComponent store f e = do
     s <- readIORef (unComponentStore store)
     maybeIndex <- HT.lookup (componentStoreEntityMap s) e
     maybe (return False)
@@ -160,23 +161,16 @@ cleanComponentStore store preserve = do
     em <- HT.newSized preserve
     writeIORef (unComponentStore store) (ComponentStoreState 0 v ev em)
 
-extendComponentStore :: (MV.MVector v a, MV.MVector v e) => ComponentStore v e a -> Int -> IO ()
-extendComponentStore (ComponentStore ref) newSize = do
-    s <- readIORef ref
-    let currentVec = componentStoreVec s
-        currentEVec = componentStoreEntityVec s
-        currentSize = MV.length currentVec
-    when (currentSize < newSize) $ do
-        vec <- MV.new newSize
-        MV.unsafeCopy (MV.unsafeTake currentSize vec) currentVec
-        evec <- MV.new newSize
-        MV.unsafeCopy (MV.unsafeTake currentSize evec) currentEVec
-        atomicModifyIORef' ref (extendSize newSize vec evec)
+extendComponentStore :: (MV.MVector v a, MV.MVector v e) => ComponentStoreState v e a -> Int -> IO (v RealWorld a, v RealWorld e)
+extendComponentStore s newReserveSize
+    | currentReserveSize < newReserveSize = do
+        vec <- MV.new newReserveSize
+        MV.unsafeCopy (MV.unsafeTake currentReserveSize vec) currentVec
+        evec <- MV.new newReserveSize
+        MV.unsafeCopy (MV.unsafeTake currentReserveSize evec) currentEVec
+        return (vec, evec)
+    | otherwise = return (componentStoreVec s, componentStoreEntityVec s)
     where
-    extendSize n v ev state =
-        let state' = state
-                { componentStoreSize = n
-                , componentStoreVec = v
-                , componentStoreEntityVec = ev
-                }
-        in (state', ())
+    currentVec = componentStoreVec s
+    currentEVec = componentStoreEntityVec s
+    currentReserveSize = MV.length currentVec

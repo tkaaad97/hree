@@ -291,7 +291,7 @@ mkMeshVertexArray scene meshInfo program =
     setVao vao a = a { meshInfoVertexArray = Just vao }
     f = do
         vao <- mkVertexArray (geometryAttribBindings geo) (geometryBuffers geo) (geometryIndexBuffer geo) program
-        void $ Component.modifyComponent meshStore meshId (setVao vao)
+        void $ Component.modifyComponent meshStore (setVao vao) meshId
         return vao
 
 removeMesh :: Scene -> MeshId -> IO ()
@@ -341,7 +341,7 @@ removeNode scene nodeId = do
 
 updateNode :: Scene -> NodeId -> (Node -> Node) -> IO Bool
 updateNode scene nodeId f =
-    Component.modifyComponent nodeStore nodeId g
+    Component.modifyComponent nodeStore g nodeId
     where
     nodeStore = sceneNodeStore scene
     g a = a { nodeInfoNode = f (nodeInfoNode a) }
@@ -373,14 +373,14 @@ rotateNode scene nodeId axis angle = applyTransformToNode scene nodeId f
 
 applyTransformToNode :: Scene -> NodeId -> (Transform -> Transform) -> IO ()
 applyTransformToNode scene nodeId f =
-    void $ Component.modifyComponent transformStore nodeId g
+    void $ Component.modifyComponent transformStore g nodeId
     where
     transformStore = sceneNodeTransformStore scene
     g tinfo @ (TransformInfo transform _ _) = tinfo { transformInfoTransform = f transform, transformInfoUpdated = True }
 
 updateMeshInstanceCount :: Scene -> MeshId -> Maybe Int -> IO ()
 updateMeshInstanceCount scene meshId c =
-    void $ Component.modifyComponent meshStore meshId f
+    void $ Component.modifyComponent meshStore f meshId
     where
     f m = m { meshInfoMesh = (meshInfoMesh m) { meshInstanceCount = c } }
     meshStore = sceneMeshStore scene
@@ -530,7 +530,7 @@ removeLight scene lightId =
 
 updateLight :: Scene -> LightId -> (Light -> Light) -> IO Bool
 updateLight scene lightId f =
-    Component.modifyComponent (sceneLightStore scene) lightId g
+    Component.modifyComponent (sceneLightStore scene) g lightId
     where
     g = Elem . marshalLight . f . unmarshalLight . unElem
 
