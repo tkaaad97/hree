@@ -43,7 +43,6 @@ dependencies:
 - transformers
 - unordered-containers
 - vector
-- vector-sized
 - zlib
 
 ghc-options:

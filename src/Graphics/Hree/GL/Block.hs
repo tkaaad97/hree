@@ -10,11 +10,9 @@ module Graphics.Hree.GL.Block
     ) where
 
 import Data.Int (Int32)
-import Data.Proxy (Proxy(..), asProxyTypeOf)
+import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Generic as GV (imapM_)
 import qualified Data.Vector.Storable as SV (generateM, length)
-import qualified Data.Vector.Storable.Sized as SVS (Vector, generateM, imapM_,
-                                                    length)
 import Data.Word (Word32)
 import Foreign (Ptr)
 import qualified Foreign (Storable(..), castPtr, plusPtr)
@@ -641,16 +639,6 @@ instance Block DMat4x3 where
 instance Element DMat4x3 where
     elemAlignmentStd140 _ = 32
     elemStrideStd140 _ = 128
-
-instance (Element a, KnownNat n) => Block (SVS.Vector n (Elem a)) where
-    alignmentStd140 _ = elemAlignmentStd140 (Proxy :: Proxy a)
-    sizeOfStd140 v = SVS.length (asProxyTypeOf undefined v) * elemStrideStd140 (Proxy :: Proxy a)
-    peekByteOffStd140 ptr off =
-        let stride = elemStrideStd140 (Proxy :: Proxy a)
-        in SVS.generateM $ \i -> Elem <$> peekByteOffStd140 ptr (off + stride * fromIntegral i)
-    pokeByteOffStd140 ptr off v =
-        let stride = elemStrideStd140 (Proxy :: Proxy a)
-        in SVS.imapM_ (\i -> pokeByteOffStd140 ptr (off + stride * fromIntegral i) . unElem) v
 
 instance (Element a, KnownNat n) => Block (LimitedVector n (Elem a)) where
     alignmentStd140 _ = elemAlignmentStd140 (Proxy :: Proxy a)
