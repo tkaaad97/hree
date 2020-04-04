@@ -77,12 +77,12 @@ runSceneTask scene (AnimationTask start animation options) t = do
         remove = removeAtEnd && (duration > dt)
     when (t > start) $ do
         let at = if loop && dt > duration
-                    then Timespan $ getTimespan at `mod` getTimespan dt
+                    then Timespan $ getTimespan dt `mod` getTimespan duration
                     else dt
         applyAnimation scene animation at
     return remove
 runSceneTask scene (RemoveNodeTask at nodeId) t =
-    if t > at
+    if t >= at
         then do
             removeNode scene nodeId
             return True
