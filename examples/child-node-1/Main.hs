@@ -1,9 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import qualified Chronos as Time (Time(..), TimeInterval(..), Timespan(..), now,
-                                  timeIntervalToTimespan)
-import Data.Fixed (mod')
+import qualified Chronos as Time (Timespan(..), now)
 import qualified Data.Vector as BV
 import qualified Data.Vector.Unboxed as UV
 import Example
@@ -14,6 +12,7 @@ import Graphics.Hree.Camera
 import Graphics.Hree.Geometry.Box
 import qualified Graphics.Hree.Material as Material
 import Graphics.Hree.Scene
+import qualified Graphics.Hree.SceneTask as SceneTask
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..), V4(..), axisAngle, inv44)
@@ -71,21 +70,22 @@ main =
             channel2 = Animation.singleChannel childNodeId track
             animation = Animation.animation (BV.fromList [channel1, channel2]) (Time.Timespan $ 10000 * ms)
 
+        st <- Time.now
+        taskBoard <- SceneTask.newSceneTaskBoard scene
+        _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOptions True False))
+
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
-        st <- Time.now
-        return (renderer, scene, camera, animation, st)
+        return (renderer, scene, camera, taskBoard)
 
-    onDisplay (r, s, c, animation, st) w = do
+    onDisplay (r, s, c, taskBoard) w = do
         render
         GLFW.pollEvents
         t <- Time.now
-        let Time.Timespan duration = Animation.animationDuration animation
-            t' = Time.getTimespan (diffTime t st) `mod'` duration
-        Animation.applyAnimation s animation (Time.Timespan t')
-        onDisplay (r, s, c, animation, st) w
+        SceneTask.runSceneTasksOnBoard taskBoard t
+        onDisplay (r, s, c, taskBoard) w
 
         where
         render = do
@@ -102,6 +102,3 @@ main =
     updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
         PerspectiveProjection $ Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
-
-diffTime :: Time.Time -> Time.Time -> Time.Timespan
-diffTime ta tb = Time.timeIntervalToTimespan $ Time.TimeInterval ta tb

@@ -1,12 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import qualified Chronos as Time (Time(..), TimeInterval(..), Timespan(..), now,
-                                  timeIntervalToTimespan)
+import qualified Chronos as Time (now)
 import Control.Concurrent (threadDelay)
 import Control.Exception (throwIO)
 import Control.Monad (void)
-import Data.Fixed (mod')
 import qualified Data.Vector as BV (head, null)
 import Example
 import qualified GLW
@@ -15,11 +13,11 @@ import qualified Graphics.Format.GLTF as GLTF (Supplement(..),
 import qualified Graphics.Format.PLY as PLY (loadGeometryFromFile)
 import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree.Animation as Animation
 import Graphics.Hree.Camera
 import Graphics.Hree.Light (directionalLight)
 import qualified Graphics.Hree.Material as Material
 import Graphics.Hree.Scene
+import qualified Graphics.Hree.SceneTask as SceneTask
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..))
@@ -58,11 +56,14 @@ main = do
         (_, sup) <- GLTF.loadSceneFromFile path scene
         let light = directionalLight (V3 0.5 (-1) (-0.5)) (V3 1 1 1) 1
             animations = GLTF.supplementAnimations sup
-        st <- Time.now
         _ <- addLight scene light
         if BV.null animations
             then return Nothing
-            else return (Just (BV.head animations, st))
+            else do
+                st <- Time.now
+                taskBoard <- SceneTask.newSceneTaskBoard scene
+                _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st (BV.head animations) (SceneTask.AnimationTaskOptions True False))
+                return (Just taskBoard)
 
     loadScene path scene extension = do
         geometry <- case extension of
@@ -76,15 +77,13 @@ main = do
         void $ addNode scene newNode{ nodeMesh = Just meshId } True
         return Nothing
 
-    onDisplay (r, s, c, Just (animation, st)) w = do
+    onDisplay (r, s, c, Just taskBoard) w = do
         render
         threadDelay 20000
         GLFW.pollEvents
         t <- Time.now
-        let Time.Timespan duration = Animation.animationDuration animation
-            t' = Time.getTimespan (diffTime t st) `mod'` duration
-        Animation.applyAnimation s animation (Time.Timespan t')
-        onDisplay (r, s, c, Just (animation, st)) w
+        SceneTask.runSceneTasksOnBoard taskBoard t
+        onDisplay (r, s, c, Just taskBoard) w
 
         where
         render = do
@@ -112,6 +111,3 @@ main = do
     updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
         PerspectiveProjection $ Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
-
-diffTime :: Time.Time -> Time.Time -> Time.Timespan
-diffTime ta tb = Time.timeIntervalToTimespan $ Time.TimeInterval ta tb

@@ -1,10 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import qualified Chronos as Time (Time(..), TimeInterval(..), Timespan(..), now,
-                                  timeIntervalToTimespan)
+import qualified Chronos as Time (Timespan(..), now)
 import Control.Concurrent (threadDelay)
-import Data.Fixed (mod')
 import Data.Int (Int64)
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
@@ -22,6 +20,7 @@ import Graphics.Hree.GL.Vertex (Vertex(..), VertexField(..), VertexSpec(..))
 import qualified Graphics.Hree.Light as Light
 import qualified Graphics.Hree.Material as Material
 import qualified Graphics.Hree.Scene as Scene
+import qualified Graphics.Hree.SceneTask as SceneTask
 import Graphics.Hree.Types (Geometry(..), Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (Quaternion(..), V3(..), V4(..))
@@ -147,6 +146,10 @@ main =
             channel = Animation.singleChannel nodeId2 track
             animation = Animation.animation (BV.singleton channel) (Time.Timespan $ 5500 * ms)
 
+        st <- Time.now
+        taskBoard <- SceneTask.newSceneTaskBoard scene
+        _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOptions True False))
+
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
 
@@ -154,18 +157,16 @@ main =
         _ <- Scene.addLight scene light
 
         GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
-        st <- Time.now
-        return (renderer, scene, camera, animation, st)
 
-    onDisplay (r, s, c, animation, st) w = do
+        return (renderer, scene, camera, taskBoard)
+
+    onDisplay (r, s, c, taskBoard) w = do
         render
         threadDelay 100000
         GLFW.pollEvents
         t <- Time.now
-        let Time.Timespan duration = Animation.animationDuration animation
-            t' = Time.getTimespan (diffTime t st) `mod'` duration
-        Animation.applyAnimation s animation (Time.Timespan t')
-        onDisplay (r, s, c, animation, st) w
+        SceneTask.runSceneTasksOnBoard taskBoard t
+        onDisplay (r, s, c, taskBoard) w
 
         where
         render = do
@@ -182,6 +183,3 @@ main =
     updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
         PerspectiveProjection $ Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
-
-diffTime :: Time.Time -> Time.Time -> Time.Timespan
-diffTime ta tb = Time.timeIntervalToTimespan $ Time.TimeInterval ta tb
