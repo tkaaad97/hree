@@ -65,7 +65,7 @@ import qualified Data.Vector as BV (Vector, empty, foldM', head, imapM_, length,
 import qualified Data.Vector.Mutable as MBV (read, replicate, write)
 import qualified Data.Vector.Storable as SV (empty, generate, generateM,
                                              unsafeWith)
-import qualified Data.Vector.Unboxed as UV (Vector, generateM, length,
+import qualified Data.Vector.Unboxed as UV (Vector, generateM, length, map,
                                             unsafeFreeze, (!))
 import qualified Data.Vector.Unboxed.Mutable as MUV (read, replicate, write)
 import Data.Word (Word16, Word8)
@@ -929,19 +929,19 @@ createChannel nodeIds buffers bufferViews accessors samplers channel = do
 
 createKeyFrames :: ChannelTargetPath -> AnimationInterpolation -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> Int -> IO Hree.KeyFrames
 createKeyFrames ChannelTargetPathTranslation interpolation buffers bufferViews accessors input output = do
-    timePoints <- createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
+    timePoints <- UV.map (round . (* 1.0E+9)) <$> createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
     values <- createVec3VectorFromBuffer UV.generateM buffers bufferViews accessors output
     let track = Hree.TrackNodeTranslation values
         interpolation' = convertInterpolation interpolation
     return $ Hree.KeyFrames interpolation' timePoints track
 createKeyFrames ChannelTargetPathRotation interpolation buffers bufferViews accessors input output = do
-    timePoints <- createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
+    timePoints <- UV.map (round . (* 1.0E+9)) <$> createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
     values <- createQuaternionVectorFromBuffer UV.generateM buffers bufferViews accessors output
     let track = Hree.TrackNodeRotation values
         interpolation' = convertInterpolation interpolation
     return $ Hree.KeyFrames interpolation' timePoints track
 createKeyFrames ChannelTargetPathScale interpolation buffers bufferViews accessors input output = do
-    timePoints <- createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
+    timePoints <- UV.map (round . (* 1.0E+9)) <$> createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
     values <- createVec3VectorFromBuffer UV.generateM buffers bufferViews accessors output
     let track = Hree.TrackNodeScale values
         interpolation' = convertInterpolation interpolation

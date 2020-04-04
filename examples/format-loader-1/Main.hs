@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import qualified Chronos as Time (Time(..), now)
+import qualified Chronos as Time (Time(..), TimeInterval(..), Timespan(..), now,
+                                  timeIntervalToTimespan)
 import Control.Concurrent (threadDelay)
 import Control.Exception (throwIO)
 import Control.Monad (void)
@@ -80,9 +81,9 @@ main = do
         threadDelay 20000
         GLFW.pollEvents
         t <- Time.now
-        let duration = Animation.animationDuration animation
-            t' = realToFrac $ diffTime t st `mod'` realToFrac duration
-        Animation.applyAnimation s animation t'
+        let Time.Timespan duration = Animation.animationDuration animation
+            t' = Time.getTimespan (diffTime t st) `mod'` duration
+        Animation.applyAnimation s animation (Time.Timespan t')
         onDisplay (r, s, c, Just (animation, st)) w
 
         where
@@ -112,8 +113,5 @@ main = do
         PerspectiveProjection $ Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
 
-diffTime :: Time.Time -> Time.Time -> Double
-diffTime ta tb =
-    let nsa = Time.getTime ta
-        nsb = Time.getTime tb
-    in fromIntegral (nsa - nsb) * 1.0E-9
+diffTime :: Time.Time -> Time.Time -> Time.Timespan
+diffTime ta tb = Time.timeIntervalToTimespan $ Time.TimeInterval ta tb

@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import qualified Chronos as Time (Time(..), now)
+import qualified Chronos as Time (Time(..), TimeInterval(..), Timespan(..), now,
+                                  timeIntervalToTimespan)
 import Data.Fixed (mod')
 import qualified Data.Vector as BV
 import qualified Data.Vector.Unboxed as UV
@@ -62,12 +63,13 @@ main =
                 }
         nodeId <- addNode scene node True
 
-        let timepoints = UV.fromList [0.0, 5.0, 10.0]
+        let ms = 1000000
+            timepoints = UV.fromList . map (* ms) $ [0, 5000, 10000]
             rotations = UV.fromList [axisAngle (V3 0 0 1) 0, axisAngle (V3 0 0 1) pi, axisAngle (V3 0 0 1) (2 * pi)]
             track = Animation.linearRotation timepoints rotations
             channel1 = Animation.singleChannel nodeId track
             channel2 = Animation.singleChannel childNodeId track
-            animation = Animation.animation (BV.fromList [channel1, channel2]) 10.0
+            animation = Animation.animation (BV.fromList [channel1, channel2]) (Time.Timespan $ 10000 * ms)
 
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
@@ -80,9 +82,9 @@ main =
         render
         GLFW.pollEvents
         t <- Time.now
-        let duration = Animation.animationDuration animation
-            t' = realToFrac $ diffTime t st `mod'` realToFrac duration
-        Animation.applyAnimation s animation t'
+        let Time.Timespan duration = Animation.animationDuration animation
+            t' = Time.getTimespan (diffTime t st) `mod'` duration
+        Animation.applyAnimation s animation (Time.Timespan t')
         onDisplay (r, s, c, animation, st) w
 
         where
@@ -101,8 +103,5 @@ main =
         PerspectiveProjection $ Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
 
-diffTime :: Time.Time -> Time.Time -> Double
-diffTime ta tb =
-    let nsa = Time.getTime ta
-        nsb = Time.getTime tb
-    in fromIntegral (nsa - nsb) * 1.0E-9
+diffTime :: Time.Time -> Time.Time -> Time.Timespan
+diffTime ta tb = Time.timeIntervalToTimespan $ Time.TimeInterval ta tb
