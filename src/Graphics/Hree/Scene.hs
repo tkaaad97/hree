@@ -25,6 +25,7 @@ module Graphics.Hree.Scene
     , newNode
     , newRenderer
     , newScene
+    , readNode
     , readNodeTransform
     , removeLight
     , removeMesh
@@ -326,6 +327,11 @@ addNode scene node isRoot = do
                 , ssRootNodes = rootNodes
                 }
         in (newState, nodeInfo)
+
+readNode :: Scene -> NodeId -> IO (Maybe Node)
+readNode scene nodeId = fmap nodeInfoNode <$> Component.readComponent store nodeId
+    where
+    store = sceneNodeStore scene
 
 readNodeTransform :: Scene -> NodeId -> IO (Maybe Transform)
 readNodeTransform scene nodeId =
