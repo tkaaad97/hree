@@ -335,9 +335,15 @@ readNodeTransform scene nodeId =
 
 removeNode :: Scene -> NodeId -> IO ()
 removeNode scene nodeId = do
-    void $ Component.removeComponent (sceneNodeStore scene) nodeId
+    nodeInfo <- maybe (throwIO . userError $ "node not found. node: " ++ show nodeId) return
+        =<< Component.readComponent nodeStore nodeId
+    void $ Component.removeComponent nodeStore nodeId
     void $ Component.removeComponent (sceneNodeTransformStore scene) nodeId
     void $ Component.removeComponent (sceneNodeTransformMatrixStore scene) nodeId
+    void $ Component.removeComponent (sceneNodeGlobalTransformMatrixStore scene) nodeId
+    BV.mapM_ (removeNode scene) (nodeChildren . nodeInfoNode $ nodeInfo)
+    where
+    nodeStore = sceneNodeStore scene
 
 updateNode :: Scene -> NodeId -> (Node -> Node) -> IO Bool
 updateNode scene nodeId f =
