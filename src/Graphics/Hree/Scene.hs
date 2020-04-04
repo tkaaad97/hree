@@ -341,15 +341,24 @@ readNodeTransform scene nodeId =
 
 removeNode :: Scene -> NodeId -> IO ()
 removeNode scene nodeId = do
-    nodeInfo <- maybe (throwIO . userError $ "node not found. node: " ++ show nodeId) return
-        =<< Component.readComponent nodeStore nodeId
-    void $ Component.removeComponent nodeStore nodeId
-    void $ Component.removeComponent (sceneNodeTransformStore scene) nodeId
-    void $ Component.removeComponent (sceneNodeTransformMatrixStore scene) nodeId
-    void $ Component.removeComponent (sceneNodeGlobalTransformMatrixStore scene) nodeId
-    BV.mapM_ (removeNode scene) (nodeChildren . nodeInfoNode $ nodeInfo)
-    where
-    nodeStore = sceneNodeStore scene
+    maybeNode <- fmap nodeInfoNode <$> Component.readComponent (sceneNodeStore scene) nodeId
+    case maybeNode of
+        Just node -> do
+            void $ Component.removeComponent nodeStore nodeId
+            void $ Component.removeComponent (sceneNodeTransformStore scene) nodeId
+            void $ Component.removeComponent (sceneNodeTransformMatrixStore scene) nodeId
+            void $ Component.removeComponent (sceneNodeGlobalTransformMatrixStore scene) nodeId
+            isRoot <- BV.elem nodeId . ssRootNodes <$> readIORef (sceneState scene)
+            when isRoot $
+                atomicModifyIORef' (sceneState scene) removeRootNode
+            BV.mapM_ (removeNode scene) (nodeChildren node)
+            where
+            nodeStore = sceneNodeStore scene
+            removeRootNode state =
+                let rootNodes = BV.filter (/= nodeId) (ssRootNodes state)
+                    state' = state { ssRootNodes = rootNodes }
+                in (state', ())
+        Nothing -> return ()
 
 updateNode :: Scene -> NodeId -> (Node -> Node) -> IO Bool
 updateNode scene nodeId f =
