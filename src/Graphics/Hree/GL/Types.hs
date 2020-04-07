@@ -121,11 +121,12 @@ data AttribInfo = AttribInfo
     } deriving (Show, Eq)
 
 data ProgramInfo = ProgramInfo
-    { programInfoProgram          :: !GLW.Program
-    , programInfoAttribs          :: !(Map ByteString AttribInfo)
-    , programInfoUniforms         :: !(Map ByteString UniformInfo)
-    , programInfoUniformLocations :: !(Map ByteString GLW.UniformLocation)
-    , programInfoUniformBlocks    :: !(Map ByteString UniformBlockInfo)
+    { programInfoProgram             :: !GLW.Program
+    , programInfoAttribs             :: !(Map ByteString AttribInfo)
+    , programInfoUniforms            :: !(Map ByteString UniformInfo)
+    , programInfoUniformLocations    :: !(Map ByteString GLW.UniformLocation)
+    , programInfoUniformBlocks       :: !(Map ByteString UniformBlockInfo)
+    , programInfoBufferBindingPoints :: !(BV.Vector (ByteString, BufferBindingIndex))
     } deriving (Show)
 
 data RenderInfo = RenderInfo

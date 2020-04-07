@@ -40,12 +40,14 @@ render commons a cur = do
     where
     program = programInfoProgram . riProgram $ a
     uniformBlockInfos = programInfoUniformBlocks . riProgram $ a
+    bindingPoints = programInfoBufferBindingPoints . riProgram $ a
     method = riDrawMethod a
     uniforms = riUniforms a
     textures = riTextures a
     setCurrentProgram (Just p0) p1 | p0 == p1 = return ()
     setCurrentProgram _ p = do
         setUniformBlocksBindingPoints p . BV.mapMaybe toUniformBlockPair $ commons
+        setUniformBlocksBindingPoints p . BV.mapMaybe toUniformBlockPair $ bindingPoints
         GLW.glUseProgram p
     toUniformBlockPair (k, BufferBindingIndex bindingIndex) = do
         blockInfo <- Map.lookup k uniformBlockInfos

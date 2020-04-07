@@ -100,6 +100,7 @@ data ProgramSpec =
     UserProgram
         !ShaderSource -- vertexShaderSource
         !ShaderSource -- fragmentShaderSource
+        !(BV.Vector (ByteString, BufferBindingIndex)) -- binding points
     deriving (Show, Eq)
 
 newtype ProgramName = ProgramName
@@ -177,7 +178,7 @@ getProgramName (EmbeddedProgram progType options) = ProgramName . Text.toStrict 
     Text.Builder.fromText (embeddedProgramName progType) `mappend`
     Text.Builder.singleton ':' `mappend`
     (Text.Builder.decimal . hash $ options)
-getProgramName (UserProgram (ShaderSource vname _) (ShaderSource fname _)) = ProgramName . Text.toStrict . Text.Builder.toLazyText $
+getProgramName (UserProgram (ShaderSource vname _) (ShaderSource fname _) _) = ProgramName . Text.toStrict . Text.Builder.toLazyText $
     Text.Builder.fromText "user:" `mappend`
     Text.Builder.fromText vname' `mappend`
     Text.Builder.singleton ':' `mappend`
@@ -193,17 +194,21 @@ embeddedProgramName SpriteProgram    = "sprite"
 embeddedProgramName StandardProgram  = "standard"
 embeddedProgramName TestProgram      = "test"
 
+embeddedProgramBindingPoints :: EmbeddedProgramType -> BV.Vector (ByteString, BufferBindingIndex)
+embeddedProgramBindingPoints _ = mempty
+
 mkProgram :: ProgramSpec -> IO ProgramInfo
 mkProgram (EmbeddedProgram progType options) = do
     let header = renderOptions options
         vsource = header `mappend` getEmbeddedVertexShaderSource progType
         fsource = header `mappend` getEmbeddedFragmentShaderSource progType
-    mkProgram' vsource fsource
-mkProgram (UserProgram (ShaderSource _ vsource) (ShaderSource _ fsource)) =
-    mkProgram' vsource fsource
+        bindingPoints = embeddedProgramBindingPoints progType
+    mkProgram' vsource fsource bindingPoints
+mkProgram (UserProgram (ShaderSource _ vsource) (ShaderSource _ fsource) bindingPoints) =
+    mkProgram' vsource fsource bindingPoints
 
-mkProgram' :: ByteString -> ByteString -> IO ProgramInfo
-mkProgram' vsource fsource = do
+mkProgram' :: ByteString -> ByteString -> BV.Vector (ByteString, BufferBindingIndex) -> IO ProgramInfo
+mkProgram' vsource fsource bindingPoints = do
     vshader <- mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) vsource
     fshader <- mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) fsource
     program <- GLW.createObject (Proxy :: Proxy GLW.Program)
@@ -227,7 +232,7 @@ mkProgram' vsource fsource = do
     uniformBlocks <- getActiveUniformBlockInfos program
     let uniformBlockMap = Map.fromList . BV.toList $ BV.zip (BV.map ubiUniformBlockName uniformBlocks) uniformBlocks
 
-    return $ ProgramInfo program attribMap uniformMap uniformLocationMap uniformBlockMap
+    return $ ProgramInfo program attribMap uniformMap uniformLocationMap uniformBlockMap bindingPoints
 
 getEmbeddedVertexShaderSource :: EmbeddedProgramType -> ByteString
 getEmbeddedVertexShaderSource BasicProgram = $(preprocessFile "shader/basic-vertex.glsl" "shader/lib")
