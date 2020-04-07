@@ -13,6 +13,7 @@ module Graphics.Hree.Scene
     , addLight
     , addMesh
     , addNode
+    , addNodeUniformBlock
     , addRootNodes
     , addSampler
     , addSkin
@@ -27,6 +28,7 @@ module Graphics.Hree.Scene
     , newScene
     , readNode
     , readNodeTransform
+    , removeBuffer
     , removeLight
     , removeMesh
     , removeNode
@@ -328,6 +330,18 @@ addNode scene node isRoot = do
                 }
         in (newState, nodeInfo)
 
+addNodeUniformBlock :: (Block a) => Scene -> NodeId -> BufferBindingIndex -> a -> IO (UniformBlockBinder a)
+addNodeUniformBlock scene nodeId bindingIndex a = do
+    binder <- mkBlockBinder scene a
+    let buffer = uniformBlockBinderBuffer binder
+    void $ Component.modifyComponent nodeStore (f buffer) nodeId
+    return binder
+    where
+    nodeStore = sceneNodeStore scene
+    f buffer nodeInfo =
+        let ubs = nodeInfoUniformBlocks nodeInfo `BV.snoc` (bindingIndex, buffer)
+        in nodeInfo { nodeInfoUniformBlocks = ubs }
+
 readNode :: Scene -> NodeId -> IO (Maybe Node)
 readNode scene nodeId = fmap nodeInfoNode <$> Component.readComponent store nodeId
     where
@@ -341,17 +355,24 @@ readNodeTransform scene nodeId =
 
 removeNode :: Scene -> NodeId -> IO ()
 removeNode scene nodeId = do
-    maybeNode <- fmap nodeInfoNode <$> Component.readComponent (sceneNodeStore scene) nodeId
-    case maybeNode of
-        Just node -> do
+    maybeNodeInfo <- Component.readComponent (sceneNodeStore scene) nodeId
+    case maybeNodeInfo of
+        Just nodeInfo -> do
+            let node = nodeInfoNode nodeInfo
             void $ Component.removeComponent nodeStore nodeId
             void $ Component.removeComponent (sceneNodeTransformStore scene) nodeId
             void $ Component.removeComponent (sceneNodeTransformMatrixStore scene) nodeId
             void $ Component.removeComponent (sceneNodeGlobalTransformMatrixStore scene) nodeId
+
+            -- remove node uniform buffers
+            BV.mapM_ (removeBuffer scene . snd) (nodeInfoUniformBlocks nodeInfo)
+
+            -- remove from root node list
             isRoot <- BV.elem nodeId . ssRootNodes <$> readIORef (sceneState scene)
             when isRoot $
                 atomicModifyIORef' (sceneState scene) removeRootNode
             BV.mapM_ (removeNode scene) (nodeChildren node)
+
             where
             nodeStore = sceneNodeStore scene
             removeRootNode state =
@@ -434,6 +455,15 @@ addIndexBufferUInt :: Scene -> SV.Vector Word32 -> IO IndexBuffer
 addIndexBufferUInt scene v = do
     buffer <- addBuffer scene (BufferSourceVector v GL.GL_STATIC_READ)
     return (IndexBuffer buffer GL.GL_UNSIGNED_INT (fromIntegral . SV.length $ v) 0)
+
+removeBuffer :: Scene -> GLW.Buffer -> IO ()
+removeBuffer scene buffer = do
+    GLW.deleteObject buffer
+    atomicModifyIORef' (sceneState scene) removeBufferFunc
+    where
+    removeBufferFunc state =
+        let buffers = filter (/= buffer) (ssBuffers state)
+        in (state { ssBuffers = buffers }, ())
 
 addTexture :: Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D)
 addTexture scene name settings source =
