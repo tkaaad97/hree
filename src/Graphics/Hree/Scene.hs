@@ -321,7 +321,7 @@ addNode scene node isRoot = do
             rootNodes = if isRoot
                 then BV.snoc (ssRootNodes state) nodeId
                 else ssRootNodes state
-            nodeInfo = NodeInfo nodeId node
+            nodeInfo = NodeInfo nodeId node mempty
             newState = state
                 { ssNodeCounter = nodeIdNext
                 , ssRootNodes = rootNodes
