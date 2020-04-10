@@ -33,10 +33,10 @@ spec = do
                 v2 = V3 10 10 10
                 v3 = V3 20 20 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-            interpolateStep timepoints values (Timespan 15) `shouldBe` v2
-            interpolateStep timepoints values (Timespan (-1)) `shouldBe` v1
-            interpolateStep timepoints values (Timespan 1) `shouldBe` v1
-            interpolateStep timepoints values (Timespan 25) `shouldBe` v3
+            interpolateTransformStep timepoints values (Timespan 15) `shouldBe` v2
+            interpolateTransformStep timepoints values (Timespan (-1)) `shouldBe` v1
+            interpolateTransformStep timepoints values (Timespan 1) `shouldBe` v1
+            interpolateTransformStep timepoints values (Timespan 25) `shouldBe` v3
 
     describe "interpolate Linear" $ do
         it "will return linear interpolated key frame value" $ do
@@ -45,10 +45,10 @@ spec = do
                 v2 = V3 10 10 10
                 v3 = V3 20 20 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-            interpolateLinear timepoints values (Timespan 15) - (V3 15 15 15) `shouldSatisfy` nearZero
-            interpolateLinear timepoints values (Timespan (-10)) - v1 `shouldSatisfy` nearZero
-            interpolateLinear timepoints values (Timespan 1) - (V3 1 1 1) `shouldSatisfy` nearZero
-            interpolateLinear timepoints values (Timespan 25) - v3 `shouldSatisfy` nearZero
+            interpolateTransformLinear timepoints values (Timespan 15) - (V3 15 15 15) `shouldSatisfy` nearZero
+            interpolateTransformLinear timepoints values (Timespan (-10)) - v1 `shouldSatisfy` nearZero
+            interpolateTransformLinear timepoints values (Timespan 1) - (V3 1 1 1) `shouldSatisfy` nearZero
+            interpolateTransformLinear timepoints values (Timespan 25) - v3 `shouldSatisfy` nearZero
 
     describe "applyAnimation" $ do
         it "transform a node" $ do

@@ -12,9 +12,9 @@ module Graphics.Hree.Animation
     , applyChannel
     , channel
     , channelDuration
-    , interpolate
-    , interpolateLinear
-    , interpolateStep
+    , interpolateTransform
+    , interpolateTransformLinear
+    , interpolateTransformStep
     , interpolateQuaternion
     , linearRotation
     , linearScale
@@ -25,17 +25,21 @@ module Graphics.Hree.Animation
     , stepRotation
     , stepScale
     , stepTranslation
+    , stepMesh
     ) where
 
 import Chronos (Timespan(..))
+import Control.Monad (void)
 import Data.Int (Int64)
 import qualified Data.Vector as BV (Vector, foldl, map, mapM_, maximum, null,
                                     singleton, snoc)
+import qualified Data.Vector.Storable as SV (Vector, head, last, length, null,
+                                             (!))
 import qualified Data.Vector.Unboxed as UV (Unbox, Vector, head, last, length,
                                             null, (!))
 import Graphics.Hree.Math (Quaternion, Transform(..), Vec3)
-import Graphics.Hree.Scene (applyTransformToNode)
-import Graphics.Hree.Types (NodeId, Scene)
+import Graphics.Hree.Scene (applyTransformToNode, updateNode)
+import Graphics.Hree.Types (MeshId, Node(nodeMesh), NodeId, Scene)
 import Linear (Additive(..), slerp)
 
 data Interpolation =
@@ -46,7 +50,8 @@ data Interpolation =
 data Track =
     TrackNodeTranslation !(UV.Vector Vec3) |
     TrackNodeRotation !(UV.Vector Quaternion) |
-    TrackNodeScale !(UV.Vector Vec3)
+    TrackNodeScale !(UV.Vector Vec3) |
+    TrackNodeMesh !(SV.Vector MeshId)
     deriving (Show, Eq)
 
 data KeyFrames = KeyFrames
@@ -73,6 +78,9 @@ stepRotation times values = KeyFrames InterpolationStep times (TrackNodeRotation
 
 stepScale :: UV.Vector Int64 -> UV.Vector Vec3 -> KeyFrames
 stepScale times values = KeyFrames InterpolationStep times (TrackNodeScale values)
+
+stepMesh :: UV.Vector Int64 -> SV.Vector MeshId -> KeyFrames
+stepMesh times values = KeyFrames InterpolationStep times (TrackNodeMesh values)
 
 linearTranslation :: UV.Vector Int64 -> UV.Vector Vec3 -> KeyFrames
 linearTranslation times values = KeyFrames InterpolationLinear times (TrackNodeTranslation values)
@@ -133,29 +141,30 @@ lowerBound vec a =
                 then Nothing
                 else go (imid + 1) (middle (imid + 1) imax) imax
 
-interpolate :: KeyFrames -> Timespan -> Transform -> Transform
-interpolate (KeyFrames InterpolationStep timepoints (TrackNodeTranslation values)) t trans =
-    trans { transformTranslation = interpolateStep timepoints values t }
-interpolate (KeyFrames InterpolationStep timepoints (TrackNodeRotation values)) t trans =
-    trans { transformQuaternion = interpolateStep timepoints values t }
-interpolate (KeyFrames InterpolationStep timepoints (TrackNodeScale values)) t trans =
-    trans { transformScale = interpolateStep timepoints values t }
-interpolate (KeyFrames InterpolationLinear timepoints (TrackNodeTranslation values)) t trans =
-    trans { transformTranslation = interpolateLinear timepoints values t }
-interpolate (KeyFrames InterpolationLinear timepoints (TrackNodeRotation values)) t trans =
+interpolateTransform :: KeyFrames -> Timespan -> Transform -> Transform
+interpolateTransform (KeyFrames InterpolationStep timepoints (TrackNodeTranslation values)) t trans =
+    trans { transformTranslation = interpolateTransformStep timepoints values t }
+interpolateTransform (KeyFrames InterpolationStep timepoints (TrackNodeRotation values)) t trans =
+    trans { transformQuaternion = interpolateTransformStep timepoints values t }
+interpolateTransform (KeyFrames InterpolationStep timepoints (TrackNodeScale values)) t trans =
+    trans { transformScale = interpolateTransformStep timepoints values t }
+interpolateTransform (KeyFrames InterpolationLinear timepoints (TrackNodeTranslation values)) t trans =
+    trans { transformTranslation = interpolateTransformLinear timepoints values t }
+interpolateTransform (KeyFrames InterpolationLinear timepoints (TrackNodeRotation values)) t trans =
     trans { transformQuaternion = interpolateQuaternion timepoints values t }
-interpolate (KeyFrames InterpolationLinear timepoints (TrackNodeScale values)) t trans =
-    trans { transformScale = interpolateLinear timepoints values t }
+interpolateTransform (KeyFrames InterpolationLinear timepoints (TrackNodeScale values)) t trans =
+    trans { transformScale = interpolateTransformLinear timepoints values t }
+interpolateTransform (KeyFrames _ _ (TrackNodeMesh _)) _ trans = trans
 
-interpolateStep :: (Additive f, UV.Unbox (f a), Num a) => UV.Vector Int64 -> UV.Vector (f a) -> Timespan -> f a
-interpolateStep timepoints values (Timespan t) =
+interpolateTransformStep :: (Additive f, UV.Unbox (f a), Num a) => UV.Vector Int64 -> UV.Vector (f a) -> Timespan -> f a
+interpolateTransformStep timepoints values (Timespan t) =
     case lowerBound timepoints t of
         Nothing -> if UV.null values then zero else UV.last values
         Just 0  -> if UV.null values then zero else UV.head values
         Just n  -> values UV.! (n - 1)
 
-interpolateLinear :: (Additive f, Fractional a, UV.Unbox (f a)) => UV.Vector Int64 -> UV.Vector (f a) -> Timespan -> f a
-interpolateLinear timepoints values (Timespan t) =
+interpolateTransformLinear :: (Additive f, Fractional a, UV.Unbox (f a)) => UV.Vector Int64 -> UV.Vector (f a) -> Timespan -> f a
+interpolateTransformLinear timepoints values (Timespan t) =
     case lowerBound timepoints t of
         Nothing -> if UV.null values then zero else UV.last values
         Just 0  -> if UV.null values then zero else UV.head values
@@ -180,10 +189,23 @@ interpolateQuaternion timepoints values (Timespan t) =
                 v = slerp v0 v1 (fromIntegral (t - t0) / fromIntegral (t1 - t0))
             in v
 
+interpolateNode :: KeyFrames -> Timespan -> Node -> Node
+interpolateNode (KeyFrames _ _ (TrackNodeTranslation _)) _ node = node
+interpolateNode (KeyFrames _ _ (TrackNodeRotation _)) _ node = node
+interpolateNode (KeyFrames _ _ (TrackNodeScale _)) _ node = node
+interpolateNode (KeyFrames _ timepoints (TrackNodeMesh values)) (Timespan t) node =
+    case lowerBound timepoints t of
+        Nothing -> if SV.null values then node else node { nodeMesh = Just (SV.last values) }
+        Just 0  -> if SV.null values then node else node { nodeMesh = Just (SV.head values) }
+        Just n  -> if SV.length values < n then node else node { nodeMesh = Just (values SV.! (n - 1)) }
+
 applyChannel :: Scene -> Channel -> Timespan -> IO ()
-applyChannel scene (Channel nodeId keys) t =
-    let f = BV.foldl (\a k -> interpolate k t . a) id keys
-    in applyTransformToNode scene nodeId f
+applyChannel scene (Channel nodeId keys) t = do
+    applyTransformToNode scene nodeId f
+    void $ updateNode scene nodeId g
+    where
+    f = BV.foldl (\a k -> interpolateTransform k t . a) id keys
+    g = BV.foldl (\a k -> interpolateNode k t . a) id keys
 
 applyAnimation :: Scene -> Animation -> Timespan -> IO ()
 applyAnimation scene (Animation channels _) t =
