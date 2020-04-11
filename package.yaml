@@ -197,6 +197,15 @@ executables:
     - hree
     - GLFW-b
 
+  node-mesh-animation-1:
+    main:                Main.hs
+    source-dirs:
+    - examples/node-mesh-animation-1
+    - examples-common
+    dependencies:
+    - hree
+    - GLFW-b
+
 tests:
   hree-test:
     main:                Spec.hs
