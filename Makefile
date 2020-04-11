@@ -6,6 +6,10 @@ ghci:
 lib: src shader package.yaml
 	docker-compose run --rm app stack build --test --no-run-tests
 
+exec: src shader examples package.yaml
+	@if [ -z ${EXAMPLE} ]; then echo "usage: make exec EXAMPLE=flat-color-1" >&2; exit 1; fi
+	docker-compose run --rm app stack exec ${EXAMPLE} -- ${ARGS}
+
 run: src shader examples package.yaml
 	@if [ -z ${EXAMPLE} ]; then echo "usage: make run EXAMPLE=flat-color-1" >&2; exit 1; fi
 	docker-compose run --rm app stack run ${EXAMPLE} -- ${ARGS}
