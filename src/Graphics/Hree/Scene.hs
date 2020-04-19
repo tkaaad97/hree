@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Hree.Scene
-    ( MeshId(..)
+    ( AddedMesh(..)
+    , MeshId(..)
     , MeshInfo(..)
     , Scene(..)
     , SceneState(..)
@@ -78,6 +79,7 @@ import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..))
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
+import Graphics.Hree.Material
 import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
@@ -87,6 +89,11 @@ import Linear ((!*!), (^+^))
 import qualified Linear
 import qualified System.Random.MWC as Random (asGenIO, uniformR,
                                               withSystemRandom)
+
+data AddedMesh b = AddedMesh
+    { addedMeshId                         :: !MeshId
+    , addedMeshMaterialUniformBlockBinder :: !(UniformBlockBinder b)
+    }
 
 renderScene :: Renderer -> Scene -> Camera -> IO ()
 renderScene renderer scene camera = do
@@ -104,7 +111,8 @@ renderScene renderer scene camera = do
         state
     where
     ubbs = BV.fromList
-        [ ("CameraBlock", cameraBlockBindingIndex)
+        [ ("MaterialBlock", materialBlockBindingIndex)
+        , ("CameraBlock", cameraBlockBindingIndex)
         , ("LightBlock", lightBlockBindingIndex)
         , ("JointMatricesBlock", skinJointMatricesBlockBindingIndex)
         , ("JointInverseBindMatricesBlock", skinJointInverseMatricesBlockBindingIndex)
@@ -118,11 +126,12 @@ renderScene renderer scene camera = do
         ubb <- maybe (mkLightBlockBinder scene lightBlock) return maybeBinder
         updateAndBindUniformBuffer ubb lightBlock lightBlockBindingIndex
 
-cameraBlockBindingIndex, lightBlockBindingIndex, skinJointMatricesBlockBindingIndex, skinJointInverseMatricesBlockBindingIndex :: BufferBindingIndex
-cameraBlockBindingIndex = BufferBindingIndex 1
-lightBlockBindingIndex = BufferBindingIndex 2
-skinJointMatricesBlockBindingIndex = BufferBindingIndex 3
-skinJointInverseMatricesBlockBindingIndex = BufferBindingIndex 4
+materialBlockBindingIndex, cameraBlockBindingIndex, lightBlockBindingIndex, skinJointMatricesBlockBindingIndex, skinJointInverseMatricesBlockBindingIndex :: BufferBindingIndex
+materialBlockBindingIndex = BufferBindingIndex 1
+cameraBlockBindingIndex = BufferBindingIndex 2
+lightBlockBindingIndex = BufferBindingIndex 3
+skinJointMatricesBlockBindingIndex = BufferBindingIndex 4
+skinJointInverseMatricesBlockBindingIndex = BufferBindingIndex 5
 
 renderNodes :: Time.Time -> BV.Vector (ByteString, BufferBindingIndex) -> Renderer -> Scene -> SceneState -> IO ()
 renderNodes t ubbs renderer scene state = do
@@ -210,36 +219,34 @@ nodeToRenderInfos renderer scene state =
 
 toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> GLW.VertexArray -> Maybe Skin -> Mat4 -> RenderInfo
 toRenderInfo program defaultTexture meshInfo vao skin matrix =
-    let maybeUniform = toUniformEntry ("modelMatrix", Uniform matrix)
-        uniforms = BV.mapMaybe toUniformEntry $ (BV.fromList . Map.toList $ materialUniforms material) `mappend` textureUniforms
-        uniforms' = maybe uniforms (BV.snoc uniforms) maybeUniform
-        ubs = maybe mempty getSkinUbs skin
-        renderInfo = RenderInfo program dm vao uniforms' ubs textures
+    let uniforms = BV.mapMaybe toUniformEntry $ ("modelMatrix", Uniform matrix) `BV.cons` textureUniforms
+        ubs = BV.fromList $ (materialBlockBindingIndex, materialInfoUniformBlock material) : maybe mempty getSkinUbs skin
+        renderInfo = RenderInfo program dm vao uniforms ubs textures
     in renderInfo
     where
-    mesh = meshInfoMesh meshInfo
-    material = meshMaterial mesh
-    dm = resolveDrawMethod mesh
+    material = meshInfoMaterial meshInfo
+    dm = resolveDrawMethod meshInfo
     uniformLocations = programInfoUniformLocations program
     toUniformEntry (uniformName, uniform) = do
         uniformLocation <- Map.lookup uniformName uniformLocations
         return (uniformLocation, uniform)
-    mtextures = BV.fromList . Map.toList $ materialTextures material
-    textures = if null mtextures
-        then BV.singleton defaultTexture
-        else BV.map snd mtextures
-    textureUniforms = BV.zip (BV.map fst mtextures) (BV.generate (BV.length textures) (Uniform . (fromIntegral :: Int -> GL.GLuint)))
+    mtextures = materialInfoTextures material
+    mtextureUnits = BV.imap (\i (_, t) -> (fromIntegral i, t)) mtextures :: BV.Vector (GL.GLuint, Texture)
+    textureUniforms = BV.imap (\i (a, _) -> (a, Uniform (fromIntegral i :: GL.GLuint))) mtextures
+    textures = if BV.null mtextures
+        then BV.singleton (0, defaultTexture)
+        else mtextureUnits
     getSkinUbs x =
         let joint = (skinJointMatricesBlockBindingIndex, getMatricesBlockBinderBuffer . skinJointMatricesBinder $ x)
             inv = (skinJointInverseMatricesBlockBindingIndex, getMatricesBlockBinderBuffer . skinJointInverseMatricesBinder $ x)
-        in BV.fromList [joint, inv]
+        in [joint, inv]
     getMatricesBlockBinderBuffer (MatricesBlockBinder binder) = uniformBlockBinderBuffer binder
 
-resolveDrawMethod :: Mesh -> DrawMethod
+resolveDrawMethod :: MeshInfo -> DrawMethod
 resolveDrawMethod mesh =
-    let indicesCount = fromIntegral . geometryVerticesCount . meshGeometry $ mesh
-        indexBuffer = geometryIndexBuffer . meshGeometry $ mesh
-        instanceCount = fromIntegral <$> meshInstanceCount mesh
+    let indicesCount = fromIntegral . geometryVerticesCount . meshInfoGeometry $ mesh
+        indexBuffer = geometryIndexBuffer . meshInfoGeometry $ mesh
+        instanceCount = fromIntegral <$> meshInfoInstanceCount mesh
     in resolve indicesCount indexBuffer instanceCount
 
     where
@@ -252,35 +259,45 @@ resolveDrawMethod mesh =
     resolve _ (Just (IndexBuffer _ dt indicesCount offset)) (Just instanceCount) =
         DrawElementsInstanced PrimitiveType.glTriangles indicesCount dt (Foreign.nullPtr `Foreign.plusPtr` offset) instanceCount
 
-addMesh :: Scene -> Mesh -> IO MeshId
+addMesh :: Material b => Scene -> Mesh b -> IO (AddedMesh (MaterialUniformBlock b))
 addMesh scene mesh = addMesh_ scene mesh Nothing
 
-addSkinnedMesh :: Scene -> Mesh -> SkinId -> IO MeshId
+addSkinnedMesh :: Material b => Scene -> Mesh b -> SkinId -> IO (AddedMesh (MaterialUniformBlock b))
 addSkinnedMesh scene mesh skin = addMesh_ scene mesh (Just skin)
 
-addMesh_ :: Scene -> Mesh -> Maybe SkinId -> IO MeshId
+addMesh_ :: Material b => Scene -> Mesh b -> Maybe SkinId -> IO (AddedMesh (MaterialUniformBlock b))
 addMesh_ scene mesh maybeSkinId = do
     maybeSkin <- maybe (return Nothing) (Component.readComponent (sceneSkinStore scene)) maybeSkinId
     let pspec = resolveProgramSpec mesh maybeSkin
         pname = getProgramName pspec
-    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc (pspec, pname))
+    (materialInfo, ubb) <- mkMaterialInfo
+    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc materialInfo (pspec, pname))
     let meshId = meshInfoId minfo
     Component.addComponent (sceneMeshStore scene) meshId minfo
-    return meshId
+    return $ AddedMesh meshId ubb
 
     where
-    addMeshFunc p state =
+    addMeshFunc materialInfo p state =
         let meshId = ssMeshCounter state
             meshIdNext = meshId + 1
             bos = map fst . IntMap.elems $ buffers
-            bos' = maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
-            minfo = MeshInfo meshId mesh maybeSkinId bos' p Nothing
+            bos' = SV.fromList $ (materialInfoUniformBlock materialInfo) : maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
+            minfo = MeshInfo meshId geo materialInfo instanceCount maybeSkinId bos' p Nothing
             newState = state
                 { ssMeshCounter = meshIdNext
                 }
         in (newState, minfo)
 
+    mkMaterialInfo = do
+        let material = meshMaterial mesh
+            textures = materialTextures material
+            block = materialUniformBlock material
+        buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
+        ubb <- newUniformBlockBinder buffer block
+        return (MaterialInfo buffer textures, ubb)
+
     geo = meshGeometry mesh
+    instanceCount = meshInstanceCount mesh
     buffers = geometryBuffers geo
     maybeIndexBuffer = geometryIndexBuffer geo
 
@@ -289,7 +306,7 @@ mkMeshVertexArray scene meshInfo program =
     maybe f return (meshInfoVertexArray meshInfo)
     where
     meshId = meshInfoId meshInfo
-    geo = meshGeometry . meshInfoMesh $ meshInfo
+    geo = meshInfoGeometry $ meshInfo
     meshStore = sceneMeshStore scene
     setVao vao a = a { meshInfoVertexArray = Just vao }
     f = do
@@ -424,7 +441,7 @@ updateMeshInstanceCount :: Scene -> MeshId -> Maybe Int -> IO ()
 updateMeshInstanceCount scene meshId c =
     void $ Component.modifyComponent meshStore f meshId
     where
-    f m = m { meshInfoMesh = (meshInfoMesh m) { meshInstanceCount = c } }
+    f m = m { meshInfoInstanceCount = c }
     meshStore = sceneMeshStore scene
 
 addBuffer :: Scene -> BufferSource -> IO GLW.Buffer

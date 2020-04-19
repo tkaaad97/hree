@@ -6,7 +6,7 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.GL.Vertex
-import qualified Graphics.Hree.Material as Material
+import qualified Graphics.Hree.Material.FlatColorMaterial as Material
 import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
@@ -43,7 +43,7 @@ main =
         scene <- newScene
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry vs GL.GL_STREAM_DRAW scene
         let mesh = Mesh geometry material Nothing
-        meshId <- addMesh scene mesh
+        meshId <- addedMeshId <$> addMesh scene mesh
         _ <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

@@ -8,6 +8,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 module Graphics.Hree.Program
     ( Options(..)
+    , EmbeddedProgramType(..)
     , ProgramName
     , ProgramSpec(..)
     , ShaderSource(..)

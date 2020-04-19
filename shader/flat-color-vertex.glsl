@@ -11,7 +11,10 @@ in vec4 jointWeights;
 #include <skin.glsl>
 
 uniform mat4 modelMatrix = mat4(1.0);
-uniform vec4 color = vec4(1.0);
+
+layout(std140) uniform MaterialBlock {
+    vec4 color;
+};
 
 void main()
 {

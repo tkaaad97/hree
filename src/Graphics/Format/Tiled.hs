@@ -35,16 +35,18 @@ import qualified Graphics.Hree.Geometry as Hree (addVerticesToGeometry,
                                                  newSpriteGeometry)
 import qualified Graphics.Hree.GL.Types as Hree (Texture(..))
 import qualified Graphics.Hree.GL.Vertex as Hree (SpriteVertex(..))
-import qualified Graphics.Hree.Material as Hree (spriteMaterial)
+import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial,
+                                                                baseColorTexture,
+                                                                spriteMaterial)
 import qualified Graphics.Hree.Sampler as Hree (glTextureMagFilter,
                                                 glTextureMinFilter,
                                                 setSamplerParameter)
 import qualified Graphics.Hree.Scene as Hree (addMesh, addNode, addSampler,
-                                              addTexture, newNode)
+                                              addTexture, addedMeshId, newNode)
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
                                                 TextureSourceData(..))
-import qualified Graphics.Hree.Types as Hree (Geometry, Material, Mesh(..),
-                                              MeshId, Node(..), NodeId, Scene)
+import qualified Graphics.Hree.Types as Hree (Geometry, Mesh(..), MeshId,
+                                              Node(..), NodeId, Scene)
 import Linear (V2(..), V3(..), (^-^))
 import Prelude hiding (map)
 import System.Directory (canonicalizePath)
@@ -58,7 +60,7 @@ data Rect = Rect
 data TilesetInfo = TilesetInfo
     { tilesetInfoIndex       :: !Int
     , tilesetInfoTileset     :: !Tileset
-    , tilesetInfoMaterial    :: !Hree.Material
+    , tilesetInfoMaterial    :: !Hree.SpriteMaterial
     , tilesetInfoTextureSize :: !(V2 Int)
     , tilesetInfoGidRange    :: !(V2 Gid)
     } deriving (Show)
@@ -235,7 +237,7 @@ createMeshFromTiles scene config map layerData origin z tilesetInfo tiles @ (V2 
     geometry <- createGeometryFromTiles scene config map layerData origin z tilesetInfo tiles
     let material = tilesetInfoMaterial tilesetInfo
         mesh = Hree.Mesh geometry material (Just n)
-    Hree.addMesh scene mesh
+    Hree.addedMeshId <$> Hree.addMesh scene mesh
 
 createGeometryFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> V2 Int -> IO Hree.Geometry
 createGeometryFromTiles scene config map layerData origin z tilesetInfo (V2 i0 n) = do
@@ -403,7 +405,7 @@ createTilesetInfo scene cd index (tileset, gidRange) =
         (_, sampler) <- Hree.addSampler scene sname
         Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
         Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
-        let material = Hree.spriteMaterial $ Hree.Texture (texture, sampler)
+        let material = Hree.spriteMaterial { Hree.baseColorTexture = Just $ Hree.Texture (texture, sampler) }
         return $ TilesetInfo index tileset material (V2 twidth theight) gidRange
     nextPow2 = nextPow2_ 1
     nextPow2_ a x | a >= x = a

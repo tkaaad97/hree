@@ -13,7 +13,7 @@ import Graphics.Hree.Camera
 import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
-import qualified Graphics.Hree.Material as Material
+import qualified Graphics.Hree.Material.SpriteMaterial as Material
 import Graphics.Hree.Scene
 import qualified Graphics.Hree.Texture as Texture
 import Graphics.Hree.Types (Mesh(..), Node(..))
@@ -51,9 +51,9 @@ main =
         (geo, _) <- Geometry.newSpriteGeometry scene
         geo' <- Geometry.addVerticesToGeometry geo spriteVertices GL.GL_STATIC_READ scene
         texture <- mkTexture scene
-        let material = Material.spriteMaterial texture
+        let material = Material.spriteMaterial { Material.baseColorTexture = Just texture }
             mesh = Mesh geo' material (Just . Vector.length $ spriteVertices)
-        meshId <- addMesh scene mesh
+        meshId <- addedMeshId <$> addMesh scene mesh
         _ <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

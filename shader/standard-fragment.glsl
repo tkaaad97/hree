@@ -32,11 +32,14 @@ struct MaterialInfo {
     float padding;
 };
 
-uniform vec4 baseColorFactor = vec4(1.0, 1.0, 1.0, 1.0);
-uniform float metallicFactor = 1.0;
-uniform float roughnessFactor = 1.0;
-uniform vec3 emissiveness = vec3(0.0, 0.0, 0.0);
-uniform float normalScale = 1.0;
+layout(std140) uniform MaterialBlock {
+    vec4 baseColorFactor;
+    vec3 emissiveness;
+    float metallicFactor;
+    float roughnessFactor;
+    float normalScale;
+} materialBlock;
+
 uniform sampler2D baseColorTexture;
 uniform sampler2D normalTexture;
 uniform sampler2D metallicRoughnessTexture;
@@ -71,7 +74,7 @@ vec3 getNormal() {
 
 #ifdef HAS_NORMAL_MAP
     vec3 n = texture2D(normalTexture, uv).rgb;
-    n = normalize(tbn * ((2.0 * n - 1.0) * vec3(normalScale, normalScale, 1.0)));
+    n = normalize(tbn * ((2.0 * n - 1.0) * vec3(materialBlock.normalScale, materialBlock.normalScale, 1.0)));
 #else
     vec3 n = normalize(tbn[2].xyz);
 #endif
@@ -159,11 +162,11 @@ vec3 toneMapping(vec3 color) {
 }
 
 void main() {
-    float metallic = clamp(metallicFactor, 0.0, 1.0);
-    float roughness = clamp(roughnessFactor, 0.0, 1.0);
+    float metallic = clamp(materialBlock.metallicFactor, 0.0, 1.0);
+    float roughness = clamp(materialBlock.roughnessFactor, 0.0, 1.0);
     vec3 view = cameraBlock.viewPosition - fragmentPosition;
     vec3 normal = getNormal();
-    vec4 color = sRGBToLinear(texture2D(baseColorTexture, fragmentUv)) * baseColorFactor;
+    vec4 color = sRGBToLinear(texture2D(baseColorTexture, fragmentUv)) * materialBlock.baseColorFactor;
 
 #ifdef HAS_VERTEX_COLOR
     color *= fragmentColor;
@@ -171,8 +174,8 @@ void main() {
 
 #ifdef HAS_METALLIC_ROUGHNESS_MAP
     vec4 mrSample = texture2D(metallicRoughnessTexture, fragmentUv);
-    metallic = mrSample.b * metallicFactor;
-    roughness = mrSample.g * roughnessFactor;
+    metallic = mrSample.b * materialBlock.metallicFactor;
+    roughness = mrSample.g * materialBlock.roughnessFactor;
 #endif
 
     vec3 diffuseColor = mix(color.rgb * (1.0 - dielectricSpecular.r), black, metallic);

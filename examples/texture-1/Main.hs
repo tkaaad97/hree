@@ -12,7 +12,7 @@ import Graphics.Hree.Camera
 import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
-import qualified Graphics.Hree.Material as Material
+import qualified Graphics.Hree.Material.BasicMaterial as Material
 import Graphics.Hree.Scene
 import qualified Graphics.Hree.Texture as Texture
 import Graphics.Hree.Types (Mesh(..), Node(..))
@@ -47,11 +47,11 @@ main =
         scene <- newScene
         geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry vs GL.GL_STREAM_DRAW scene
         texture <- mkTexture scene
-        let material = Material.basicMaterial
-                `Material.setBaseColorTexture` texture
-                `Material.setDirectionalLight` V3 0 0 (-1)
+        let material = (Material.basicMaterial (V3 0 0 (-1)))
+                { Material.baseColorTexture = Just texture
+                }
             mesh = Mesh geometry material Nothing
-        meshId <- addMesh scene mesh
+        meshId <- addedMeshId <$> addMesh scene mesh
         _ <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera

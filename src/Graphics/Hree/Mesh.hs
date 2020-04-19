@@ -7,23 +7,23 @@ module Graphics.Hree.Mesh
 import Data.ByteString (ByteString)
 import Data.Function ((&))
 import qualified Data.Map.Strict as Map
+import Graphics.Hree.Material (Material(..), TextureMappingType(..))
 import Graphics.Hree.Program
 import Graphics.Hree.Skin (maxJointCount)
 import Graphics.Hree.Types
 
-resolveProgramSpec :: Mesh -> Maybe Skin -> ProgramSpec
+resolveProgramSpec :: Material b => Mesh b -> Maybe Skin -> ProgramSpec
 resolveProgramSpec mesh maybeSkin =
     let geo = meshGeometry mesh
         material = meshMaterial mesh
-        textures = materialTextures material
         options = defaultOptions
             & applyWhen (hasAttribute geo "jointIndices") (`setHasJointIndices` True)
             & applyWhen (hasAttribute geo "jointWeights") (`setHasJointWeights` True)
             & applyWhen (hasAttribute geo "normal") (`setHasVertexNormal` True)
             & applyWhen (hasAttribute geo "tangent") (`setHasVertexTangent` True)
             & applyWhen (hasAttribute geo "color") (`setHasVertexColor` True)
-            & applyWhen (Map.member "normalTexture" textures) (`setHasNormalMap` True)
-            & applyWhen (Map.member "metallicRoughnessTexture" textures) (`setHasMetallicRoughnessMap` True)
+            & applyWhen (materialHasTextureMapping material NormalMapping) (`setHasNormalMap` True)
+            & applyWhen (materialHasTextureMapping material MetallicRoughnessMapping) (`setHasMetallicRoughnessMap` True)
             & applySkinOptions maybeSkin
     in (materialProgramSpec . meshMaterial $ mesh) options
     where

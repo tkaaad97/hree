@@ -6,12 +6,15 @@ in vec4 fragmentColor;
 
 out vec4 outColor;
 
+layout(std140) uniform MaterialBlock {
+    vec3 directionalLight;
+} materialBlock;
+
 uniform sampler2D baseColorTexture;
-uniform vec3 directionalLight = vec3(0.0, 0.0, 0.0);
 
 void main()
 {
-    float diffuse = clamp(dot(fragmentNormal, -normalize(directionalLight)), 0.1, 1.0);
+    float diffuse = clamp(dot(fragmentNormal, -normalize(materialBlock.directionalLight)), 0.1, 1.0);
     vec4 color = texture2D(baseColorTexture, fragmentUv);
 #ifdef HAS_VERTEX_COLOR
     color = color * fragmentColor;

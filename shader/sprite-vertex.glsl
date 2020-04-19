@@ -12,7 +12,10 @@ out vec2 fragmentUv;
 #include <camerablock.glsl>
 
 uniform mat4 modelMatrix = mat4(1.0);
-uniform vec3 rotateAxis = vec3(0.0, 0.0, 1.0);
+
+layout(std140) uniform MaterialBlock {
+    vec3 rotateAxis;
+};
 
 mat3 rotateMatrix(vec3 axis, float angle)
 {

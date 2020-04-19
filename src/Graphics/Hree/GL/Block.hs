@@ -80,6 +80,12 @@ fromBool :: Bool -> Int32
 fromBool False = 0
 fromBool True  = 1
 
+instance Block () where
+    alignmentStd140 _ = 1
+    sizeOfStd140 _ = 0
+    peekByteOffStd140 _ _ = return ()
+    pokeByteOffStd140 _ _ _ = return ()
+
 instance Block Bool where
     alignmentStd140 _ = 4
     sizeOfStd140 _ = 4

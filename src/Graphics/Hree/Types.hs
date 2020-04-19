@@ -5,7 +5,7 @@ module Graphics.Hree.Types
     ( Geometry(..)
     , LightId(..)
     , LightStore
-    , Material(..)
+    , MaterialInfo(..)
     , MatricesBlockBinder(..)
     , Mesh(..)
     , MeshId(..)
@@ -52,14 +52,10 @@ data Geometry = Geometry
     , geometryVerticesCount  :: !Int
     } deriving (Show)
 
-data Material = Material
-    { materialUniforms    :: !(Map ByteString Uniform)
-    , materialTextures    :: !(Map ByteString Texture)
-    , materialProgramSpec :: !(Options -> ProgramSpec)
-    }
-
-instance Show Material where
-    show (Material us ts _) = "Material { materialUniforms = " ++ show us ++ ", materialTextures = " ++ show ts ++ ", materialProgramSpec = Function }"
+data MaterialInfo = MaterialInfo
+    { materialInfoUniformBlock :: !GLW.Buffer
+    , materialInfoTextures     :: !(BV.Vector (ByteString, Texture))
+    } deriving (Show, Eq)
 
 newtype LightId = LightId
     { unLightId :: Int
@@ -69,19 +65,21 @@ newtype MeshId = MeshId
     { unMeshId :: Int
     } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
 
-data Mesh = Mesh
+data Mesh b = Mesh
     { meshGeometry      :: !Geometry
-    , meshMaterial      :: !Material
+    , meshMaterial      :: !b
     , meshInstanceCount :: !(Maybe Int)
     } deriving (Show)
 
 data MeshInfo = MeshInfo
-    { meshInfoId          :: !MeshId
-    , meshInfoMesh        :: !Mesh
-    , meshInfoSkin        :: !(Maybe SkinId)
-    , meshInfoBuffers     :: ![GLW.Buffer]
-    , meshInfoProgram     :: !(ProgramSpec, ProgramName)
-    , meshInfoVertexArray :: !(Maybe GLW.VertexArray)
+    { meshInfoId            :: !MeshId
+    , meshInfoGeometry      :: !Geometry
+    , meshInfoMaterial      :: !MaterialInfo
+    , meshInfoInstanceCount :: !(Maybe Int)
+    , meshInfoSkin          :: !(Maybe SkinId)
+    , meshInfoBuffers       :: !(SV.Vector GLW.Buffer)
+    , meshInfoProgram       :: !(ProgramSpec, ProgramName)
+    , meshInfoVertexArray   :: !(Maybe GLW.VertexArray)
     } deriving (Show)
 
 newtype NodeId = NodeId

@@ -135,7 +135,7 @@ data RenderInfo = RenderInfo
     , riVertexArray   :: !GLW.VertexArray
     , riUniforms      :: !(BV.Vector (GLW.UniformLocation, Uniform))
     , riUniformBlocks :: !(BV.Vector (BufferBindingIndex, GLW.Buffer))
-    , riTextures      :: !(BV.Vector Texture)
+    , riTextures      :: !(BV.Vector (GL.GLuint, Texture))
     }
 
 data DrawMethod =

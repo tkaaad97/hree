@@ -18,13 +18,15 @@ import Graphics.Hree.Camera
 import Graphics.Hree.Geometry as Hree (addVerticesToGeometry, newSpriteGeometry)
 import qualified Graphics.Hree.GL.Types as Hree (Texture(..))
 import qualified Graphics.Hree.GL.Vertex as Hree (SpriteVertex(..))
-import qualified Graphics.Hree.Material as Hree (spriteMaterial)
+import qualified Graphics.Hree.Material.SpriteMaterial as Hree (baseColorTexture,
+                                                                spriteMaterial)
 import qualified Graphics.Hree.Sampler as Hree (glTextureMagFilter,
                                                 glTextureMinFilter,
                                                 setSamplerParameter)
-import qualified Graphics.Hree.Scene as Hree (addMesh, addNode, addSampler,
-                                              addTexture, newNode, newRenderer,
-                                              newScene, renderScene, updateNode)
+import qualified Graphics.Hree.Scene as Hree (AddedMesh(..), addMesh, addNode,
+                                              addSampler, addTexture, newNode,
+                                              newRenderer, newScene,
+                                              renderScene, updateNode)
 import qualified Graphics.Hree.SceneTask as SceneTask
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
                                                 TextureSourceData(..))
@@ -154,14 +156,14 @@ main =
         (_, sampler) <- Hree.addSampler scene "material1"
         Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
         Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
-        let material = Hree.spriteMaterial $ Hree.Texture (texture, sampler)
+        let material = Hree.spriteMaterial { Hree.baseColorTexture = Just $ Hree.Texture (texture, sampler) }
         return material
 
     createMesh scene material (V2 (V2 x y) (V2 w h)) = do
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 (x / twidth') (y / theight')) (V2 (w / twidth') (h / theight'))
         (geo, _) <- Hree.newSpriteGeometry scene
         geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
-        Hree.addMesh scene $ Mesh geo' material (Just 1)
+        fmap Hree.addedMeshId . Hree.addMesh scene $ Mesh geo' material (Just 1)
 
     createMeshes scene material uvs = SV.mapM (createMesh scene material) uvs
 

@@ -10,7 +10,7 @@ import qualified Graphics.GL as GL
 import qualified Graphics.Hree.Animation as Animation
 import Graphics.Hree.Camera
 import Graphics.Hree.Geometry.Box
-import qualified Graphics.Hree.Material as Material
+import qualified Graphics.Hree.Material.FlatColorMaterial as Material
 import Graphics.Hree.Scene
 import qualified Graphics.Hree.SceneTask as SceneTask
 import Graphics.Hree.Types (Mesh(..), Node(..))
@@ -43,8 +43,8 @@ main =
             childMaterial = Material.flatColorMaterial (V4 0.95 0.1 0.1 1)
             childMesh = Mesh geometry childMaterial Nothing
             mesh = Mesh geometry material Nothing
-        childMeshId <- addMesh scene childMesh
-        meshId <- addMesh scene mesh
+        childMeshId <- addedMeshId <$> addMesh scene childMesh
+        meshId <- addedMeshId <$> addMesh scene mesh
 
         let childNode = newNode
                 { nodeMesh = Just childMeshId

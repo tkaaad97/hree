@@ -19,7 +19,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy(..), asProxyTypeOf)
-import qualified Data.Vector as BV (Vector, generate, mapMaybe, zip)
+import qualified Data.Vector as BV (Vector, mapMaybe)
 import qualified Data.Vector.Storable as SV
 import qualified Foreign (Storable(..), castPtr)
 import qualified GLW
@@ -71,12 +71,12 @@ bindUniformBlockBuffers = mapM_ bindUniformBlockBuffer
     bindUniformBlockBuffer (BufferBindingIndex bindingIndex, buffer) =
         GLW.glBindBufferBase GL.GL_UNIFORM_BUFFER bindingIndex buffer
 
-bindTextures :: BV.Vector Texture -> IO ()
-bindTextures textures = mapM_ bindTexture $ BV.zip (BV.generate (length textures) id) textures
+bindTextures :: BV.Vector (GL.GLuint, Texture) -> IO ()
+bindTextures textures = mapM_ bindTexture textures
     where
     bindTexture (index, Texture (texture, sampler)) = do
-        GLW.glBindTextureUnit (fromIntegral index) texture
-        GLW.glBindSampler (fromIntegral index) sampler
+        GLW.glBindTextureUnit index texture
+        GLW.glBindSampler index sampler
 
 renderMany :: Foldable t => BV.Vector (ByteString, BufferBindingIndex) -> t RenderInfo -> IO ()
 renderMany common = void . foldrM (render common) Nothing

@@ -7,7 +7,7 @@ import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.Light
-import qualified Graphics.Hree.Material as Material
+import qualified Graphics.Hree.Material.StandardMaterial as Material
 import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
@@ -42,11 +42,14 @@ main = do
         renderer <- newRenderer
         scene <- newScene
         geometry <- STL.loadGeometryFromFile path scene
-        let material = Material.standardMaterial metalness roughness
-                `Material.setDirectionalLight` V3 (-1) 0 (-5)
+        let material = Material.standardMaterial $
+                Material.standardMaterialBlock
+                    { Material.metallicFactor = metalness
+                    , Material.roughnessFactor = roughness
+                    }
             mesh = Mesh geometry material Nothing
             light = directionalLight (V3 (-1) 0 (-5)) (V3 1 1 1) 1
-        meshId <- addMesh scene mesh
+        meshId <- addedMeshId <$> addMesh scene mesh
         _ <- addNode scene newNode{ nodeMesh = Just meshId } True
         _ <- addLight scene light
         camera <- newCamera proj la

@@ -15,7 +15,7 @@ import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.Light (directionalLight)
-import qualified Graphics.Hree.Material as Material
+import qualified Graphics.Hree.Material.BasicMaterial as Material
 import Graphics.Hree.Scene
 import qualified Graphics.Hree.SceneTask as SceneTask
 import Graphics.Hree.Types (Mesh(..), Node(..))
@@ -70,10 +70,9 @@ main = do
                         ".stl" -> STL.loadGeometryFromFile path scene
                         ".ply" -> PLY.loadGeometryFromFile path scene
                         _ -> throwIO . userError $ "unknown format. path: " ++ path
-        let material = Material.basicMaterial
-                `Material.setDirectionalLight` V3 0.5 (-1) (-0.5)
+        let material = Material.basicMaterial $ V3 0.5 (-1) (-0.5)
             mesh = Mesh geometry material Nothing
-        meshId <- addMesh scene mesh
+        meshId <- addedMeshId <$> addMesh scene mesh
         void $ addNode scene newNode{ nodeMesh = Just meshId } True
         return Nothing
 

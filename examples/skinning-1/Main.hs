@@ -18,7 +18,7 @@ import Graphics.Hree.GL (attribFormat, attribIFormat)
 import Graphics.Hree.GL.Types (BindBufferSetting(..), IVec4, Vec3, Vec4)
 import Graphics.Hree.GL.Vertex (Vertex(..), VertexField(..), VertexSpec(..))
 import qualified Graphics.Hree.Light as Light
-import qualified Graphics.Hree.Material as Material
+import qualified Graphics.Hree.Material.StandardMaterial as Material
 import qualified Graphics.Hree.Scene as Scene
 import qualified Graphics.Hree.SceneTask as SceneTask
 import Graphics.Hree.Types (Geometry(..), Mesh(..), Node(..))
@@ -135,10 +135,14 @@ main =
 
         skinId <- Scene.addSkin scene nodeId0 (SV.fromList [nodeId1, nodeId2]) invMats
 
-        let material = Material.standardMaterial 0 0
-                `Material.setBaseColorFactor` V4 0.1 0.1 0.8 1.0
+        let material = Material.standardMaterial $
+                Material.standardMaterialBlock
+                    {Material.metallicFactor = 0
+                    , Material.roughnessFactor = 0
+                    , Material.baseColorFactor = V4 0.1 0.1 0.8 1.0
+                    }
             mesh = Mesh geometry material Nothing
-        meshId <- Scene.addSkinnedMesh scene mesh skinId
+        meshId <- Scene.addedMeshId <$> Scene.addSkinnedMesh scene mesh skinId
 
         _ <- Scene.updateNode scene nodeId0 (\n -> n { nodeMesh = Just meshId })
 

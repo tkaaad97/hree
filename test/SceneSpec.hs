@@ -17,7 +17,7 @@ import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree.Geometry as Hree
 import qualified Graphics.Hree.GL.Vertex as Hree
-import qualified Graphics.Hree.Material as Hree
+import qualified Graphics.Hree.Material.TestMaterial as Hree
 import qualified Graphics.Hree.Mesh as Hree (Mesh(..))
 import qualified Graphics.Hree.Scene as Hree
 import qualified Graphics.Hree.Texture as Hree
@@ -35,7 +35,7 @@ spec = do
             scene <- Hree.newScene
             geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material Nothing
-            meshId <- Hree.addMesh scene mesh
+            meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             meshId `shouldBe` Hree.MeshId 1
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 2
@@ -46,9 +46,9 @@ spec = do
             scene <- Hree.newScene
             geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material Nothing
-            meshId1 <- Hree.addMesh scene mesh
+            meshId1 <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             meshId1 `shouldBe` Hree.MeshId 1
-            meshId2 <- Hree.addMesh scene mesh
+            meshId2 <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             meshId2 `shouldBe` Hree.MeshId 2
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 3
@@ -60,7 +60,7 @@ spec = do
             scene <- Hree.newScene
             geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
             let mesh = Hree.Mesh geometry material Nothing
-            meshId <- Hree.addMesh scene mesh
+            meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             (`shouldBe` [GLW.Buffer 1]) =<< getSceneProp scene Hree.ssBuffers
             Hree.removeMesh scene meshId
             (`shouldBe` [GLW.Buffer 1]) =<< getSceneProp scene Hree.ssBuffers

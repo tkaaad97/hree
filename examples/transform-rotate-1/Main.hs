@@ -6,7 +6,7 @@ import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.Geometry.Box
-import qualified Graphics.Hree.Material as Material
+import qualified Graphics.Hree.Material.FlatColorMaterial as Material
 import Graphics.Hree.Scene
 import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
@@ -34,7 +34,7 @@ main =
         (geometry, _) <- createBoxGeometry 0.5 0.5 0.5 scene
         let material = Material.flatColorMaterial (V4 0.2 0.4 0.6 1)
             mesh = Mesh geometry material Nothing
-        meshId <- addMesh scene mesh
+        meshId <- addedMeshId <$> addMesh scene mesh
         nodeId <- addNode scene newNode{ nodeMesh = Just meshId } True
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
