@@ -60,7 +60,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
 import qualified Data.Vector as BV (Vector, empty, foldM', head, imapM_, length,
-                                    map, mapM, maximum, toList, unsafeFreeze,
+                                    map, mapM, singleton, toList, unsafeFreeze,
                                     unzip, (!), (!?))
 import qualified Data.Vector.Mutable as MBV (read, replicate, write)
 import qualified Data.Vector.Storable as SV (empty, generate, generateM,
@@ -73,11 +73,12 @@ import qualified Foreign (Ptr, Storable(..), castPtr, peekByteOff)
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree.Animation as Hree (Animation, Channel,
+import qualified Graphics.Hree.Animation as Hree (AnimationClip(..),
                                                   Interpolation(..),
-                                                  KeyFrames(..), Track(..),
-                                                  animation, channelDuration,
-                                                  singleChannel)
+                                                  KeyFrames(..),
+                                                  TransformChannel(..),
+                                                  TransformTrack(..),
+                                                  animationClipTransform)
 import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
 import qualified Graphics.Hree.GL as Hree (attribFormat, attribIFormat)
 import qualified Graphics.Hree.GL.Types as Hree (AttributeFormat(..),
@@ -326,8 +327,8 @@ data GLTF = GLTF
 
 data Supplement = Supplement
     { supplementNodeIds    :: !(BV.Vector Hree.NodeId)
-    , supplementAnimations :: !(BV.Vector Hree.Animation)
-    } deriving (Show, Eq)
+    , supplementAnimations :: !(BV.Vector Hree.AnimationClip)
+    } deriving (Show)
 
 instance Aeson.FromJSON Buffer where
     parseJSON = Aeson.withObject "Buffer" $ \v -> do
@@ -914,40 +915,39 @@ createSkin scene nodes nodeIds buffers bufferViews accessors skin = do
         jointNodeIds = SV.generate (BV.length joints) ((nodeIds BV.!) . (joints BV.!))
     Hree.addSkin scene skeletonNodeId jointNodeIds invMats
 
-createAnimations :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Animation -> IO (BV.Vector Hree.Animation)
+createAnimations :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Animation -> IO (BV.Vector Hree.AnimationClip)
 createAnimations nodeIds buffers bufferViews accessors = BV.mapM (createAnimation nodeIds buffers bufferViews accessors)
 
-createAnimation :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Animation -> IO Hree.Animation
+createAnimation :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Animation -> IO Hree.AnimationClip
 createAnimation nodeIds buffers bufferViews accessors animation = do
-    channels <- BV.mapM (createChannel nodeIds buffers bufferViews accessors (animationSamplers animation)) (animationChannels animation)
-    let duration = BV.maximum . BV.map Hree.channelDuration $ channels
-    return $ Hree.animation channels duration
+    channels <- BV.mapM (createAnimationChannel nodeIds buffers bufferViews accessors (animationSamplers animation)) (animationChannels animation)
+    return $ Hree.animationClipTransform channels
 
-createChannel :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector AnimationSampler -> Channel -> IO Hree.Channel
-createChannel nodeIds buffers bufferViews accessors samplers channel = do
+createAnimationChannel :: BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector AnimationSampler -> Channel -> IO Hree.TransformChannel
+createAnimationChannel nodeIds buffers bufferViews accessors samplers channel = do
     let AnimationSampler input interpolation output = samplers BV.! channelSampler channel
         ChannelTarget targetNode path = channelTarget channel
         nodeId = nodeIds BV.! targetNode
     keyFrames <- createKeyFrames path interpolation buffers bufferViews accessors input output
-    return $ Hree.singleChannel nodeId keyFrames
+    return $ Hree.TransformChannel nodeId (BV.singleton keyFrames)
 
-createKeyFrames :: ChannelTargetPath -> AnimationInterpolation -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> Int -> IO Hree.KeyFrames
+createKeyFrames :: ChannelTargetPath -> AnimationInterpolation -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> Int -> IO (Hree.KeyFrames Hree.TransformTrack)
 createKeyFrames ChannelTargetPathTranslation interpolation buffers bufferViews accessors input output = do
     timePoints <- UV.map (round . (* 1.0E+9)) <$> createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
     values <- createVec3VectorFromBuffer UV.generateM buffers bufferViews accessors output
-    let track = Hree.TrackNodeTranslation values
+    let track = Hree.TransformTrackTranslation values
         interpolation' = convertInterpolation interpolation
     return $ Hree.KeyFrames interpolation' timePoints track
 createKeyFrames ChannelTargetPathRotation interpolation buffers bufferViews accessors input output = do
     timePoints <- UV.map (round . (* 1.0E+9)) <$> createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
     values <- createQuaternionVectorFromBuffer UV.generateM buffers bufferViews accessors output
-    let track = Hree.TrackNodeRotation values
+    let track = Hree.TransformTrackRotation values
         interpolation' = convertInterpolation interpolation
     return $ Hree.KeyFrames interpolation' timePoints track
 createKeyFrames ChannelTargetPathScale interpolation buffers bufferViews accessors input output = do
     timePoints <- UV.map (round . (* 1.0E+9)) <$> createFloatVectorFromBuffer UV.generateM buffers bufferViews accessors input
     values <- createVec3VectorFromBuffer UV.generateM buffers bufferViews accessors output
-    let track = Hree.TrackNodeScale values
+    let track = Hree.TransformTrackScale values
         interpolation' = convertInterpolation interpolation
     return $ Hree.KeyFrames interpolation' timePoints track
 

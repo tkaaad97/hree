@@ -3,6 +3,7 @@ module AnimationSpec
     ) where
 
 import Chronos (Timespan(..))
+import Data.Maybe (maybe)
 import qualified Data.Vector.Unboxed as UV
 import Graphics.Hree.Animation
 import Graphics.Hree.Math (Transform(..))
@@ -33,10 +34,10 @@ spec = do
                 v2 = V3 10 10 10
                 v3 = V3 20 20 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-            interpolateTransformStep timepoints values (Timespan 15) `shouldBe` v2
-            interpolateTransformStep timepoints values (Timespan (-1)) `shouldBe` v1
-            interpolateTransformStep timepoints values (Timespan 1) `shouldBe` v1
-            interpolateTransformStep timepoints values (Timespan 25) `shouldBe` v3
+            interpolateStep timepoints values (Timespan 15) `shouldBe` Just v2
+            interpolateStep timepoints values (Timespan (-1)) `shouldBe` Just v1
+            interpolateStep timepoints values (Timespan 1) `shouldBe` Just v1
+            interpolateStep timepoints values (Timespan 25) `shouldBe` Just v3
 
     describe "interpolate Linear" $ do
         it "will return linear interpolated key frame value" $ do
@@ -45,10 +46,10 @@ spec = do
                 v2 = V3 10 10 10
                 v3 = V3 20 20 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-            interpolateTransformLinear timepoints values (Timespan 15) - (V3 15 15 15) `shouldSatisfy` nearZero
-            interpolateTransformLinear timepoints values (Timespan (-10)) - v1 `shouldSatisfy` nearZero
-            interpolateTransformLinear timepoints values (Timespan 1) - (V3 1 1 1) `shouldSatisfy` nearZero
-            interpolateTransformLinear timepoints values (Timespan 25) - v3 `shouldSatisfy` nearZero
+            (-) (V3 15 15 15) <$> interpolateLinear timepoints values (Timespan 15) `shouldSatisfy` maybe False nearZero
+            (-) v1 <$> interpolateLinear timepoints values (Timespan (-10)) `shouldSatisfy` maybe False nearZero
+            (-) (V3 1 1 1) <$> interpolateLinear timepoints values (Timespan 1) `shouldSatisfy` maybe False nearZero
+            (-) v3 <$> interpolateLinear timepoints values (Timespan 25) `shouldSatisfy` maybe False nearZero
 
     describe "applyAnimation" $ do
         it "transform a node" $ do
@@ -59,12 +60,12 @@ spec = do
                 v2 = V3 10 10 0
                 v3 = V3 10 10 20
                 values = UV.fromList [v1, v2, v3] :: UV.Vector (V3 Float)
-                ani = singleAnimation nodeId (linearTranslation timepoints values)
-            applyAnimation scene ani (Timespan 0)
+                ani = singleTransformClip nodeId (linearTranslation timepoints values)
+            applyAnimationClip scene ani (Timespan 0)
             Hree.readNodeTransform scene nodeId >>= (`shouldBe` Just v1) . fmap transformTranslation
-            applyAnimation scene ani (Timespan 5)
+            applyAnimationClip scene ani (Timespan 5)
             Hree.readNodeTransform scene nodeId >>= (`shouldBe` Just (V3 5 5 0)) . fmap transformTranslation
-            applyAnimation scene ani (Timespan 10)
+            applyAnimationClip scene ani (Timespan 10)
             Hree.readNodeTransform scene nodeId >>= (`shouldBe` Just (V3 10 10 0)) . fmap transformTranslation
-            applyAnimation scene ani (Timespan 21)
+            applyAnimationClip scene ani (Timespan 21)
             Hree.readNodeTransform scene nodeId >>= (`shouldBe` Just (V3 10 10 20)) . fmap transformTranslation

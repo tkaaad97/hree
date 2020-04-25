@@ -18,15 +18,15 @@ import Data.Atomics.Counter (AtomicCounter)
 import qualified Data.Atomics.Counter as Counter (incrCounter, newCounter)
 import Data.Hashable (Hashable)
 import qualified Data.HashTable.IO as HT
-import Graphics.Hree.Animation (Animation(..), applyAnimation)
+import Graphics.Hree.Animation (AnimationClip(..), applyAnimationClip)
 import Graphics.Hree.Scene (removeNode)
 import Graphics.Hree.Types (NodeId, Scene)
 
 data SceneTask =
     Nop |
-    AnimationTask !Time !Animation !AnimationTaskOptions |
+    AnimationTask !Time !AnimationClip !AnimationTaskOptions |
     RemoveNodeTask !Time !NodeId
-    deriving (Show, Eq)
+    deriving (Show)
 
 data AnimationTaskOptions = AnimationTaskOptions
     { animationTaskOptionsLoop        :: !Bool
@@ -72,14 +72,14 @@ runSceneTask _ Nop _ = return False
 runSceneTask scene (AnimationTask start animation options) t = do
     let loop = animationTaskOptionsLoop options
         removeAtEnd = animationTaskOptionsRemoveAtEnd options
-        duration = animationDuration animation
+        duration = animationClipDuration animation
         dt = timeIntervalToTimespan $ TimeInterval start t
         remove = removeAtEnd && (duration > dt)
     when (t > start) $ do
         let at = if loop && dt > duration
                     then Timespan $ getTimespan dt `mod` getTimespan duration
                     else dt
-        applyAnimation scene animation at
+        applyAnimationClip scene animation at
     return remove
 runSceneTask scene (RemoveNodeTask at nodeId) t =
     if t >= at

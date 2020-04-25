@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import qualified Chronos as Time (Timespan(..), now)
+import qualified Chronos as Time (now)
 import qualified Data.Vector as BV
 import qualified Data.Vector.Unboxed as UV
 import Example
@@ -66,9 +66,9 @@ main =
             timepoints = UV.fromList . map (* ms) $ [0, 5000, 10000]
             rotations = UV.fromList [axisAngle (V3 0 0 1) 0, axisAngle (V3 0 0 1) pi, axisAngle (V3 0 0 1) (2 * pi)]
             track = Animation.linearRotation timepoints rotations
-            channel1 = Animation.singleChannel nodeId track
-            channel2 = Animation.singleChannel childNodeId track
-            animation = Animation.animation (BV.fromList [channel1, channel2]) (Time.Timespan $ 10000 * ms)
+            channel1 = Animation.singleTransformChannel nodeId track
+            channel2 = Animation.singleTransformChannel childNodeId track
+            animation = Animation.animationClip (BV.fromList [channel1, channel2])
 
         st <- Time.now
         taskBoard <- SceneTask.newSceneTaskBoard scene

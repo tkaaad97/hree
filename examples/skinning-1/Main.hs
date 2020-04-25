@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import qualified Chronos as Time (Timespan(..), now)
+import qualified Chronos as Time (now)
 import Control.Concurrent (threadDelay)
 import Data.Int (Int64)
 import qualified Data.Vector as BV
@@ -147,8 +147,7 @@ main =
         _ <- Scene.updateNode scene nodeId0 (\n -> n { nodeMesh = Just meshId })
 
         let track = Animation.linearRotation timePoints rotations
-            channel = Animation.singleChannel nodeId2 track
-            animation = Animation.animation (BV.singleton channel) (Time.Timespan $ 5500 * ms)
+            animation = Animation.singleTransformClip nodeId2 track
 
         st <- Time.now
         taskBoard <- SceneTask.newSceneTaskBoard scene

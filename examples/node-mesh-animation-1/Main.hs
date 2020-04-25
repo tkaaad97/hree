@@ -40,11 +40,11 @@ data CharacterInfo = CharacterInfo
     , meshStillBack      :: MeshId
     , meshStillLeft      :: MeshId
     , meshStillRight     :: MeshId
-    , animationWalkFront :: Animation.Animation
-    , animationWalkBack  :: Animation.Animation
-    , animationWalkLeft  :: Animation.Animation
-    , animationWalkRight :: Animation.Animation
-    } deriving (Show, Eq)
+    , animationWalkFront :: Animation.AnimationClip
+    , animationWalkBack  :: Animation.AnimationClip
+    , animationWalkLeft  :: Animation.AnimationClip
+    , animationWalkRight :: Animation.AnimationClip
+    } deriving (Show)
 
 main :: IO ()
 main =
@@ -169,9 +169,7 @@ main =
 
     createNodeMeshAnimation scene material nodeId uvs = do
         meshIds <- createMeshes scene material uvs
-        let track = Animation.stepMesh timepoints meshIds
-            animation = Animation.singleAnimation nodeId track
-        return animation
+        return $ Animation.stepMesh scene nodeId timepoints meshIds
 
     resizeWindow' camera _ w h = do
         GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
