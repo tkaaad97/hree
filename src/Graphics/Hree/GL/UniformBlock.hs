@@ -3,6 +3,7 @@ module Graphics.Hree.GL.UniformBlock
     ( UniformBlockBinder(..)
     , bindUniformBuffer
     , newUniformBlockBinder
+    , modifyUniformBlock
     , updateAndBindUniformBuffer
     , updateUniformBlock
     , updateUniformBlock_
@@ -40,6 +41,12 @@ updateUniformBlock_ (UniformBlockBinder buffer ptr) a =
     Foreign.withForeignPtr ptr $ \p -> do
         Foreign.poke p (Std140 a)
         writeBuffer (Foreign.castPtr p :: Foreign.Ptr a) buffer
+
+modifyUniformBlock :: (Eq a, Block a) => (a -> a) -> UniformBlockBinder a -> IO ()
+modifyUniformBlock f ubb @ (UniformBlockBinder _ ptr) = do
+    prev <- unStd140 <$> Foreign.withForeignPtr ptr Foreign.peek
+    let modified = f prev
+    when (modified /= prev) $ updateUniformBlock_ ubb modified
 
 updateUniformBlockWith :: forall a. (Block a) => UniformBlockBinder a -> (Foreign.Ptr () -> IO ()) -> IO ()
 updateUniformBlockWith (UniformBlockBinder buffer ptr) f =

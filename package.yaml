@@ -206,6 +206,15 @@ executables:
     - hree
     - GLFW-b
 
+  uv-animation-1:
+    main:                Main.hs
+    source-dirs:
+    - examples/uv-animation-1
+    - examples-common
+    dependencies:
+    - hree
+    - GLFW-b
+
 tests:
   hree-test:
     main:                Spec.hs

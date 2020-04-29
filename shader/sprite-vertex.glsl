@@ -15,7 +15,9 @@ uniform mat4 modelMatrix = mat4(1.0);
 
 layout(std140) uniform MaterialBlock {
     vec3 rotateAxis;
-};
+    vec2 uvOffset;
+    vec2 uvScale;
+} materialBlock;
 
 mat3 rotateMatrix(vec3 axis, float angle)
 {
@@ -37,7 +39,10 @@ mat3 rotateMatrix(vec3 axis, float angle)
 
 void main()
 {
-    vec3 offset = position + center + rotateMatrix(rotateAxis, angle) * vec3(size.x * positionOffset.x - center.x, size.y * positionOffset.y - center.y, size.z * positionOffset.z - center.z);
+    vec3 offset = position + center + rotateMatrix(materialBlock.rotateAxis, angle) * vec3(size.x * positionOffset.x - center.x, size.y * positionOffset.y - center.y, size.z * positionOffset.z - center.z);
     gl_Position = cameraBlock.projectionMatrix * cameraBlock.viewMatrix * modelMatrix * vec4(offset, 1.0);
-    fragmentUv = uv + vec2(uvOffset.x * uvSize.x, uvOffset.y * uvSize.y);
+
+    float uvx = uv.x + uvOffset.x * uvSize.x;
+    float uvy = uv.y + uvOffset.y * uvSize.y;
+    fragmentUv = materialBlock.uvOffset + vec2(uvx * materialBlock.uvScale.x, uvy * materialBlock.uvScale.y);
 }

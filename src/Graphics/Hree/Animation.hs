@@ -23,6 +23,7 @@ module Graphics.Hree.Animation
     , lowerBound
     , singleTransformChannel
     , singleTransformClip
+    , singleVariationClip
     , stepRotation
     , stepScale
     , stepTranslation
@@ -132,8 +133,14 @@ singleTransformChannel nodeId key =
 
 singleTransformClip :: NodeId -> KeyFrames TransformTrack -> AnimationClip
 singleTransformClip nodeId key =
-    let duration = keyFrameTracksDuration (BV.singleton key)
+    let duration = keyFrameTrackDuration key
         channel = AnimationChannelTransform (TransformChannel nodeId (BV.singleton key))
+    in AnimationClip (BV.singleton channel) duration
+
+singleVariationClip :: (Show (v a)) => (a -> IO ()) -> KeyFrames (VariationTrack (v a)) -> AnimationClip
+singleVariationClip setter key =
+    let duration = keyFrameTrackDuration key
+        channel = AnimationChannelVariation (VariationChannel setter key)
     in AnimationClip (BV.singleton channel) duration
 
 animationClip :: BV.Vector AnimationChannel -> AnimationClip

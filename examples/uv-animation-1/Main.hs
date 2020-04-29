@@ -17,38 +17,40 @@ import qualified Graphics.Hree.Animation as Animation
 import Graphics.Hree.Camera
 import Graphics.Hree.Geometry as Hree (addVerticesToGeometry, newSpriteGeometry)
 import qualified Graphics.Hree.GL.Types as Hree (Texture(..))
+import qualified Graphics.Hree.GL.UniformBlock as Hree (modifyUniformBlock)
 import qualified Graphics.Hree.GL.Vertex as Hree (SpriteVertex(..))
-import qualified Graphics.Hree.Material.SpriteMaterial as Hree (baseColorTexture,
-                                                                spriteMaterial)
+import qualified Graphics.Hree.Material.SpriteMaterial as Material (SpriteMaterial(..),
+                                                                    SpriteMaterialBlock(..),
+                                                                    spriteMaterial)
 import qualified Graphics.Hree.Sampler as Hree (glTextureMagFilter,
                                                 glTextureMinFilter,
                                                 setSamplerParameter)
 import qualified Graphics.Hree.Scene as Hree (AddedMesh(..), addMesh, addNode,
                                               addSampler, addTexture, newNode,
                                               newRenderer, newScene,
-                                              renderScene, updateNode)
+                                              renderScene)
 import qualified Graphics.Hree.SceneTask as SceneTask
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
                                                 TextureSourceData(..))
-import Graphics.Hree.Types (Mesh(..), MeshId, Node(..))
+import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
-import Linear (V2(..), V3(..))
+import Linear (V2(..), V3(..), (!*))
 import Prelude hiding (init)
 
 data CharacterInfo = CharacterInfo
-    { meshStillFront     :: MeshId
-    , meshStillBack      :: MeshId
-    , meshStillLeft      :: MeshId
-    , meshStillRight     :: MeshId
-    , animationWalkFront :: Animation.AnimationClip
-    , animationWalkBack  :: Animation.AnimationClip
-    , animationWalkLeft  :: Animation.AnimationClip
-    , animationWalkRight :: Animation.AnimationClip
+    { stillFront         :: !(V2 (V2 Float))
+    , stillBack          :: !(V2 (V2 Float))
+    , stillLeft          :: !(V2 (V2 Float))
+    , stillRight         :: !(V2 (V2 Float))
+    , animationWalkFront :: !Animation.AnimationClip
+    , animationWalkBack  :: !Animation.AnimationClip
+    , animationWalkLeft  :: !Animation.AnimationClip
+    , animationWalkRight :: !Animation.AnimationClip
     } deriving (Show)
 
 main :: IO ()
 main =
-    withWindow width height "node-mesh-animation-1" init onDisplay
+    withWindow width height "uv-animation-1" init onDisplay
 
     where
     width  = 640
@@ -62,6 +64,9 @@ main =
     tsize = V2 128 128
     V2 twidth theight = tsize
     V2 twidth' theight' = fmap fromIntegral tsize
+    uvCoordMat = V2 (V2 (1 / twidth') 0) (V2 0 (1 / theight'))
+
+    uvOffsetScale (V2 p s) = V2 (uvCoordMat !* p) s
 
     timepoints :: UV.Vector Int64
     timepoints = UV.map (* 1000000) $ UV.fromList
@@ -72,58 +77,61 @@ main =
         , 1000
         ]
 
-    walkFrontUVs, walkBackUVs, walkLeftUVs, walkRightUVs :: SV.Vector (V2 (V2 Float))
-    walkFrontUVs = SV.fromList
-        [ V2 (V2 16 31) (V2 16 (-16))
-        , V2 (V2 16 48) (V2 16 (-16))
-        , V2 (V2 16 31) (V2 16 (-16))
-        , V2 (V2 16 64) (V2 16 (-16))
-        , V2 (V2 16 31) (V2 16 (-16))
+    walkFrontUVs, walkBackUVs, walkLeftUVs, walkRightUVs :: UV.Vector (V2 (V2 Float))
+    walkFrontUVs = UV.fromList
+        [ V2 (V2 16 31) (V2 1 (-1))
+        , V2 (V2 16 48) (V2 1 (-1))
+        , V2 (V2 16 31) (V2 1 (-1))
+        , V2 (V2 16 64) (V2 1 (-1))
+        , V2 (V2 16 31) (V2 1 (-1))
         ]
-    walkBackUVs = SV.fromList
-        [ V2 (V2 48 31) (V2 16 (-16))
-        , V2 (V2 48 48) (V2 16 (-16))
-        , V2 (V2 48 31) (V2 16 (-16))
-        , V2 (V2 48 64) (V2 16 (-16))
-        , V2 (V2 48 31) (V2 16 (-16))
+    walkBackUVs = UV.fromList
+        [ V2 (V2 48 31) (V2 1 (-1))
+        , V2 (V2 48 48) (V2 1 (-1))
+        , V2 (V2 48 31) (V2 1 (-1))
+        , V2 (V2 48 64) (V2 1 (-1))
+        , V2 (V2 48 31) (V2 1 (-1))
         ]
-    walkLeftUVs = SV.fromList
-        [ V2 (V2 48 31) (V2 (-16) (-16))
-        , V2 (V2 48 48) (V2 (-16) (-16))
-        , V2 (V2 48 31) (V2 (-16) (-16))
-        , V2 (V2 48 64) (V2 (-16) (-16))
-        , V2 (V2 48 31) (V2 (-16) (-16))
+    walkLeftUVs = UV.fromList
+        [ V2 (V2 48 31) (V2 (-1) (-1))
+        , V2 (V2 48 48) (V2 (-1) (-1))
+        , V2 (V2 48 31) (V2 (-1) (-1))
+        , V2 (V2 48 64) (V2 (-1) (-1))
+        , V2 (V2 48 31) (V2 (-1) (-1))
         ]
-    walkRightUVs = SV.fromList
-        [ V2 (V2 32 31) (V2 16 (-16))
-        , V2 (V2 32 48) (V2 16 (-16))
-        , V2 (V2 32 31) (V2 16 (-16))
-        , V2 (V2 32 64) (V2 16 (-16))
-        , V2 (V2 32 31) (V2 16 (-16))
+    walkRightUVs = UV.fromList
+        [ V2 (V2 32 31) (V2 1 (-1))
+        , V2 (V2 32 48) (V2 1 (-1))
+        , V2 (V2 32 31) (V2 1 (-1))
+        , V2 (V2 32 64) (V2 1 (-1))
+        , V2 (V2 32 31) (V2 1 (-1))
         ]
 
     init w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
+        material <- createMaterial scene (uvOffsetScale $ UV.head walkFrontUVs)
+        Hree.AddedMesh meshId uniformBlockBinder <- createMesh scene material (V2 16 16)
+        let walkFront = createUvAnimation uniformBlockBinder walkFrontUVs
+            walkBack = createUvAnimation uniformBlockBinder walkBackUVs
+            walkLeft = createUvAnimation uniformBlockBinder walkLeftUVs
+            walkRight = createUvAnimation uniformBlockBinder walkRightUVs
+            characterInfo = CharacterInfo
+                (uvOffsetScale $ UV.head walkFrontUVs)
+                (uvOffsetScale $ UV.head walkBackUVs)
+                (uvOffsetScale $ UV.head walkLeftUVs)
+                (uvOffsetScale $ UV.head walkRightUVs)
+                walkFront
+                walkBack
+                walkLeft
+                walkRight
 
-        material <- createMaterial scene
-
-        stillFront <- createMesh scene material $ SV.head walkFrontUVs
-        stillBack <- createMesh scene material $ SV.head walkBackUVs
-        stillLeft <- createMesh scene material $ SV.head walkLeftUVs
-        stillRight <- createMesh scene material $ SV.head walkRightUVs
-        let node = Hree.newNode { nodeMesh = Just stillFront }
-        nodeId <- Hree.addNode scene node True
-        walkFront <- createNodeMeshAnimation scene material nodeId walkFrontUVs
-        walkBack <- createNodeMeshAnimation scene material nodeId walkBackUVs
-        walkLeft <- createNodeMeshAnimation scene material nodeId walkLeftUVs
-        walkRight <- createNodeMeshAnimation scene material nodeId walkRightUVs
-        let characterInfo = CharacterInfo stillFront stillBack stillLeft stillRight walkFront walkBack walkLeft walkRight
-
+        let node = Hree.newNode { nodeMesh = Just meshId }
+        _ <- Hree.addNode scene node True
         taskBoard <- SceneTask.newSceneTaskBoard scene
         taskId <- SceneTask.addSceneTask taskBoard SceneTask.Nop
 
-        GLFW.setKeyCallback w (Just $ keyCallback scene nodeId characterInfo taskBoard taskId)
+        GLFW.setKeyCallback w (Just $ keyCallback uniformBlockBinder characterInfo taskBoard taskId)
 
         camera <- newCamera proj la
         _ <- setCameraMouseControl w camera
@@ -147,7 +155,7 @@ main =
     -- image source https://opengameart.org/sites/default/files/RPG_assets.png
     imagePath = "examples/images/RPG_assets.png"
 
-    createMaterial scene = do
+    createMaterial scene (V2 off scale) = do
         image <- either (throwIO . userError) (return . Picture.convertRGBA8) =<< Picture.readImage imagePath
         let settings = Hree.TextureSettings 1 GL.GL_RGBA8 twidth theight False
         (_, texture) <- SV.unsafeWith (Picture.imageData image) $ \ptr -> do
@@ -156,20 +164,28 @@ main =
         (_, sampler) <- Hree.addSampler scene "material1"
         Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
         Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
-        let material = Hree.spriteMaterial { Hree.baseColorTexture = Just $ Hree.Texture (texture, sampler) }
+        let material = Material.spriteMaterial
+                { Material.uniformBlock = (Material.uniformBlock Material.spriteMaterial)
+                    { Material.uvOffset = off
+                    , Material.uvScale = scale
+                    }
+                , Material.baseColorTexture = Just $ Hree.Texture (texture, sampler)
+                }
         return material
 
-    createMesh scene material (V2 (V2 x y) (V2 w h)) = do
-        let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 (x / twidth') (y / theight')) (V2 (w / twidth') (h / theight'))
+    createMesh scene material (V2 w h) = do
+        let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 0 0) (V2 (w / twidth') (h / theight'))
         (geo, _) <- Hree.newSpriteGeometry scene
         geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
-        fmap Hree.addedMeshId . Hree.addMesh scene $ Mesh geo' material (Just 1)
+        Hree.addMesh scene $ Mesh geo' material (Just 1)
 
-    createMeshes scene material uvs = SV.mapM (createMesh scene material) uvs
-
-    createNodeMeshAnimation scene material nodeId uvs = do
-        meshIds <- createMeshes scene material uvs
-        return $ Animation.stepMesh scene nodeId timepoints meshIds
+    createUvAnimation ubb uvs =
+        let uvs' = UV.map uvOffsetScale uvs
+            setter (V2 off scale) = Hree.modifyUniformBlock (\a -> a { Material.uvOffset = off, Material.uvScale = scale }) ubb
+            track = Animation.VariationTrackDiscrete uvs'
+            keyFrames = Animation.KeyFrames Animation.InterpolationStep timepoints track
+            animation = Animation.singleVariationClip setter keyFrames
+        in animation
 
     resizeWindow' camera _ w h = do
         GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
@@ -182,22 +198,22 @@ main =
         PerspectiveProjection $ Perspective fov aspect near far
     updateProjectionAspectRatio p _ = p
 
-    keyCallback _ _ characterInfo taskBoard taskId _ key _ GLFW.KeyState'Pressed _ =
+    keyCallback _ characterInfo taskBoard taskId _ key _ GLFW.KeyState'Pressed _ =
         case resolveWalkAnimation characterInfo key of
             Just animation -> do
                 st <- Time.now
                 SceneTask.modifySceneTask taskBoard (const $ SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOptions True False)) taskId
             Nothing -> return ()
 
-    keyCallback scene nodeId characterInfo taskBoard taskId _ key _ GLFW.KeyState'Released _ =
-        case resolveStillMesh characterInfo key of
-            Just mesh -> do
+    keyCallback ubb characterInfo taskBoard taskId _ key _ GLFW.KeyState'Released _ =
+        case resolveStillUV characterInfo key of
+            Just (V2 off scale) -> do
                 SceneTask.modifySceneTask taskBoard (const SceneTask.Nop) taskId
-                _ <- Hree.updateNode scene nodeId (\node -> node { nodeMesh = Just mesh })
+                Hree.modifyUniformBlock (\a -> a { Material.uvOffset = off, Material.uvScale = scale }) ubb
                 return ()
             Nothing -> return ()
 
-    keyCallback _ _ _ _ _ _ _ _ _ _ = return ()
+    keyCallback _ _ _ _ _ _ _ _ _ = return ()
 
     resolveWalkAnimation characterInfo GLFW.Key'Up = Just $ animationWalkBack characterInfo
     resolveWalkAnimation characterInfo GLFW.Key'Down = Just $ animationWalkFront characterInfo
@@ -205,8 +221,8 @@ main =
     resolveWalkAnimation characterInfo GLFW.Key'Right = Just $ animationWalkRight characterInfo
     resolveWalkAnimation _ _ = Nothing
 
-    resolveStillMesh characterInfo GLFW.Key'Up = Just $ meshStillBack characterInfo
-    resolveStillMesh characterInfo GLFW.Key'Down = Just $ meshStillFront characterInfo
-    resolveStillMesh characterInfo GLFW.Key'Left = Just $ meshStillLeft characterInfo
-    resolveStillMesh characterInfo GLFW.Key'Right = Just $ meshStillRight characterInfo
-    resolveStillMesh _ _ = Nothing
+    resolveStillUV characterInfo GLFW.Key'Up = Just $ stillBack characterInfo
+    resolveStillUV characterInfo GLFW.Key'Down = Just $ stillFront characterInfo
+    resolveStillUV characterInfo GLFW.Key'Left = Just $ stillLeft characterInfo
+    resolveStillUV characterInfo GLFW.Key'Right = Just $ stillRight characterInfo
+    resolveStillUV _ _ = Nothing
