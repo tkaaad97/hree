@@ -3,10 +3,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Hree.Scene
     ( AddedMesh(..)
-    , MeshId(..)
-    , MeshInfo(..)
-    , Scene(..)
-    , SceneState(..)
     , addBuffer
     , addIndexBufferUByte
     , addIndexBufferUInt

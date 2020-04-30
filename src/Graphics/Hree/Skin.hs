@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Hree.Skin
-    ( maxJointCount
+    ( Skin
+    , maxJointCount
     ) where
 
 import Data.Proxy (Proxy(..))

@@ -1,22 +1,22 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTs                     #-}
 module Graphics.Hree.Animation
-    ( AnimationClip(..)
-    , AnimationChannel(..)
-    , TransformChannel(..)
-    , VariationChannel(..)
+    ( AnimationChannel(..)
+    , AnimationClip(..)
     , Interpolation(..)
     , KeyFrames(..)
+    , TransformChannel(..)
     , TransformTrack(..)
+    , VariationChannel(..)
     , VariationTrack(..)
     , animationClip
     , animationClipTransform
     , animationClipVariation
     , applyAnimationClip
-    , interpolateTransform
     , interpolateLinear
-    , interpolateStep
     , interpolateQuaternion
+    , interpolateStep
+    , interpolateTransform
     , linearRotation
     , linearScale
     , linearTranslation
@@ -24,12 +24,12 @@ module Graphics.Hree.Animation
     , singleTransformChannel
     , singleTransformClip
     , singleVariationClip
+    , stepMesh
     , stepRotation
     , stepScale
     , stepTranslation
-    , stepMesh
-    , transformClip
     , transformChannel
+    , transformClip
     ) where
 
 import Chronos (Timespan(..))
