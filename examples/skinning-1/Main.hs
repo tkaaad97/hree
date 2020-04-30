@@ -9,27 +9,20 @@ import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 import Example
 import Foreign (Storable(..), castPtr, plusPtr)
-import qualified GLW
 import qualified Graphics.GL as GL
+import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Animation as Animation
-import Graphics.Hree.Camera
-import qualified Graphics.Hree.Geometry as Geometry
 import Graphics.Hree.GL (attribFormat, attribIFormat)
-import Graphics.Hree.GL.Types (BindBufferSetting(..), IVec4, Vec3, Vec4)
-import Graphics.Hree.GL.Vertex (Vertex(..), VertexField(..), VertexSpec(..))
-import qualified Graphics.Hree.Light as Light
 import qualified Graphics.Hree.Material.StandardMaterial as Material
-import qualified Graphics.Hree.Scene as Scene
 import qualified Graphics.Hree.SceneTask as SceneTask
-import Graphics.Hree.Types (Geometry(..), Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (Quaternion(..), V3(..), V4(..))
 import Prelude hiding (init)
 
 data SkinVertex = SkinVertex
-    { vertexPosition     :: !Vec3
-    , vertexJointIndices :: !IVec4
-    , vertexJointWeights :: !Vec4
+    { vertexPosition     :: !Hree.Vec3
+    , vertexJointIndices :: !Hree.IVec4
+    , vertexJointWeights :: !Hree.Vec4
     } deriving (Show, Eq)
 
 instance Storable SkinVertex where
@@ -48,19 +41,19 @@ instance Storable SkinVertex where
         poke (castPtr ptr `plusPtr` 12) i
         poke (castPtr ptr `plusPtr` 28) w
 
-instance Vertex SkinVertex where
-    vertexSpec _ = VertexSpec bbs fields
+instance Hree.Vertex SkinVertex where
+    vertexSpec _ = Hree.VertexSpec bbs fields
 
         where
-        positionField = VertexField "position" (attribFormat 3 GL.GL_FLOAT False 0)
-        jointIndicesField = VertexField "jointIndices" (attribIFormat 4 GL.GL_INT 12)
-        jointWeightsField = VertexField "jointWeights" (attribFormat 4 GL.GL_FLOAT False 28)
+        positionField = Hree.VertexField "position" (attribFormat 3 GL.GL_FLOAT False 0)
+        jointIndicesField = Hree.VertexField "jointIndices" (attribIFormat 4 GL.GL_INT 12)
+        jointWeightsField = Hree.VertexField "jointWeights" (attribFormat 4 GL.GL_FLOAT False 28)
         fields =
             [ positionField
             , jointIndicesField
             , jointWeightsField
             ]
-        bbs = BindBufferSetting 0 (sizeOf (undefined :: SkinVertex)) 0
+        bbs = Hree.BindBufferSetting 0 (sizeOf (undefined :: SkinVertex)) 0
 
 main :: IO ()
 main =
@@ -116,35 +109,35 @@ main =
 
     defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = perspective 90 defaultAspect 0.001 1000.0
+    proj = Hree.perspective 90 defaultAspect 0.001 1000.0
 
-    la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
+    la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     init w = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
-        renderer <- Scene.newRenderer
-        scene <- Scene.newScene
+        renderer <- Hree.newRenderer
+        scene <- Hree.newScene
 
-        indexBuffer <- Scene.addIndexBufferUInt scene indices
-        geometry <- Geometry.addVerticesToGeometry Geometry.newGeometry { geometryIndexBuffer = Just indexBuffer } vs GL.GL_STREAM_DRAW scene
+        indexBuffer <- Hree.addIndexBufferUInt scene indices
+        geometry <- Hree.addVerticesToGeometry Hree.newGeometry { Hree.geometryIndexBuffer = Just indexBuffer } vs GL.GL_STREAM_DRAW scene
 
-        nodeId2 <- Scene.addNode scene Scene.newNode { nodeRotation = Quaternion 1 (V3 0 0 0) } False
-        nodeId1 <- Scene.addNode scene Scene.newNode { nodeChildren = BV.singleton nodeId2, nodeTranslation = V3 0 1 0 } False
-        nodeId0 <- Scene.addNode scene Scene.newNode { nodeChildren = BV.singleton nodeId1 } True
+        nodeId2 <- Hree.addNode scene Hree.newNode { Hree.nodeRotation = Quaternion 1 (V3 0 0 0) } False
+        nodeId1 <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.singleton nodeId2, Hree.nodeTranslation = V3 0 1 0 } False
+        nodeId0 <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.singleton nodeId1 } True
 
-        skinId <- Scene.addSkin scene nodeId0 (SV.fromList [nodeId1, nodeId2]) invMats
+        skinId <- Hree.addSkin scene nodeId0 (SV.fromList [nodeId1, nodeId2]) invMats
 
         let material = Material.standardMaterial $
                 Material.standardMaterialBlock
-                    {Material.metallicFactor = 0
+                    { Material.metallicFactor = 0
                     , Material.roughnessFactor = 0
                     , Material.baseColorFactor = V4 0.1 0.1 0.8 1.0
                     }
-            mesh = Mesh geometry material Nothing
-        meshId <- Scene.addedMeshId <$> Scene.addSkinnedMesh scene mesh skinId
+            mesh = Hree.Mesh geometry material Nothing
+        meshId <- Hree.addedMeshId <$> Hree.addSkinnedMesh scene mesh skinId
 
-        _ <- Scene.updateNode scene nodeId0 (\n -> n { nodeMesh = Just meshId })
+        _ <- Hree.updateNode scene nodeId0 (\n -> n { Hree.nodeMesh = Just meshId })
 
         let track = Animation.linearRotation timePoints rotations
             animation = Animation.singleTransformClip nodeId2 track
@@ -153,13 +146,13 @@ main =
         taskBoard <- SceneTask.newSceneTaskBoard scene
         _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOptions True False))
 
-        camera <- newCamera proj la
+        camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
 
-        let light = Light.directionalLight (V3 0.5 (-1) (-0.5)) (V3 1 1 1) 1
-        _ <- Scene.addLight scene light
+        let light = Hree.directionalLight (V3 0.5 (-1) (-0.5)) (V3 1 1 1) 1
+        _ <- Hree.addLight scene light
 
-        GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
+        GLFW.setWindowSizeCallback w (Just (resizeWindowWithCamera camera))
 
         return (renderer, scene, camera, taskBoard)
 
@@ -173,16 +166,5 @@ main =
 
         where
         render = do
-            Scene.renderScene r s c
+            Hree.renderScene r s c
             GLFW.swapBuffers w
-
-    resizeWindow' camera _ w h = do
-        GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
-        projection <- getCameraProjection camera
-        let aspect = fromIntegral w / fromIntegral h
-            projection' = updateProjectionAspectRatio projection aspect
-        updateProjection camera projection'
-
-    updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
-        PerspectiveProjection $ Perspective fov aspect near far
-    updateProjectionAspectRatio p _ = p

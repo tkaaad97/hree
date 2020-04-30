@@ -10,29 +10,15 @@ import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 import Example
 import qualified Foreign (castPtr)
-import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
+import Graphics.Hree as Hree
 import qualified Graphics.Hree.Animation as Animation
-import Graphics.Hree.Camera
-import Graphics.Hree.Geometry as Hree (addVerticesToGeometry, newSpriteGeometry)
-import qualified Graphics.Hree.GL.Types as Hree (Texture(..))
 import qualified Graphics.Hree.GL.UniformBlock as Hree (modifyUniformBlock)
-import qualified Graphics.Hree.GL.Vertex as Hree (SpriteVertex(..))
 import qualified Graphics.Hree.Material.SpriteMaterial as Material (SpriteMaterial(..),
                                                                     SpriteMaterialBlock(..),
                                                                     spriteMaterial)
-import qualified Graphics.Hree.Sampler as Hree (glTextureMagFilter,
-                                                glTextureMinFilter,
-                                                setSamplerParameter)
-import qualified Graphics.Hree.Scene as Hree (AddedMesh(..), addMesh, addNode,
-                                              addSampler, addTexture, newNode,
-                                              newRenderer, newScene,
-                                              renderScene)
 import qualified Graphics.Hree.SceneTask as SceneTask
-import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
-                                                TextureSourceData(..))
-import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), (!*))
 import Prelude hiding (init)
@@ -57,9 +43,9 @@ main =
     height = 480
     defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = orthographic (-defaultAspect) defaultAspect (-1.0) 1.0 0.01 10.0
+    proj = Hree.orthographic (-defaultAspect) defaultAspect (-1.0) 1.0 0.01 10.0
 
-    la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
+    la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     tsize = V2 128 128
     V2 twidth theight = tsize
@@ -126,17 +112,17 @@ main =
                 walkLeft
                 walkRight
 
-        let node = Hree.newNode { nodeMesh = Just meshId }
+        let node = Hree.newNode { Hree.nodeMesh = Just meshId }
         _ <- Hree.addNode scene node True
         taskBoard <- SceneTask.newSceneTaskBoard scene
         taskId <- SceneTask.addSceneTask taskBoard SceneTask.Nop
 
         GLFW.setKeyCallback w (Just $ keyCallback uniformBlockBinder characterInfo taskBoard taskId)
 
-        camera <- newCamera proj la
+        camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
 
-        GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
+        GLFW.setWindowSizeCallback w (Just (resizeWindowWithCamera camera))
         return (renderer, scene, camera, taskBoard)
 
     onDisplay (r, s, c, taskBoard) w = do
@@ -186,17 +172,6 @@ main =
             keyFrames = Animation.KeyFrames Animation.InterpolationStep timepoints track
             animation = Animation.singleVariationClip setter keyFrames
         in animation
-
-    resizeWindow' camera _ w h = do
-        GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
-        projection <- getCameraProjection camera
-        let aspect = fromIntegral w / fromIntegral h
-            projection' = updateProjectionAspectRatio projection aspect
-        updateProjection camera projection'
-
-    updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
-        PerspectiveProjection $ Perspective fov aspect near far
-    updateProjectionAspectRatio p _ = p
 
     keyCallback _ characterInfo taskBoard taskId _ key _ GLFW.KeyState'Pressed _ =
         case resolveWalkAnimation characterInfo key of

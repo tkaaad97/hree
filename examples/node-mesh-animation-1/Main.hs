@@ -10,36 +10,22 @@ import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 import Example
 import qualified Foreign (castPtr)
-import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
+import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Animation as Animation
-import Graphics.Hree.Camera
-import Graphics.Hree.Geometry as Hree (addVerticesToGeometry, newSpriteGeometry)
-import qualified Graphics.Hree.GL.Types as Hree (Texture(..))
-import qualified Graphics.Hree.GL.Vertex as Hree (SpriteVertex(..))
 import qualified Graphics.Hree.Material.SpriteMaterial as Hree (baseColorTexture,
                                                                 spriteMaterial)
-import qualified Graphics.Hree.Sampler as Hree (glTextureMagFilter,
-                                                glTextureMinFilter,
-                                                setSamplerParameter)
-import qualified Graphics.Hree.Scene as Hree (AddedMesh(..), addMesh, addNode,
-                                              addSampler, addTexture, newNode,
-                                              newRenderer, newScene,
-                                              renderScene, updateNode)
 import qualified Graphics.Hree.SceneTask as SceneTask
-import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
-                                                TextureSourceData(..))
-import Graphics.Hree.Types (Mesh(..), MeshId, Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..))
 import Prelude hiding (init)
 
 data CharacterInfo = CharacterInfo
-    { meshStillFront     :: MeshId
-    , meshStillBack      :: MeshId
-    , meshStillLeft      :: MeshId
-    , meshStillRight     :: MeshId
+    { meshStillFront     :: Hree.MeshId
+    , meshStillBack      :: Hree.MeshId
+    , meshStillLeft      :: Hree.MeshId
+    , meshStillRight     :: Hree.MeshId
     , animationWalkFront :: Animation.AnimationClip
     , animationWalkBack  :: Animation.AnimationClip
     , animationWalkLeft  :: Animation.AnimationClip
@@ -55,9 +41,9 @@ main =
     height = 480
     defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = orthographic (-defaultAspect) defaultAspect (-1.0) 1.0 0.01 10.0
+    proj = Hree.orthographic (-defaultAspect) defaultAspect (-1.0) 1.0 0.01 10.0
 
-    la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
+    la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     tsize = V2 128 128
     V2 twidth theight = tsize
@@ -112,7 +98,7 @@ main =
         stillBack <- createMesh scene material $ SV.head walkBackUVs
         stillLeft <- createMesh scene material $ SV.head walkLeftUVs
         stillRight <- createMesh scene material $ SV.head walkRightUVs
-        let node = Hree.newNode { nodeMesh = Just stillFront }
+        let node = Hree.newNode { Hree.nodeMesh = Just stillFront }
         nodeId <- Hree.addNode scene node True
         walkFront <- createNodeMeshAnimation scene material nodeId walkFrontUVs
         walkBack <- createNodeMeshAnimation scene material nodeId walkBackUVs
@@ -125,10 +111,10 @@ main =
 
         GLFW.setKeyCallback w (Just $ keyCallback scene nodeId characterInfo taskBoard taskId)
 
-        camera <- newCamera proj la
+        camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
 
-        GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
+        GLFW.setWindowSizeCallback w (Just (resizeWindowWithCamera camera))
         return (renderer, scene, camera, taskBoard)
 
     onDisplay (r, s, c, taskBoard) w = do
@@ -163,24 +149,13 @@ main =
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 (x / twidth') (y / theight')) (V2 (w / twidth') (h / theight'))
         (geo, _) <- Hree.newSpriteGeometry scene
         geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
-        fmap Hree.addedMeshId . Hree.addMesh scene $ Mesh geo' material (Just 1)
+        fmap Hree.addedMeshId . Hree.addMesh scene $ Hree.Mesh geo' material (Just 1)
 
     createMeshes scene material uvs = SV.mapM (createMesh scene material) uvs
 
     createNodeMeshAnimation scene material nodeId uvs = do
         meshIds <- createMeshes scene material uvs
         return $ Animation.stepMesh scene nodeId timepoints meshIds
-
-    resizeWindow' camera _ w h = do
-        GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
-        projection <- getCameraProjection camera
-        let aspect = fromIntegral w / fromIntegral h
-            projection' = updateProjectionAspectRatio projection aspect
-        updateProjection camera projection'
-
-    updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
-        PerspectiveProjection $ Perspective fov aspect near far
-    updateProjectionAspectRatio p _ = p
 
     keyCallback _ _ characterInfo taskBoard taskId _ key _ GLFW.KeyState'Pressed _ =
         case resolveWalkAnimation characterInfo key of
@@ -193,7 +168,7 @@ main =
         case resolveStillMesh characterInfo key of
             Just mesh -> do
                 SceneTask.modifySceneTask taskBoard (const SceneTask.Nop) taskId
-                _ <- Hree.updateNode scene nodeId (\node -> node { nodeMesh = Just mesh })
+                _ <- Hree.updateNode scene nodeId (\node -> node { Hree.nodeMesh = Just mesh })
                 return ()
             Nothing -> return ()
 

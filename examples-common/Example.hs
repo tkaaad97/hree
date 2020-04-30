@@ -4,6 +4,7 @@ module Example
     , setCameraMouseControl
     , shutdown
     , resizeWindow
+    , resizeWindowWithCamera
     , withWindow
     ) where
 
@@ -13,8 +14,8 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import Data.Word (Word8)
 import qualified GLW
-import Graphics.Hree.Camera
-import Graphics.Hree.CameraControl.SphericalControl
+import qualified Graphics.Hree.Camera as Hree
+import qualified Graphics.Hree.CameraControl.SphericalControl as Hree
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V4(..))
 import System.Exit (exitSuccess)
@@ -55,18 +56,31 @@ resizeWindow :: GLFW.WindowSizeCallback
 resizeWindow _ w h =
     GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
 
-setCameraMouseControl :: GLFW.Window -> Camera -> IO SphericalControl
+resizeWindowWithCamera :: Hree.Camera -> GLFW.WindowSizeCallback
+resizeWindowWithCamera camera _ w h = do
+    GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
+    projection <- Hree.getCameraProjection camera
+    let aspect = fromIntegral w / fromIntegral h
+        projection' = updateProjectionAspectRatio projection aspect
+    Hree.updateProjection camera projection'
+
+updateProjectionAspectRatio :: Hree.Projection -> Float -> Hree.Projection
+updateProjectionAspectRatio (Hree.PerspectiveProjection (Hree.Perspective fov _ near far)) aspect =
+    Hree.PerspectiveProjection $ Hree.Perspective fov aspect near far
+updateProjectionAspectRatio p _ = p
+
+setCameraMouseControl :: GLFW.Window -> Hree.Camera -> IO Hree.SphericalControl
 setCameraMouseControl w camera = do
-    control <- newSphericalControlDefault camera
-    setMouseButtonEventCallback w (enterSphericalControl control) (leaveSphericalControl control)
-    setEnterOrLeaveEventCallback w (const $ return ()) (leaveSphericalControl control)
-    setCursorMoveEventCallback w (updateSphericalControl control)
+    control <- Hree.newSphericalControlDefault camera
+    setMouseButtonEventCallback w (Hree.enterSphericalControl control) (Hree.leaveSphericalControl control)
+    setEnterOrLeaveEventCallback w (const $ return ()) (Hree.leaveSphericalControl control)
+    setCursorMoveEventCallback w (Hree.updateSphericalControl control)
     return control
 
     where
     setMouseButtonEventCallback _ onPress onRelease =
-        let callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Pressed _ = go w' (onPress SphericalControlModeOrbit)
-            callback w' GLFW.MouseButton'2 GLFW.MouseButtonState'Pressed _ = go w' (onPress SphericalControlModeZoom)
+        let callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Pressed _ = go w' (onPress Hree.SphericalControlModeOrbit)
+            callback w' GLFW.MouseButton'2 GLFW.MouseButtonState'Pressed _ = go w' (onPress Hree.SphericalControlModeZoom)
             callback w' GLFW.MouseButton'1 GLFW.MouseButtonState'Released _ = go w' onRelease
             callback w' GLFW.MouseButton'2 GLFW.MouseButtonState'Released _ = go w' onRelease
             callback _ _ _ _ = return ()

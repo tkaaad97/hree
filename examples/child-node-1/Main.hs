@@ -5,15 +5,11 @@ import qualified Chronos as Time (now)
 import qualified Data.Vector as BV
 import qualified Data.Vector.Unboxed as UV
 import Example
-import qualified GLW
 import qualified Graphics.GL as GL
+import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Animation as Animation
-import Graphics.Hree.Camera
-import Graphics.Hree.Geometry.Box
 import qualified Graphics.Hree.Material.FlatColorMaterial as Material
-import Graphics.Hree.Scene
 import qualified Graphics.Hree.SceneTask as SceneTask
-import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..), V4(..), axisAngle, inv44)
 import Prelude hiding (init)
@@ -27,40 +23,40 @@ main =
     height = 480
     defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = orthographic (-defaultAspect) defaultAspect (-1.0) 1.0 0.01 10.0
+    proj = Hree.orthographic (-defaultAspect) defaultAspect (-1.0) 1.0 0.01 10.0
 
-    la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
+    la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     inverseBindMatrix = Linear.inv44 (V4 (V4 1 0 0 0) (V4 0 1 0 0.05) (V4 0 0 1 0) (V4 0 0 0 1))
 
     init w = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
-        renderer <- newRenderer
-        scene <- newScene
-        (geometry, _) <- createBoxGeometry 0.5 0.1 0.1 scene
+        renderer <- Hree.newRenderer
+        scene <- Hree.newScene
+        (geometry, _) <- Hree.createBoxGeometry 0.5 0.1 0.1 scene
         let material = Material.flatColorMaterial (V4 0.1 0.1 0.95 1)
             childMaterial = Material.flatColorMaterial (V4 0.95 0.1 0.1 1)
-            childMesh = Mesh geometry childMaterial Nothing
-            mesh = Mesh geometry material Nothing
-        childMeshId <- addedMeshId <$> addMesh scene childMesh
-        meshId <- addedMeshId <$> addMesh scene mesh
+            childMesh = Hree.Mesh geometry childMaterial Nothing
+            mesh = Hree.Mesh geometry material Nothing
+        childMeshId <- Hree.addedMeshId <$> Hree.addMesh scene childMesh
+        meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
 
-        let childNode = newNode
-                { nodeMesh = Just childMeshId
-                , nodeTranslation = V3 0.5 0 0
-                , nodeScale = V3 0.5 1 1
-                , nodeInverseBindMatrix = inverseBindMatrix
+        let childNode = Hree.newNode
+                { Hree.nodeMesh = Just childMeshId
+                , Hree.nodeTranslation = V3 0.5 0 0
+                , Hree.nodeScale = V3 0.5 1 1
+                , Hree.nodeInverseBindMatrix = inverseBindMatrix
                 }
-        childNodeId <- addNode scene childNode False
+        childNodeId <- Hree.addNode scene childNode False
 
-        let node = newNode
-                { nodeMesh = Just meshId
-                , nodeTranslation = V3 0 0 0
-                , nodeChildren = BV.fromList [childNodeId]
-                , nodeInverseBindMatrix = inverseBindMatrix
+        let node = Hree.newNode
+                { Hree.nodeMesh = Just meshId
+                , Hree.nodeTranslation = V3 0 0 0
+                , Hree.nodeChildren = BV.fromList [childNodeId]
+                , Hree.nodeInverseBindMatrix = inverseBindMatrix
                 }
-        nodeId <- addNode scene node True
+        nodeId <- Hree.addNode scene node True
 
         let ms = 1000000
             timepoints = UV.fromList . map (* ms) $ [0, 5000, 10000]
@@ -74,10 +70,10 @@ main =
         taskBoard <- SceneTask.newSceneTaskBoard scene
         _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOptions True False))
 
-        camera <- newCamera proj la
+        camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
 
-        GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
+        GLFW.setWindowSizeCallback w (Just (resizeWindowWithCamera camera))
         return (renderer, scene, camera, taskBoard)
 
     onDisplay (r, s, c, taskBoard) w = do
@@ -89,16 +85,5 @@ main =
 
         where
         render = do
-            renderScene r s c
+            Hree.renderScene r s c
             GLFW.swapBuffers w
-
-    resizeWindow' camera _ w h = do
-        GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
-        projection <- getCameraProjection camera
-        let aspect = fromIntegral w / fromIntegral h
-            projection' = updateProjectionAspectRatio projection aspect
-        updateProjection camera projection'
-
-    updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
-        PerspectiveProjection $ Perspective fov aspect near far
-    updateProjectionAspectRatio p _ = p

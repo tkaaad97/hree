@@ -2,14 +2,10 @@
 module Main where
 
 import Example
-import qualified GLW
 import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
 import qualified Graphics.GL as GL
-import Graphics.Hree.Camera
-import Graphics.Hree.Light
+import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Material.StandardMaterial as Material
-import Graphics.Hree.Scene
-import Graphics.Hree.Types (Mesh(..), Node(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..))
 import Prelude hiding (init)
@@ -32,30 +28,30 @@ main = do
     height = 480
     defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = perspective 90 defaultAspect 0.1 1000.0
+    proj = Hree.perspective 90 defaultAspect 0.1 1000.0
 
-    la = lookAt (V3 0 0 10) (V3 0 0 0) (V3 0 1 0)
+    la = Hree.lookAt (V3 0 0 10) (V3 0 0 0) (V3 0 1 0)
 
     init path metalness roughness w = do
         GL.glEnable GL.GL_CULL_FACE
         GL.glEnable GL.GL_DEPTH_TEST
-        renderer <- newRenderer
-        scene <- newScene
+        renderer <- Hree.newRenderer
+        scene <- Hree.newScene
         geometry <- STL.loadGeometryFromFile path scene
         let material = Material.standardMaterial $
                 Material.standardMaterialBlock
                     { Material.metallicFactor = metalness
                     , Material.roughnessFactor = roughness
                     }
-            mesh = Mesh geometry material Nothing
-            light = directionalLight (V3 (-1) 0 (-5)) (V3 1 1 1) 1
-        meshId <- addedMeshId <$> addMesh scene mesh
-        _ <- addNode scene newNode{ nodeMesh = Just meshId } True
-        _ <- addLight scene light
-        camera <- newCamera proj la
+            mesh = Hree.Mesh geometry material Nothing
+            light = Hree.directionalLight (V3 (-1) 0 (-5)) (V3 1 1 1) 1
+        meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+        _ <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } True
+        _ <- Hree.addLight scene light
+        camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
 
-        GLFW.setWindowSizeCallback w (Just (resizeWindow' camera))
+        GLFW.setWindowSizeCallback w (Just (resizeWindowWithCamera camera))
         return (renderer, scene, camera)
 
     onDisplay (r, s, c) w = do
@@ -65,17 +61,5 @@ main = do
 
         where
         render = do
-            renderScene r s c
+            Hree.renderScene r s c
             GLFW.swapBuffers w
-
-    resizeWindow' camera _ w h = do
-        GLW.glViewport 0 0 (fromIntegral w) (fromIntegral h)
-        projection <- getCameraProjection camera
-        let aspect = fromIntegral w / fromIntegral h
-            projection' = updateProjectionAspectRatio projection aspect
-        updateProjection camera projection'
-
-    updateProjectionAspectRatio (PerspectiveProjection (Perspective fov _ near far)) aspect =
-        PerspectiveProjection $ Perspective fov aspect near far
-    updateProjectionAspectRatio p _ = p
-
