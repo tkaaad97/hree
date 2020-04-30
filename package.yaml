@@ -7,7 +7,7 @@ maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
 
 extra-source-files:
-- shader/**/*.glsl
+  - shader/**/*.glsl
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -19,201 +19,227 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/hree#readme>
 
 dependencies:
-- base >= 4.7 && < 5
-- JuicyPixels
-- aeson
-- atomic-primops
-- attoparsec
-- binary
-- bytestring
-- base64-bytestring
-- cereal
-- chronos
-- containers
-- directory
-- filepath
-- file-embed
-- gl
-- gl-wrapper
-- hashable
-- hashtables
-- linear
-- mwc-random
-- template-haskell
-- text
-- transformers
-- unordered-containers
-- vector
-- zlib
+  - base >= 4.7 && < 5
+  - JuicyPixels
+  - aeson
+  - atomic-primops
+  - attoparsec
+  - binary
+  - bytestring
+  - base64-bytestring
+  - cereal
+  - chronos
+  - containers
+  - directory
+  - filepath
+  - file-embed
+  - gl
+  - gl-wrapper
+  - hashable
+  - hashtables
+  - linear
+  - mwc-random
+  - template-haskell
+  - text
+  - transformers
+  - unordered-containers
+  - vector
+  - zlib
 
 ghc-options:
-- -Wall
-- -Wcompat
-- -Widentities
-- -Wincomplete-record-updates
-- -Wincomplete-uni-patterns
-- -Wpartial-fields
-- -Wredundant-constraints
-- -Wtabs
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wpartial-fields
+  - -Wredundant-constraints
+  - -Wtabs
 
 library:
   ghc-options:
     - -O2
   source-dirs: src
 
+_exe-common: &exe-common
+  source-dirs:
+    - examples
+  other-modules:
+    - Example
+    - FlatColor1
+  dependencies:
+    - hree
+    - GLFW-b
+
 executables:
+  child-node-1:
+    <<: *exe-common
+    main:                ChildNode1.hs
+    other-modules:
+      - Example
+      - ChildNode1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - ChildNode1
+
   flat-color-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/flat-color-1
-    - examples-common
+    <<: *exe-common
+    main:                FlatColor1.hs
+    other-modules:
+      - Example
+      - FlatColor1
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hree
-    - GLFW-b
-
-  texture-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/texture-1
-    - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hree
-    - GLFW-b
-
-  geometry-box-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/geometry-box-1
-    - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hree
-    - GLFW-b
-
-  transform-rotate-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/transform-rotate-1
-    - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hree
-    - GLFW-b
-
-  sprite-instanced-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/sprite-instanced-1
-    - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hree
-    - GLFW-b
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - FlatColor1
 
   format-loader-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/format-loader-1
-    - examples-common
+    <<: *exe-common
+    main:                FormatLoader1.hs
+    other-modules:
+      - Example
+      - FormatLoader1
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hree
-    - GLFW-b
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - FormatLoader1
+
+  geometry-box-1:
+    <<: *exe-common
+    main:                GeometryBox1.hs
+    other-modules:
+      - Example
+      - GeometryBox1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - GeometryBox1
 
   gltf-minimal-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/gltf-minimal-1
-    - examples-common
+    <<: *exe-common
+    main:                GLTFMinimal1.hs
+    other-modules:
+      - Example
+      - GLTFMinimal1
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hree
-    - GLFW-b
-
-  child-node-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/child-node-1
-    - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hree
-    - GLFW-b
-
-  standard-material-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/standard-material-1
-    - examples-common
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hree
-    - GLFW-b
-
-  skinning-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/skinning-1
-    - examples-common
-    dependencies:
-    - hree
-    - GLFW-b
-
-  tiled-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/tiled-1
-    - examples-common
-    dependencies:
-    - hree
-    - GLFW-b
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - GLTFMinimal1
 
   node-mesh-animation-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/node-mesh-animation-1
-    - examples-common
-    dependencies:
-    - hree
-    - GLFW-b
+    <<: *exe-common
+    main:                NodeMeshAnimation1.hs
+    other-modules:
+      - Example
+      - NodeMeshAnimation1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - NodeMeshAnimation1
+
+  skinning-1:
+    <<: *exe-common
+    main:                Skinning1.hs
+    other-modules:
+      - Example
+      - Skinning1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - Skinning1
+
+  sprite-instanced-1:
+    <<: *exe-common
+    main:                SpriteInstanced1.hs
+    other-modules:
+      - Example
+      - SpriteInstanced1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - SpriteInstanced1
+
+  standard-material-1:
+    <<: *exe-common
+    main:                StandardMaterial1.hs
+    other-modules:
+      - Example
+      - StandardMaterial1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - StandardMaterial1
+
+  texture-1:
+    <<: *exe-common
+    main:                Texture1.hs
+    other-modules:
+      - Example
+      - Texture1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - Texture1
+
+  tiled-1:
+    <<: *exe-common
+    main:                FlatColor1.hs
+    other-modules:
+      - Example
+      - FlatColor1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - FlatColor1
+
+  transform-rotate-1:
+    <<: *exe-common
+    main:                TransformRotate1.hs
+    other-modules:
+      - Example
+      - TransformRotate1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - TransformRotate1
 
   uv-animation-1:
-    main:                Main.hs
-    source-dirs:
-    - examples/uv-animation-1
-    - examples-common
-    dependencies:
-    - hree
-    - GLFW-b
+    <<: *exe-common
+    main:                UvAnimation1.hs
+    other-modules:
+      - Example
+      - UvAnimation1
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -main-is
+      - UvAnimation1
 
 tests:
   hree-test:

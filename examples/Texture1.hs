@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+module Texture1 where
 
 import qualified Data.Vector.Storable as Vector
 import Data.Word (Word8)

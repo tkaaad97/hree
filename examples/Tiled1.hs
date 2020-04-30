@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+module Tiled1 where
 
 import Control.Concurrent (threadDelay)
 import Example

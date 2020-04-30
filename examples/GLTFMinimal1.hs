@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+module GLTFMinimal1 where
 
 import Control.Monad (void)
 import Example

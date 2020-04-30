@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+module Skinning1 where
 
 import qualified Chronos as Time (now)
 import Control.Concurrent (threadDelay)

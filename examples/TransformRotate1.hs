@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+module TransformRotate1 where
 
 import Example
 import qualified Graphics.GL as GL

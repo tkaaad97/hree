@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+module StandardMaterial1 where
 
 import Example
 import qualified Graphics.Format.STL as STL (loadGeometryFromFile)

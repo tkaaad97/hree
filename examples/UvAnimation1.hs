@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+module UvAnimation1 where
 
 import qualified Chronos as Time (now)
 import qualified Codec.Picture as Picture (Image(..), convertRGBA8, readImage)

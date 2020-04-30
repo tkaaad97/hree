@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+module ChildNode1 where
 
 import qualified Chronos as Time (now)
 import qualified Data.Vector as BV

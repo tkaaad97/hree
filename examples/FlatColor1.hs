@@ -1,4 +1,4 @@
-module Main where
+module FlatColor1 where
 
 import qualified Data.Vector.Storable as Vector
 import Example
