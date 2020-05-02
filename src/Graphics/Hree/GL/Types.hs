@@ -129,6 +129,56 @@ data ProgramInfo = ProgramInfo
     , programInfoBufferBindingPoints :: !(BV.Vector (ByteString, BufferBindingIndex))
     } deriving (Show)
 
+data DepthOption = DepthOption
+    { depthOptionDepthTest     :: !Bool
+    , depthOptionDepthMask     :: !Bool
+    , depthOptionDepthFunction :: !GLW.DepthFunction
+    } deriving (Show, Eq)
+
+data BlendingSeparateOption = BlendingSeparateOption
+    { blendingOptionBlendEquation :: !GL.GLenum
+    , blendingOptionFunction      :: !(GL.GLenum, GL.GLenum)
+    } deriving (Show, Eq)
+
+data BlendingOption = BlendingOption
+    { blendingOptionEnabled :: !Bool
+    , blendingOptionRGB     :: !BlendingSeparateOption
+    , blendingOptionAlpha   :: !BlendingSeparateOption
+    } deriving (Show, Eq)
+
+data StencilFuncArgs = StencilFuncArgs
+    { stencilFuncArgsFunc :: !GLW.StencilFunction
+    , stencilFuncArgsRef  :: !GL.GLint
+    , stencilFuncArgsMask :: !GL.GLuint
+    } deriving (Show, Eq)
+
+data StencilOpArgs = StencilOpArgs
+    { stencilOpArgsSFail  :: !GLW.StencilOp
+    , stencilOpArgsDpFail :: !GLW.StencilOp
+    , stencilOpArgsDpPass :: !GLW.StencilOp
+    } deriving (Show, Eq)
+
+data FaceStencilOption = StencilSeparateOption
+    { faceStencilOptionStencilFunc :: !StencilFuncArgs
+    , faceStencilOptionStencilOp   :: !StencilOpArgs
+    , faceStencilOptionStencilMask :: !GL.GLuint
+    } deriving (Show, Eq)
+
+data StencilOption = StencilOption
+    { stencilOptionStencilTest :: !Bool
+    , stencilOptionFront       :: !FaceStencilOption
+    , stencilOptionBack        :: !FaceStencilOption
+    } deriving (Show, Eq)
+
+data RenderOption = RenderOption
+    { renderOptionCullFace  :: !(Maybe GLW.CullFaceMode)
+    , renderOptionFlipSided :: !Bool
+    , renderOptionDepth     :: !DepthOption
+    , renderOptionBlending  :: !BlendingOption
+    , renderOptionStencil   :: !StencilOption
+    , renderOptionColorMask :: !BVec4
+    } deriving (Show, Eq)
+
 data RenderInfo = RenderInfo
     { riProgram       :: !ProgramInfo
     , riDrawMethod    :: !DrawMethod
