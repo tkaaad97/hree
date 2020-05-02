@@ -2,8 +2,8 @@ module Graphics.Hree.GL
     ( attribFormat
     , attribIFormat
     , attribLFormat
-    , mkBuffer
-    , mkVertexArray
+    , createBuffer
+    , createVertexArray
     , renderMany
     , updateBuffer
     ) where
@@ -87,19 +87,19 @@ drawWith (DrawElements mode num dataType indices) = GLW.glDrawElements mode num 
 drawWith (DrawArraysInstanced mode index num inum) = GLW.glDrawArraysInstanced mode index num inum
 drawWith (DrawElementsInstanced mode num dataType indices inum) = GLW.glDrawElementsInstanced mode num dataType indices inum
 
-mkBuffer :: BufferSource -> IO GLW.Buffer
-mkBuffer (BufferSourcePtr ptr usage) = do
+createBuffer :: BufferSource -> IO GLW.Buffer
+createBuffer (BufferSourcePtr ptr usage) = do
     let size = fromIntegral $ Foreign.sizeOf (asProxyTypeOf undefined ptr)
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
     return buffer
-mkBuffer (BufferSourceVector vec usage) = do
+createBuffer (BufferSourceVector vec usage) = do
     let n = SV.length vec
         size = fromIntegral $ n * Foreign.sizeOf (SV.head vec)
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     SV.unsafeWith vec $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
     return buffer
-mkBuffer (BufferSourceByteString bs usage) = do
+createBuffer (BufferSourceByteString bs usage) = do
     let size = fromIntegral $ ByteString.length bs
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     ByteString.unsafeUseAsCString bs $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
@@ -117,8 +117,8 @@ updateBuffer buffer (BufferSourceByteString bs usage) = do
     let size = fromIntegral $ ByteString.length bs
     ByteString.unsafeUseAsCString bs $ \ptr -> GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
 
-mkVertexArray :: Map ByteString AttribBinding -> IntMap (GLW.Buffer, BindBufferSetting) -> Maybe IndexBuffer -> ProgramInfo -> IO GLW.VertexArray
-mkVertexArray attribBindings buffers indexBuffer programInfo = do
+createVertexArray :: Map ByteString AttribBinding -> IntMap (GLW.Buffer, BindBufferSetting) -> Maybe IndexBuffer -> ProgramInfo -> IO GLW.VertexArray
+createVertexArray attribBindings buffers indexBuffer programInfo = do
     GLW.glUseProgram program
     vao <- GLW.createObject (Proxy :: Proxy GLW.VertexArray)
     mapM_ (setAttrib vao) (Map.toList attribBindings)

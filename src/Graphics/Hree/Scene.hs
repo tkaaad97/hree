@@ -306,7 +306,7 @@ mkMeshVertexArray scene meshInfo program =
     meshStore = sceneMeshStore scene
     setVao vao a = a { meshInfoVertexArray = Just vao }
     f = do
-        vao <- mkVertexArray (geometryAttribBindings geo) (geometryBuffers geo) (geometryIndexBuffer geo) program
+        vao <- createVertexArray (geometryAttribBindings geo) (geometryBuffers geo) (geometryIndexBuffer geo) program
         void $ Component.modifyComponent meshStore (setVao vao) meshId
         return vao
 
@@ -442,7 +442,7 @@ updateMeshInstanceCount scene meshId c =
 
 addBuffer :: Scene -> BufferSource -> IO GLW.Buffer
 addBuffer scene bufferSource = do
-    buffer <- mkBuffer bufferSource
+    buffer <- createBuffer bufferSource
     addBufferResource scene buffer
     return buffer
 
