@@ -6,10 +6,20 @@ module Graphics.Hree.GL
     , createVertexArray
     , renderMany
     , updateBuffer
+    , getFrontFaceStencilOption
+    , getBackFaceStencilOption
+    , getStencilOption
+    , setRenderOption
+    , setCullFace
+    , setDepthOption
+    , setBlendingOption
+    , setBlendingSeparateOption
+    , setStencilOption
+    , setFaceStencilOption
     ) where
 
 import Control.Exception (throwIO)
-import Control.Monad (void, when)
+import Control.Monad (unless, void, when)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (length)
 import qualified Data.ByteString.Unsafe as ByteString (unsafeUseAsCString)
@@ -21,11 +31,16 @@ import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy(..), asProxyTypeOf)
 import qualified Data.Vector as BV (Vector, mapMaybe)
 import qualified Data.Vector.Storable as SV
-import qualified Foreign (Storable(..), castPtr)
+import qualified Foreign (Storable(..), alloca, castPtr)
 import qualified GLW
+import qualified GLW.Groups.Boolean as Boolean
+import qualified GLW.Groups.EnableCap as EnableCap
+import qualified GLW.Groups.FrontFaceDirection as FrontFaceDirection
+import qualified GLW.Internal.Groups as GLW (StencilFunction(..), StencilOp(..))
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
+import Linear (V4(..))
 import System.IO.Error (userError)
 
 render :: BV.Vector (ByteString, BufferBindingIndex) -> RenderInfo -> Maybe GLW.Program -> IO (Maybe GLW.Program)
@@ -86,6 +101,175 @@ drawWith (DrawArrays mode index num) = GLW.glDrawArrays mode index num
 drawWith (DrawElements mode num dataType indices) = GLW.glDrawElements mode num dataType indices
 drawWith (DrawArraysInstanced mode index num inum) = GLW.glDrawArraysInstanced mode index num inum
 drawWith (DrawElementsInstanced mode num dataType indices inum) = GLW.glDrawElementsInstanced mode num dataType indices inum
+
+setRenderOption :: Maybe RenderOption -> RenderOption -> IO ()
+setRenderOption beforeOption option = do
+    setCullFace (renderOptionCullFace =<< beforeOption) (renderOptionCullFace option)
+    setFlipSided (renderOptionFlipSided <$> beforeOption) (renderOptionFlipSided option)
+    setDepthOption (renderOptionDepth <$> beforeOption) (renderOptionDepth option)
+    setBlendingOption (renderOptionBlending <$> beforeOption) (renderOptionBlending option)
+    setStencilOption (renderOptionStencil <$> beforeOption) (renderOptionStencil option)
+    setColorMask (renderOptionColorMask <$> beforeOption) (renderOptionColorMask option)
+
+setCullFace :: Maybe GLW.CullFaceMode -> Maybe GLW.CullFaceMode -> IO ()
+setCullFace Nothing Nothing = GLW.glDisable EnableCap.glCullFace
+setCullFace Nothing (Just a) = do
+    GLW.glEnable EnableCap.glCullFace
+    GLW.glCullFace a
+setCullFace (Just a) (Just b)
+    | a == b = return ()
+    | otherwise = GLW.glCullFace b
+setCullFace (Just _) Nothing = GLW.glDisable EnableCap.glCullFace
+
+setFlipSided :: Maybe Bool -> Bool -> IO ()
+setFlipSided Nothing True =
+    GLW.glFrontFace FrontFaceDirection.glCw
+setFlipSided Nothing False =
+    GLW.glFrontFace FrontFaceDirection.glCcw
+setFlipSided (Just beforeOption) option
+    | beforeOption == option = return ()
+    | option = GLW.glFrontFace FrontFaceDirection.glCw
+    | otherwise = GLW.glFrontFace FrontFaceDirection.glCcw
+
+setDepthOption :: Maybe DepthOption -> DepthOption -> IO ()
+setDepthOption Nothing option = do
+    if depthOptionDepthTest option
+        then GLW.glEnable EnableCap.glDepthTest
+        else GLW.glDisable EnableCap.glDepthTest
+    GLW.glDepthMask (if depthOptionDepthMask option then Boolean.glTrue else Boolean.glFalse)
+    GLW.glDepthFunc (depthOptionDepthFunction option)
+setDepthOption (Just beforeOption) option = do
+    unless (depthOptionDepthTest beforeOption == depthOptionDepthTest option) $
+        if depthOptionDepthTest option
+            then GLW.glEnable EnableCap.glDepthTest
+            else GLW.glDisable EnableCap.glDepthTest
+    unless (depthOptionDepthMask beforeOption == depthOptionDepthMask option) $
+        GLW.glDepthMask (if depthOptionDepthMask option then Boolean.glTrue else Boolean.glFalse)
+    unless (depthOptionDepthFunction beforeOption == depthOptionDepthFunction option) $
+        GLW.glDepthFunc (depthOptionDepthFunction option)
+
+setBlendingOption :: Maybe BlendingOption -> BlendingOption -> IO ()
+setBlendingOption Nothing option = do
+    let BlendingOption enabled rgb alpha = option
+    if enabled
+        then GLW.glEnable EnableCap.glBlend
+        else GLW.glDisable EnableCap.glBlend
+    when enabled $
+        setBlendingSeparateOption Nothing (rgb, alpha)
+setBlendingOption (Just beforeOption) option = do
+    let BlendingOption beforeEnabled beforeRgb beforeAlpha = beforeOption
+        BlendingOption enabled rgb alpha = option
+    unless (beforeEnabled == enabled) $
+        if enabled
+            then GLW.glEnable EnableCap.glBlend
+            else GLW.glDisable EnableCap.glBlend
+    when enabled $
+        setBlendingSeparateOption (Just (beforeRgb, beforeAlpha)) (rgb, alpha)
+
+setBlendingSeparateOption :: Maybe (BlendingSeparateOption, BlendingSeparateOption) -> (BlendingSeparateOption, BlendingSeparateOption) -> IO ()
+setBlendingSeparateOption Nothing (BlendingSeparateOption rgbEq (rgbSrc, rgbDest), BlendingSeparateOption alphaEq (alphaSrc, alphaDest)) = do
+    GL.glBlendEquationSeparate rgbEq alphaEq
+    GL.glBlendFuncSeparate rgbSrc rgbDest alphaSrc alphaDest
+setBlendingSeparateOption (Just beforeOption) option = do
+    let (BlendingSeparateOption beforeRgbEq (beforeRgbSrc, beforeRgbDest), BlendingSeparateOption beforeAlphaEq (beforeAlphaSrc, beforeAlphaDest)) = beforeOption
+        (BlendingSeparateOption rgbEq (rgbSrc, rgbDest), BlendingSeparateOption alphaEq (alphaSrc, alphaDest)) = option
+    unless (beforeRgbEq == rgbEq && beforeAlphaEq == alphaEq) $
+        GL.glBlendEquationSeparate rgbEq alphaEq
+    unless (beforeRgbSrc == rgbSrc && beforeRgbDest == rgbDest && beforeAlphaSrc == alphaSrc && beforeAlphaDest == alphaDest) $
+        GL.glBlendFuncSeparate rgbSrc rgbDest alphaSrc alphaDest
+
+getStencilOption :: IO StencilOption
+getStencilOption = do
+    enabled <- toBool <$> getBooleanv GL.GL_STENCIL_TEST
+    front <- getFrontFaceStencilOption
+    back <- getBackFaceStencilOption
+    return $ StencilOption enabled front back
+
+setStencilOption :: Maybe StencilOption -> StencilOption -> IO ()
+setStencilOption Nothing option = do
+    if stencilOptionStencilTest option
+        then GLW.glEnable EnableCap.glStencilTest
+        else GLW.glDisable EnableCap.glStencilTest
+    let front = stencilOptionFront option
+        back = stencilOptionBack option
+    if front == back
+        then setFaceStencilOption GL.GL_FRONT_AND_BACK Nothing front
+        else do
+            setFaceStencilOption GL.GL_FRONT Nothing front
+            setFaceStencilOption GL.GL_BACK Nothing back
+setStencilOption (Just beforeOption) option = do
+    let StencilOption beforeTest beforeFront beforeBack = beforeOption
+        StencilOption test front back = option
+
+    unless (beforeTest == test) $
+        if test
+            then GLW.glEnable EnableCap.glStencilTest
+            else GLW.glDisable EnableCap.glStencilTest
+
+    unless (beforeFront == front && beforeBack == back) $
+        if beforeFront == beforeBack && front == back
+            then setFaceStencilOption GL.GL_FRONT_AND_BACK (Just beforeFront) front
+            else do
+                setFaceStencilOption GL.GL_FRONT (Just beforeFront) front
+                setFaceStencilOption GL.GL_BACK (Just beforeBack) back
+
+getFrontFaceStencilOption :: IO FaceStencilOption
+getFrontFaceStencilOption = do
+    func <- fromIntegral <$> getInteger64v GL.GL_STENCIL_FUNC
+    ref <- getIntegerv GL.GL_STENCIL_REF
+    fmask <- fromIntegral <$> getInteger64v GL.GL_STENCIL_VALUE_MASK
+    sfail <- fromIntegral <$> getInteger64v GL.GL_STENCIL_FAIL
+    dpfail <- fromIntegral <$> getInteger64v GL.GL_STENCIL_PASS_DEPTH_FAIL
+    dppass <- fromIntegral <$> getInteger64v GL.GL_STENCIL_PASS_DEPTH_PASS
+    writeMask <- fromIntegral <$> getInteger64v GL.GL_STENCIL_WRITEMASK
+    let funcArgs = StencilFuncArgs (GLW.StencilFunction func) ref fmask
+        opArgs = StencilOpArgs (GLW.StencilOp sfail) (GLW.StencilOp dpfail) (GLW.StencilOp dppass)
+        option = FaceStencilOption funcArgs opArgs writeMask
+    return option
+
+getBackFaceStencilOption :: IO FaceStencilOption
+getBackFaceStencilOption = do
+    func <- fromIntegral <$> getInteger64v GL.GL_STENCIL_BACK_FUNC
+    ref <- getIntegerv GL.GL_STENCIL_BACK_REF
+    fmask <- fromIntegral <$> getInteger64v GL.GL_STENCIL_BACK_VALUE_MASK
+    sfail <- fromIntegral <$> getInteger64v GL.GL_STENCIL_BACK_FAIL
+    dpfail <- fromIntegral <$> getInteger64v GL.GL_STENCIL_BACK_PASS_DEPTH_FAIL
+    dppass <- fromIntegral <$> getInteger64v GL.GL_STENCIL_BACK_PASS_DEPTH_PASS
+    writeMask <- fromIntegral <$> getInteger64v GL.GL_STENCIL_BACK_WRITEMASK
+    let funcArgs = StencilFuncArgs (GLW.StencilFunction func) ref fmask
+        opArgs = StencilOpArgs (GLW.StencilOp sfail) (GLW.StencilOp dpfail) (GLW.StencilOp dppass)
+        option = FaceStencilOption funcArgs opArgs writeMask
+    return option
+
+setFaceStencilOption :: GL.GLenum -> Maybe FaceStencilOption -> FaceStencilOption -> IO ()
+setFaceStencilOption face Nothing option = do
+    let StencilFuncArgs func ref fmask = faceStencilOptionStencilFunc option
+        StencilOpArgs sfail dpfail dppass = faceStencilOptionStencilOp option
+        mask = faceStencilOptionStencilMask option
+    GLW.glStencilFuncSeparate face func ref fmask
+    GLW.glStencilOpSeparate face sfail dpfail dppass
+    GLW.glStencilMaskSeparate face mask
+setFaceStencilOption face (Just beforeOption) option = do
+    let beforeFuncArgs = faceStencilOptionStencilFunc beforeOption
+        funcArgs = faceStencilOptionStencilFunc option
+        beforeOpArgs = faceStencilOptionStencilOp beforeOption
+        opArgs = faceStencilOptionStencilOp option
+        StencilFuncArgs func ref fmask = funcArgs
+        StencilOpArgs sfail dpfail dppass = opArgs
+        beforeMask = faceStencilOptionStencilMask beforeOption
+        mask = faceStencilOptionStencilMask option
+    unless (beforeFuncArgs == funcArgs) $
+        GLW.glStencilFuncSeparate face func ref fmask
+    unless (beforeOpArgs == opArgs) $
+        GLW.glStencilOpSeparate face sfail dpfail dppass
+    unless (beforeMask == mask) $
+        GLW.glStencilMaskSeparate face mask
+
+setColorMask :: Maybe BVec4 -> BVec4 -> IO ()
+setColorMask Nothing (V4 red green blue alpha) = GL.glColorMask red green blue alpha
+setColorMask (Just beforeOption) option @ (V4 red green blue alpha)
+    | beforeOption == option = return ()
+    | otherwise = GL.glColorMask red green blue alpha
 
 createBuffer :: BufferSource -> IO GLW.Buffer
 createBuffer (BufferSourcePtr ptr usage) = do
@@ -189,3 +373,22 @@ attribIFormat size type' relativeOffset = AttribIFormat' $ AttribIFormat size ty
 
 attribLFormat :: Int -> GL.GLenum -> Int -> AttributeFormat
 attribLFormat size type' relativeOffset = AttribLFormat' $ AttribLFormat size type' relativeOffset
+
+toBool :: GL.GLboolean -> Bool
+toBool 0 = False
+toBool _ = True
+
+getBooleanv :: GL.GLenum -> IO GL.GLboolean
+getBooleanv param = Foreign.alloca $ \p -> do
+    GL.glGetBooleanv param p
+    Foreign.peek p
+
+getIntegerv :: GL.GLenum -> IO GL.GLint
+getIntegerv param = Foreign.alloca $ \p -> do
+    GL.glGetIntegerv param p
+    Foreign.peek p
+
+getInteger64v :: GL.GLenum -> IO GL.GLint64
+getInteger64v param = Foreign.alloca $ \p -> do
+    GL.glGetInteger64v param p
+    Foreign.peek p

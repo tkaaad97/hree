@@ -18,6 +18,14 @@ module Graphics.Hree.GL.Types
     , IndexBuffer(..)
     , ProgramInfo(..)
     , RenderInfo(..)
+    , RenderOption(..)
+    , DepthOption(..)
+    , BlendingOption(..)
+    , BlendingSeparateOption(..)
+    , StencilOption(..)
+    , StencilFuncArgs(..)
+    , StencilOpArgs(..)
+    , FaceStencilOption(..)
     , Uniform(..)
     , UniformInfo(..)
     , UniformBlockInfo(..)
@@ -59,11 +67,9 @@ module Graphics.Hree.GL.Types
     ) where
 
 import Data.ByteString (ByteString)
-import Data.Int (Int32)
 import Data.Map.Strict (Map)
 import qualified Data.Vector as BV (Vector)
 import qualified Data.Vector.Storable as SV (Vector)
-import Data.Word (Word32)
 import Foreign (Ptr, Storable)
 import GHC.TypeNats (Nat)
 import qualified GLW
@@ -158,7 +164,7 @@ data StencilOpArgs = StencilOpArgs
     , stencilOpArgsDpPass :: !GLW.StencilOp
     } deriving (Show, Eq)
 
-data FaceStencilOption = StencilSeparateOption
+data FaceStencilOption = FaceStencilOption
     { faceStencilOptionStencilFunc :: !StencilFuncArgs
     , faceStencilOptionStencilOp   :: !StencilOpArgs
     , faceStencilOptionStencilMask :: !GL.GLuint
@@ -230,21 +236,21 @@ newtype BufferBindingIndex = BufferBindingIndex
     { unBufferBindingIndex :: GL.GLuint
     } deriving (Show, Eq)
 
-type BVec2 = V2 Bool
-type BVec3 = V3 Bool
-type BVec4 = V4 Bool
-type Vec2 = V2 Float
-type Vec3 = V3 Float
-type Vec4 = V4 Float
-type IVec2 = V2 Int32
-type IVec3 = V3 Int32
-type IVec4 = V4 Int32
-type UVec2 = V2 Word32
-type UVec3 = V3 Word32
-type UVec4 = V4 Word32
-type DVec2 = V2 Double
-type DVec3 = V3 Double
-type DVec4 = V4 Double
+type BVec2 = V2 GL.GLboolean
+type BVec3 = V3 GL.GLboolean
+type BVec4 = V4 GL.GLboolean
+type Vec2 = V2 GL.GLfloat
+type Vec3 = V3 GL.GLfloat
+type Vec4 = V4 GL.GLfloat
+type IVec2 = V2 GL.GLint
+type IVec3 = V3 GL.GLint
+type IVec4 = V4 GL.GLint
+type UVec2 = V2 GL.GLuint
+type UVec3 = V3 GL.GLuint
+type UVec4 = V4 GL.GLuint
+type DVec2 = V2 GL.GLdouble
+type DVec3 = V3 GL.GLdouble
+type DVec4 = V4 GL.GLdouble
 
 -- glsl's mat{C}x{R} is C-column by R-row
 -- linear's M{R}{C} is R-row by C-column

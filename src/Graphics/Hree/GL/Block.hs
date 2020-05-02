@@ -18,6 +18,7 @@ import Foreign (Ptr)
 import qualified Foreign (Storable(..), castPtr, plusPtr)
 import GHC.TypeNats (KnownNat, natVal)
 import qualified GLW
+import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types (BVec2, BVec3, BVec4, DMat2, DMat2x3, DMat2x4,
                                DMat3, DMat3x2, DMat3x4, DMat4, DMat4x2, DMat4x3,
                                DVec2, DVec3, DVec4, IVec2, IVec3, IVec4,
@@ -72,13 +73,11 @@ instance Block a => Foreign.Storable (Std140 a) where
     peekByteOff ptr off = Std140 <$> peekByteOffStd140 ptr off
     pokeByteOff ptr off = pokeByteOffStd140 ptr off . unStd140
 
-toBool :: Int32 -> Bool
-toBool 0 = False
-toBool _ = True
+toBoolean :: Word32 -> GL.GLboolean
+toBoolean = fromIntegral
 
-fromBool :: Bool -> Int32
-fromBool False = 0
-fromBool True  = 1
+fromBoolean :: GL.GLboolean -> Word32
+fromBoolean = fromIntegral
 
 instance Block () where
     alignmentStd140 _ = 1
@@ -86,13 +85,13 @@ instance Block () where
     peekByteOffStd140 _ _ = return ()
     pokeByteOffStd140 _ _ _ = return ()
 
-instance Block Bool where
+instance Block GL.GLboolean where
     alignmentStd140 _ = 4
     sizeOfStd140 _ = 4
-    peekByteOffStd140 ptr off = toBool <$> Foreign.peekByteOff ptr off
-    pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fromBool
+    peekByteOffStd140 ptr off = toBoolean <$> Foreign.peekByteOff ptr off
+    pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fromBoolean
 
-instance Element Bool where
+instance Element GL.GLboolean where
     elemAlignmentStd140 _ = 16
     elemStrideStd140 _ = 16
 
@@ -139,8 +138,8 @@ instance Element Double where
 instance Block BVec2 where
     alignmentStd140 _ = 8
     sizeOfStd140 _ = 8
-    peekByteOffStd140 ptr off = fmap toBool <$> Foreign.peekByteOff ptr off
-    pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fmap fromBool
+    peekByteOffStd140 ptr off = fmap toBoolean <$> Foreign.peekByteOff ptr off
+    pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fmap fromBoolean
 
 instance Element BVec2 where
     elemAlignmentStd140 _ = 16
@@ -149,8 +148,8 @@ instance Element BVec2 where
 instance Block BVec3 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 12
-    peekByteOffStd140 ptr off = fmap toBool <$> Foreign.peekByteOff ptr off
-    pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fmap fromBool
+    peekByteOffStd140 ptr off = fmap toBoolean <$> Foreign.peekByteOff ptr off
+    pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fmap fromBoolean
 
 instance Element BVec3 where
     elemAlignmentStd140 _ = 16
@@ -159,8 +158,8 @@ instance Element BVec3 where
 instance Block BVec4 where
     alignmentStd140 _ = 16
     sizeOfStd140 _ = 16
-    peekByteOffStd140 ptr off = fmap toBool <$> Foreign.peekByteOff ptr off
-    pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fmap fromBool
+    peekByteOffStd140 ptr off = fmap toBoolean <$> Foreign.peekByteOff ptr off
+    pokeByteOffStd140 ptr off = Foreign.pokeByteOff ptr off . fmap fromBoolean
 
 instance Element BVec4 where
     elemAlignmentStd140 _ = 16
