@@ -253,5 +253,6 @@ tests:
     - hree
     - hspec
     - GLFW-b
+    - QuickCheck
     extra-libraries:
     - OSMesa
