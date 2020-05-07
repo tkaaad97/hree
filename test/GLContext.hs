@@ -37,10 +37,10 @@ foreign import ccall "OSMesaDestroyContext" ffiOSMesaDestroyContext
     :: Ptr () -> IO ()
 
 depthBits :: GL.GLint
-depthBits = 24
+depthBits = 32
 
 stencilBits :: GL.GLint
-stencilBits = 0
+stencilBits = 8
 
 accumBits :: GL.GLint
 accumBits = 0

@@ -1,5 +1,11 @@
 module GLTypesGen
-    (
+    ( DepthOptionGen(..)
+    , BlendingSeparateOptionGen(..)
+    , BlendingOptionGen(..)
+    , StencilFuncArgsGen(..)
+    , StencilOpArgsGen(..)
+    , StencilOptionGen(..)
+    , RenderOptionGen(..)
     ) where
 
 import qualified GLW.Groups.CullFaceMode as CullFaceMode
@@ -10,7 +16,7 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Linear (V4(..))
 import Test.QuickCheck (Arbitrary(..))
-import qualified Test.QuickCheck as QuickCheck (elements)
+import qualified Test.QuickCheck as QuickCheck (choose, elements)
 
 newtype DepthOptionGen = DepthOptionGen
     { unDepthOptionGen :: DepthOption
@@ -115,7 +121,7 @@ instance Arbitrary StencilFuncArgsGen where
             , StencilFunction.glNever
             , StencilFunction.glNotequal
             ]
-        ref <- arbitrary
+        ref <- QuickCheck.choose (0, 0xFF)
         fmask <- arbitrary
         return . StencilFuncArgsGen $ StencilFuncArgs func ref fmask
 
