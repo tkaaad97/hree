@@ -142,8 +142,8 @@ data DepthOption = DepthOption
     } deriving (Show, Eq)
 
 data BlendingSeparateOption = BlendingSeparateOption
-    { blendingOptionBlendEquation :: !GL.GLenum
-    , blendingOptionFunction      :: !(GL.GLenum, GL.GLenum)
+    { blendingSeparateOptionBlendEquation :: !GL.GLenum
+    , blendingSeparateOptionFunction      :: !(GL.GLenum, GL.GLenum)
     } deriving (Show, Eq)
 
 data BlendingOption = BlendingOption
@@ -192,6 +192,7 @@ data RenderInfo = RenderInfo
     , riUniforms      :: !(BV.Vector (GLW.UniformLocation, Uniform))
     , riUniformBlocks :: !(BV.Vector (BufferBindingIndex, GLW.Buffer))
     , riTextures      :: !(BV.Vector (GL.GLuint, Texture))
+    , riRenderOption  :: !RenderOption
     }
 
 data DrawMethod =

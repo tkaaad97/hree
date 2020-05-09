@@ -50,17 +50,19 @@ import Graphics.Hree.GL.Types
 import Linear (V4(..))
 import System.IO.Error (userError)
 
-render :: BV.Vector (ByteString, BufferBindingIndex) -> RenderInfo -> Maybe GLW.Program -> IO (Maybe GLW.Program)
+render :: BV.Vector (ByteString, BufferBindingIndex) -> RenderInfo -> Maybe (GLW.Program, RenderOption) -> IO (Maybe (GLW.Program, RenderOption))
 render commons a cur = do
-    setCurrentProgram cur program
+    setCurrentProgram (fst <$> cur) program
+    setRenderOption (snd <$> cur) renderOption
     GLW.glBindVertexArray (riVertexArray a)
     bindUniformBlockBuffers (riUniformBlocks a)
     bindUniforms uniforms
     bindTextures textures
     drawWith method
-    return . Just $ program
+    return . Just $ (program, renderOption)
     where
     program = programInfoProgram . riProgram $ a
+    renderOption = riRenderOption a
     uniformBlockInfos = programInfoUniformBlocks . riProgram $ a
     bindingPoints = programInfoBufferBindingPoints . riProgram $ a
     method = riDrawMethod a

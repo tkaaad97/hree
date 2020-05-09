@@ -55,6 +55,7 @@ data Geometry = Geometry
 data MaterialInfo = MaterialInfo
     { materialInfoUniformBlock :: !GLW.Buffer
     , materialInfoTextures     :: !(BV.Vector (ByteString, Texture))
+    , materialInfoRenderOption :: !RenderOption
     } deriving (Show, Eq)
 
 newtype LightId = LightId

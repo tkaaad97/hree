@@ -8,9 +8,11 @@ module Graphics.Hree.Material.SpriteMaterial
 
 import Data.Maybe (maybe)
 import qualified Data.Vector as BV (singleton)
+import qualified GLW.Groups.DepthFunction as DepthFunction
 import Graphics.Hree.GL.Block (Block(..))
-import Graphics.Hree.GL.Types (Texture)
-import Graphics.Hree.Material (Material(..), TextureMappingType(..))
+import Graphics.Hree.GL.Types (DepthOption(..), RenderOption(..), Texture)
+import Graphics.Hree.Material (Material(..), TextureMappingType(..),
+                               defaultRenderOption)
 import Graphics.Hree.Program (EmbeddedProgramType(..), ProgramSpec(..))
 import Linear (V2(..), V3(..))
 
@@ -49,6 +51,14 @@ instance Material SpriteMaterial where
         hasColorMapping BaseColorMapping (Just _) = True
         hasColorMapping _ _                       = False
     materialProgramSpec _ = EmbeddedProgram SpriteProgram
+    materialRenderOption _ = defaultRenderOption
+        { renderOptionCullFace = Nothing
+        , renderOptionDepth = DepthOption
+            { depthOptionDepthTest = False
+            , depthOptionDepthMask = True
+            , depthOptionDepthFunction = DepthFunction.glLequal
+            }
+        }
 
 spriteMaterial :: SpriteMaterial
 spriteMaterial = SpriteMaterial (SpriteMaterialBlock (V3 0 0 1) (V2 0 0) (V2 1 1)) Nothing

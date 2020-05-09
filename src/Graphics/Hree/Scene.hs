@@ -217,10 +217,11 @@ toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> GLW.VertexArray -> Maybe S
 toRenderInfo program defaultTexture meshInfo vao skin matrix =
     let uniforms = BV.mapMaybe toUniformEntry $ ("modelMatrix", Uniform matrix) `BV.cons` textureUniforms
         ubs = BV.fromList $ (materialBlockBindingIndex, materialInfoUniformBlock material) : maybe mempty getSkinUbs skin
-        renderInfo = RenderInfo program dm vao uniforms ubs textures
+        renderInfo = RenderInfo program dm vao uniforms ubs textures roption
     in renderInfo
     where
     material = meshInfoMaterial meshInfo
+    roption = materialInfoRenderOption material
     dm = resolveDrawMethod meshInfo
     uniformLocations = programInfoUniformLocations program
     toUniformEntry (uniformName, uniform) = do
@@ -288,9 +289,10 @@ addMesh_ scene mesh maybeSkinId = do
         let material = meshMaterial mesh
             textures = materialTextures material
             block = materialUniformBlock material
+            roption = materialRenderOption material
         buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
         ubb <- newUniformBlockBinder buffer block
-        return (MaterialInfo buffer textures, ubb)
+        return (MaterialInfo buffer textures roption, ubb)
 
     geo = meshGeometry mesh
     instanceCount = meshInstanceCount mesh
