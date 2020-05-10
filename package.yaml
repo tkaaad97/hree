@@ -204,16 +204,16 @@ executables:
 
   tiled-1:
     <<: *exe-common
-    main:                FlatColor1.hs
+    main:                Tiled1.hs
     other-modules:
       - Example
-      - FlatColor1
+      - Tiled1
     ghc-options:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
       - -main-is
-      - FlatColor1
+      - Tiled1
 
   transform-rotate-1:
     <<: *exe-common
