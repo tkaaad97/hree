@@ -36,8 +36,6 @@ main =
     la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     init w = do
-        GL.glEnable GL.GL_BLEND
-        GL.glBlendFunc GL.GL_SRC_ALPHA GL.GL_ONE_MINUS_SRC_ALPHA
         renderer <- newRenderer
         scene <- newScene
 

@@ -2,7 +2,6 @@
 module TransformRotate1 where
 
 import Example
-import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Material.FlatColorMaterial as Material
 import qualified Graphics.UI.GLFW as GLFW
@@ -23,8 +22,6 @@ main =
     la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     init w = do
-        GL.glEnable GL.GL_CULL_FACE
-        GL.glEnable GL.GL_DEPTH_TEST
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         (geometry, _) <- Hree.createBoxGeometry 0.5 0.5 0.5 scene

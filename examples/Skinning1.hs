@@ -114,8 +114,6 @@ main =
     la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     init w = do
-        GL.glEnable GL.GL_CULL_FACE
-        GL.glEnable GL.GL_DEPTH_TEST
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
 

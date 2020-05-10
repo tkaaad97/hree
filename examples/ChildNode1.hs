@@ -5,7 +5,6 @@ import qualified Chronos as Time (now)
 import qualified Data.Vector as BV
 import qualified Data.Vector.Unboxed as UV
 import Example
-import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Animation as Animation
 import qualified Graphics.Hree.Material.FlatColorMaterial as Material
@@ -30,8 +29,6 @@ main =
     inverseBindMatrix = Linear.inv44 (V4 (V4 1 0 0 0) (V4 0 1 0 0.05) (V4 0 0 1 0) (V4 0 0 0 1))
 
     init w = do
-        GL.glEnable GL.GL_CULL_FACE
-        GL.glEnable GL.GL_DEPTH_TEST
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         (geometry, _) <- Hree.createBoxGeometry 0.5 0.1 0.1 scene

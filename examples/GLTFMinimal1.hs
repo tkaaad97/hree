@@ -4,7 +4,6 @@ module GLTFMinimal1 where
 import Control.Monad (void)
 import Example
 import qualified Graphics.Format.GLTF as GLTF (loadSceneFromFile)
-import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..))
@@ -25,8 +24,6 @@ main = do
     la = Hree.lookAt (V3 0 0 10) (V3 0 0 0) (V3 0 1 0)
 
     init path w = do
-        GL.glEnable GL.GL_CULL_FACE
-        GL.glEnable GL.GL_DEPTH_TEST
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         void $ GLTF.loadSceneFromFile path scene

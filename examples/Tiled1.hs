@@ -5,7 +5,6 @@ import Control.Concurrent (threadDelay)
 import Example
 import qualified Graphics.Format.Tiled as Tiled (createNodesFromTiledMap)
 import qualified Graphics.Format.Tiled.JSON as Tiled (loadTiledMap)
-import qualified Graphics.GL as GL
 import Graphics.Hree as Hree
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..))
@@ -31,8 +30,6 @@ main = do
     la = Hree.lookAt (V3 0 0 0.1) (V3 0 0 0) (V3 0 1 0)
 
     init path w = do
-        GL.glEnable GL.GL_BLEND
-        GL.glBlendFunc GL.GL_SRC_ALPHA GL.GL_ONE_MINUS_SRC_ALPHA
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         load scene path

@@ -3,7 +3,6 @@ module StandardMaterial1 where
 
 import Example
 import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
-import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Material.StandardMaterial as Material
 import qualified Graphics.UI.GLFW as GLFW
@@ -33,8 +32,6 @@ main = do
     la = Hree.lookAt (V3 0 0 10) (V3 0 0 0) (V3 0 1 0)
 
     init path metalness roughness w = do
-        GL.glEnable GL.GL_CULL_FACE
-        GL.glEnable GL.GL_DEPTH_TEST
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         geometry <- STL.loadGeometryFromFile path scene
