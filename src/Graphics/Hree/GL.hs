@@ -207,12 +207,15 @@ setBlendingOption Nothing option = do
 setBlendingOption (Just beforeOption) option = do
     let BlendingOption beforeEnabled beforeRgb beforeAlpha = beforeOption
         BlendingOption enabled rgb alpha = option
+        beforeSeparateOption = if beforeEnabled
+            then Just (beforeRgb, beforeAlpha)
+            else Nothing
     unless (beforeEnabled == enabled) $
         if enabled
             then GLW.glEnable EnableCap.glBlend
             else GLW.glDisable EnableCap.glBlend
     when enabled $
-        setBlendingSeparateOption (Just (beforeRgb, beforeAlpha)) (rgb, alpha)
+        setBlendingSeparateOption beforeSeparateOption (rgb, alpha)
 
 getBlendingSeparateOptionRgb :: IO BlendingSeparateOption
 getBlendingSeparateOptionRgb = do
