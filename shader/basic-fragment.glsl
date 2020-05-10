@@ -19,5 +19,5 @@ void main()
 #ifdef HAS_VERTEX_COLOR
     color = color * fragmentColor;
 #endif
-    outColor = diffuse * color;
+    outColor = vec4(diffuse * color.xyz, 1.0);
 }
