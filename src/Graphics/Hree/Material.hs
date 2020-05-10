@@ -39,12 +39,12 @@ class Block (MaterialUniformBlock a) => Material a where
 
 defaultRenderOption :: RenderOption
 defaultRenderOption = RenderOption
-    { renderOptionCullFace = Just CullFaceMode.glFront
+    { renderOptionCullFace = Just CullFaceMode.glBack
     , renderOptionFlipSided = False
     , renderOptionDepth = defaultDepthOption
     , renderOptionBlending = defaultBlendingOption
     , renderOptionStencil = defaultStencilOption
-    , renderOptionColorMask = V4 GL.GL_FALSE GL.GL_FALSE GL.GL_FALSE GL.GL_FALSE
+    , renderOptionColorMask = V4 GL.GL_TRUE GL.GL_TRUE GL.GL_TRUE GL.GL_TRUE
     }
 
 defaultDepthOption :: DepthOption

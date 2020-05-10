@@ -9,8 +9,10 @@ module Graphics.Hree.Material.SpriteMaterial
 import Data.Maybe (maybe)
 import qualified Data.Vector as BV (singleton)
 import qualified GLW.Groups.DepthFunction as DepthFunction
+import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Block (Block(..))
-import Graphics.Hree.GL.Types (DepthOption(..), RenderOption(..), Texture)
+import Graphics.Hree.GL.Types (BlendingOption(..), BlendingSeparateOption(..),
+                               DepthOption(..), RenderOption(..), Texture)
 import Graphics.Hree.Material (Material(..), TextureMappingType(..),
                                defaultRenderOption)
 import Graphics.Hree.Program (EmbeddedProgramType(..), ProgramSpec(..))
@@ -52,11 +54,15 @@ instance Material SpriteMaterial where
         hasColorMapping _ _                       = False
     materialProgramSpec _ = EmbeddedProgram SpriteProgram
     materialRenderOption _ = defaultRenderOption
-        { renderOptionCullFace = Nothing
-        , renderOptionDepth = DepthOption
+        { renderOptionDepth = DepthOption
             { depthOptionDepthTest = False
             , depthOptionDepthMask = True
             , depthOptionDepthFunction = DepthFunction.glLequal
+            }
+        , renderOptionBlending = BlendingOption
+            { blendingOptionEnabled = True
+            , blendingOptionRGB = BlendingSeparateOption GL.GL_FUNC_ADD (GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
+            , blendingOptionAlpha = BlendingSeparateOption GL.GL_FUNC_ADD (GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
             }
         }
 
