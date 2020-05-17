@@ -2,7 +2,8 @@
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Graphics.Hree.Types
-    ( Geometry(..)
+    ( ClearOption(..)
+    , Geometry(..)
     , LightId(..)
     , LightStore
     , MaterialInfo(..)
@@ -14,6 +15,7 @@ module Graphics.Hree.Types
     , Node(..)
     , NodeInfo(..)
     , Renderer(..)
+    , RendererOption(..)
     , RendererState(..)
     , Scene(..)
     , SceneState(..)
@@ -37,6 +39,7 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import Foreign (Storable(..), castPtr, plusPtr)
 import GHC.TypeNats (KnownNat)
 import qualified GLW
+import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.GL.Block (Elem)
 import Graphics.Hree.GL.Types
@@ -44,6 +47,7 @@ import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
 import Graphics.Hree.Math
 import Graphics.Hree.Program
+import Linear (V4(..))
 
 data Geometry = Geometry
     { geometryAttribBindings :: !(Map ByteString AttribBinding)
@@ -138,8 +142,19 @@ data SceneState = SceneState
     , ssLightBlockBinder  :: !(Maybe (UniformBlockBinder LightBlock))
     } deriving (Show)
 
-newtype Renderer = Renderer
-    { rendererState :: IORef RendererState
+data ClearOption = ClearOption
+    { clearOptionColor   :: !(Maybe (V4 GL.GLfloat))
+    , clearOptionDepth   :: !(Maybe GL.GLdouble)
+    , clearOptionStencil :: !(Maybe GL.GLint)
+    } deriving (Show, Eq)
+
+data RendererOption = RendererOption
+    { rendererOptionAutoClear :: !ClearOption
+    } deriving (Show, Eq)
+
+data Renderer = Renderer
+    { rendererOption :: !RendererOption
+    , rendererState  :: !(IORef RendererState)
     }
 
 newtype RendererState = RendererState

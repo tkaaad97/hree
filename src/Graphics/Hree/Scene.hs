@@ -17,11 +17,13 @@ module Graphics.Hree.Scene
     , addSkinnedMesh
     , addTexture
     , applyTransformToNode
+    , defaultRendererOption
     , deleteRenderer
     , deleteScene
     , mkDefaultTextureIfNotExists
     , newNode
     , newRenderer
+    , newRendererWithOption
     , newScene
     , readNode
     , readNodeTransform
@@ -39,7 +41,7 @@ module Graphics.Hree.Scene
 
 import qualified Chronos as Time (Time, epoch, now)
 import Control.Exception (bracketOnError, throwIO)
-import Control.Monad (void, when)
+import Control.Monad (unless, void, when)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Data.Bits ((.|.))
@@ -52,7 +54,7 @@ import qualified Data.Component as Component
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, maybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust, maybe)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as GV (imapM_)
@@ -62,11 +64,11 @@ import Foreign (Ptr)
 import qualified Foreign (castPtr, copyArray, nullPtr, plusPtr, withArray)
 import GHC.TypeNats (KnownNat)
 import qualified GLW
-import qualified GLW.Groups.ClearBufferMask as GLW (glColorBufferBit,
-                                                    glDepthBufferBit)
+import qualified GLW.Groups.ClearBufferMask as ClearBufferMask
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Groups.PrimitiveType as PrimitiveType
-import qualified GLW.Internal.Groups as GLW (PixelFormat(..))
+import qualified GLW.Internal.Groups as GLW (ClearBufferMask(..),
+                                             PixelFormat(..))
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
@@ -81,7 +83,7 @@ import Graphics.Hree.Mesh
 import Graphics.Hree.Program
 import Graphics.Hree.Texture
 import Graphics.Hree.Types
-import Linear ((!*!), (^+^))
+import Linear (V4(..), (!*!), (^+^))
 import qualified Linear
 import qualified System.Random.MWC as Random (asGenIO, uniformR,
                                               withSystemRandom)
@@ -94,8 +96,7 @@ data AddedMesh b = AddedMesh
 renderScene :: Renderer -> Scene -> Camera -> IO ()
 renderScene renderer scene camera = do
     t <- Time.now
-    GLW.glClearColor 1 1 1 1
-    GLW.glClear (GLW.glColorBufferBit .|. GLW.glDepthBufferBit)
+    autoClear (rendererOptionAutoClear . rendererOption $ renderer)
     state <- readIORef . sceneState $ scene
     bindCamera (ssCameraBlockBinder state)
     bindLight (ssLightBlockBinder state)
@@ -121,6 +122,24 @@ renderScene renderer scene camera = do
         lightBlock <- getLightBlock (sceneLightStore scene)
         ubb <- maybe (mkLightBlockBinder scene lightBlock) return maybeBinder
         updateAndBindUniformBuffer ubb lightBlock lightBlockBindingIndex
+
+autoClear :: ClearOption -> IO ()
+autoClear (ClearOption colorOption depthOption stencilOption) = do
+    clearColor colorOption
+    clearDepth depthOption
+    clearStencil stencilOption
+    unless (clearFlag == zeroFlag) $ GLW.glClear clearFlag
+    where
+    clearColor Nothing = return ()
+    clearColor (Just (V4 red green blue alpha)) = GL.glClearColor red green blue alpha
+    clearDepth Nothing      = return ()
+    clearDepth (Just depth) = GL.glClearDepth depth
+    clearStencil Nothing        = return ()
+    clearStencil (Just stencil) = GL.glClearStencil stencil
+    zeroFlag = GLW.ClearBufferMask 0
+    clearFlag = (if isJust colorOption then ClearBufferMask.glColorBufferBit else zeroFlag)
+        .|. (if isJust depthOption then ClearBufferMask.glDepthBufferBit else zeroFlag)
+        .|. (if isJust stencilOption then ClearBufferMask.glStencilBufferBit else zeroFlag)
 
 materialBlockBindingIndex, cameraBlockBindingIndex, lightBlockBindingIndex, skinJointMatricesBlockBindingIndex, skinJointInverseMatricesBlockBindingIndex :: BufferBindingIndex
 materialBlockBindingIndex = BufferBindingIndex 1
@@ -777,9 +796,18 @@ deleteScene scene = do
             textures = Map.elems . ssTextures $ state
         in (initialSceneState, (buffers, textures))
 
+defaultRendererOption :: RendererOption
+defaultRendererOption = RendererOption autoClearOption
+    where
+    autoClearOption = ClearOption (Just (V4 1 1 1 1)) (Just 1) (Just 0)
+
 newRenderer :: IO Renderer
-newRenderer =
-    newIORef initialRendererState >>= return . Renderer
+newRenderer = newRendererWithOption defaultRendererOption
+
+newRendererWithOption :: RendererOption -> IO Renderer
+newRendererWithOption option = do
+    s <- newIORef initialRendererState
+    return $ Renderer option s
 
 initialRendererState :: RendererState
 initialRendererState = RendererState mempty
