@@ -55,7 +55,7 @@ main = do
             else do
                 st <- Time.now
                 taskBoard <- SceneTask.newSceneTaskBoard scene
-                _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st (BV.head animations) (SceneTask.AnimationTaskOptions True False))
+                _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st (BV.head animations) (SceneTask.AnimationTaskOption True False))
                 return (Just taskBoard)
 
     loadScene path scene extension = do

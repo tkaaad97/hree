@@ -177,7 +177,7 @@ main =
         case resolveWalkAnimation characterInfo key of
             Just animation -> do
                 st <- Time.now
-                SceneTask.modifySceneTask taskBoard (const $ SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOptions True False)) taskId
+                SceneTask.modifySceneTask taskBoard (const $ SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOption True False)) taskId
             Nothing -> return ()
 
     keyCallback ubb characterInfo taskBoard taskId _ key _ GLFW.KeyState'Released _ =

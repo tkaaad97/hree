@@ -3,7 +3,7 @@ module Graphics.Hree.SceneTask
     ( SceneTask(..)
     , SceneTaskId
     , SceneTaskBoard(..)
-    , AnimationTaskOptions(..)
+    , AnimationTaskOption(..)
     , addSceneTask
     , newSceneTaskBoard
     , runSceneTask
@@ -24,13 +24,13 @@ import Graphics.Hree.Types (NodeId, Scene)
 
 data SceneTask =
     Nop |
-    AnimationTask !Time !AnimationClip !AnimationTaskOptions |
+    AnimationTask !Time !AnimationClip !AnimationTaskOption |
     RemoveNodeTask !Time !NodeId
     deriving (Show)
 
-data AnimationTaskOptions = AnimationTaskOptions
-    { animationTaskOptionsLoop        :: !Bool
-    , animationTaskOptionsRemoveAtEnd :: !Bool
+data AnimationTaskOption = AnimationTaskOption
+    { animationTaskOptionLoop        :: !Bool
+    , animationTaskOptionRemoveAtEnd :: !Bool
     } deriving (Show, Eq)
 
 type HashTable k v = HT.BasicHashTable k v
@@ -70,8 +70,8 @@ modifySceneTask (SceneTaskBoard _ _ items) f taskId =
 runSceneTask :: Scene -> SceneTask -> Time -> IO Bool
 runSceneTask _ Nop _ = return False
 runSceneTask scene (AnimationTask start animation options) t = do
-    let loop = animationTaskOptionsLoop options
-        removeAtEnd = animationTaskOptionsRemoveAtEnd options
+    let loop = animationTaskOptionLoop options
+        removeAtEnd = animationTaskOptionRemoveAtEnd options
         duration = animationClipDuration animation
         dt = timeIntervalToTimespan $ TimeInterval start t
         remove = removeAtEnd && (duration > dt)
