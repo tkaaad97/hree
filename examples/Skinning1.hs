@@ -142,7 +142,7 @@ main =
 
         st <- Time.now
         taskBoard <- SceneTask.newSceneTaskBoard scene
-        _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOption True False))
+        _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOption True False Nothing))
 
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
