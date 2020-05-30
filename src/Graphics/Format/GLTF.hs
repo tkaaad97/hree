@@ -434,7 +434,7 @@ instance Aeson.FromJSON ChannelTargetPath where
 instance Aeson.FromJSON AnimationSampler where
     parseJSON = Aeson.withObject "AnimationSampler" $ \v -> do
         input <- v Aeson..: "input"
-        interpolation <- v Aeson..: "interpolation"
+        interpolation <- v Aeson..:? "interpolation" Aeson..!= AnimationInterpolationLinear
         output <- v Aeson..: "output"
         return $ AnimationSampler input interpolation output
 
@@ -908,7 +908,7 @@ createIndexBuffer buffer bufferView accessor = do
         fail ("accessorType should be SCALAR. but actual accessorType: " ++ show (accessorType accessor))
     dataType <- convertToIndexBufferDataType (accessorComponentType accessor)
     let count = accessorCount accessor
-        offset = bufferViewByteOffset bufferView
+        offset = bufferViewByteOffset bufferView + accessorByteOffset accessor
     return $ Hree.IndexBuffer buffer dataType (fromIntegral count) offset
 
 convertToIndexBufferDataType :: ComponentType -> Either String GL.GLenum
