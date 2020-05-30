@@ -45,29 +45,30 @@ main = do
         GLFW.setWindowSizeCallback w (Just (resizeWindowWithCamera camera))
         return (renderer, scene, camera, a)
 
-    loadScene path scene ".gltf" = do
-        (_, sup) <- GLTF.loadSceneFromFile path scene
-        let light = Hree.directionalLight (V3 0.5 (-1) (-0.5)) (V3 1 1 1) 1
-            animations = GLTF.supplementAnimations sup
-        _ <- Hree.addLight scene light
-        if BV.null animations
-            then return Nothing
-            else do
-                st <- Time.now
-                taskBoard <- SceneTask.newSceneTaskBoard scene
-                _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st (BV.head animations) (SceneTask.AnimationTaskOption True False Nothing))
-                return (Just taskBoard)
+    loadScene path scene extension
+        | extension == ".glb" || extension == ".gltf" = do
+            (_, sup) <- GLTF.loadSceneFromFile path scene
+            let light = Hree.directionalLight (V3 0.5 (-1) (-0.5)) (V3 1 1 1) 1
+                animations = GLTF.supplementAnimations sup
+            _ <- Hree.addLight scene light
+            if BV.null animations
+                then return Nothing
+                else do
+                    st <- Time.now
+                    taskBoard <- SceneTask.newSceneTaskBoard scene
+                    _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st (BV.head animations) (SceneTask.AnimationTaskOption True False Nothing))
+                    return (Just taskBoard)
 
-    loadScene path scene extension = do
-        geometry <- case extension of
-                        ".stl" -> STL.loadGeometryFromFile path scene
-                        ".ply" -> PLY.loadGeometryFromFile path scene
-                        _ -> throwIO . userError $ "unknown format. path: " ++ path
-        let material = Material.basicMaterial $ V3 0.5 (-1) (-0.5)
-            mesh = Hree.Mesh geometry material Nothing
-        meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
-        void $ Hree.addNode scene Hree.newNode{ Hree.nodeMesh = Just meshId } True
-        return Nothing
+        | otherwise = do
+            geometry <- case extension of
+                            ".stl" -> STL.loadGeometryFromFile path scene
+                            ".ply" -> PLY.loadGeometryFromFile path scene
+                            _ -> throwIO . userError $ "unknown format. path: " ++ path
+            let material = Material.basicMaterial $ V3 0.5 (-1) (-0.5)
+                mesh = Hree.Mesh geometry material Nothing
+            meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+            void $ Hree.addNode scene Hree.newNode{ Hree.nodeMesh = Just meshId } True
+            return Nothing
 
     onDisplay (r, s, c, Just taskBoard) w = do
         render

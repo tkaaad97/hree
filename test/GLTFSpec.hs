@@ -52,7 +52,7 @@ spec = do
                         ]
                     , GLTF.gltfBuffers = BV.fromList
                         [ GLTF.Buffer
-                            { GLTF.bufferUri = "data:application/octet-stream;base64,AAABAAIAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAA="
+                            { GLTF.bufferUri = Just "data:application/octet-stream;base64,AAABAAIAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAA="
                             , GLTF.bufferByteLength = 44
                             }
                         ]

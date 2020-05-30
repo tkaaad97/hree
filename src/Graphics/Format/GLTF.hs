@@ -27,6 +27,8 @@ module Graphics.Format.GLTF
     , createImageFromUri
     , loadGLTFFile
     , loadSceneFromFile
+    , loadSceneFromGLBFile
+    , loadSceneFromGLBBin
     , marshalComponentType
     , marshalValueType
     , numberOfComponent
@@ -39,8 +41,9 @@ import qualified Codec.Picture as Picture
 import Control.Exception (throwIO)
 import Control.Monad (unless, void)
 import qualified Data.Aeson as Aeson (FromJSON(..), Object, Value,
-                                      eitherDecodeFileStrict', withObject,
-                                      withText, (.!=), (.:), (.:?))
+                                      eitherDecodeFileStrict',
+                                      eitherDecodeStrict', withObject, withText,
+                                      (.!=), (.:), (.:?))
 import qualified Data.Aeson.Types as Aeson (Parser)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (drop, isPrefixOf, readFile,
@@ -59,16 +62,16 @@ import Data.Maybe (fromMaybe, maybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
-import qualified Data.Vector as BV (Vector, empty, foldM', head, imapM_, length,
-                                    map, mapM, singleton, toList, unsafeFreeze,
-                                    unzip, (!), (!?))
+import qualified Data.Vector as BV (Vector, cons, drop, empty, foldM', head,
+                                    imapM_, length, map, mapM, singleton,
+                                    toList, unsafeFreeze, unzip, (!), (!?))
 import qualified Data.Vector.Mutable as MBV (read, replicate, write)
 import qualified Data.Vector.Storable as SV (empty, generate, generateM,
                                              unsafeWith)
 import qualified Data.Vector.Unboxed as UV (Vector, generateM, length, map,
                                             unsafeFreeze, (!))
 import qualified Data.Vector.Unboxed.Mutable as MUV (read, replicate, write)
-import Data.Word (Word16, Word8)
+import Data.Word (Word16, Word32, Word8)
 import qualified Foreign (Ptr, Storable(..), castPtr, peekByteOff)
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
@@ -109,8 +112,9 @@ import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
 import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId,
                                               Node(..), NodeId, Scene, SkinId)
 import qualified Linear (Quaternion(..), V3(..), V4(..), transpose, zero)
+import Numeric (showHex)
 import System.Directory (canonicalizePath)
-import System.FilePath (dropFileName, (</>))
+import System.FilePath (dropFileName, takeExtension, (</>))
 
 data ComponentType =
     Byte' |
@@ -134,7 +138,7 @@ data ValueType =
 
 data Buffer = Buffer
     { bufferByteLength :: !Int
-    , bufferUri        :: !Text
+    , bufferUri        :: !(Maybe Text)
     } deriving (Show, Eq)
 
 data BufferView = BufferView
@@ -330,10 +334,16 @@ data Supplement = Supplement
     , supplementAnimations :: !(BV.Vector Hree.AnimationClip)
     } deriving (Show)
 
+data GLBHeader = GLBHeader Word32 Word32 Word32
+    deriving (Show, Eq)
+
+data ChunkHeader = ChunkHeader Word32 Word32
+    deriving (Show, Eq)
+
 instance Aeson.FromJSON Buffer where
     parseJSON = Aeson.withObject "Buffer" $ \v -> do
         len <- v Aeson..: "byteLength"
-        uri <- v Aeson..: "uri"
+        uri <- v Aeson..:? "uri"
         return $ Buffer len uri
 
 instance Aeson.FromJSON BufferView where
@@ -461,8 +471,8 @@ instance Aeson.FromJSON Sampler where
     parseJSON = Aeson.withObject "Sampler" $ \v -> do
         magFilter <- v Aeson..:? "magFilter"
         minFilter <- v Aeson..:? "minFilter"
-        wrapS <- v Aeson..: "wrapS" Aeson..!= defaultWrap
-        wrapT <- v Aeson..: "wrapT" Aeson..!= defaultWrap
+        wrapS <- v Aeson..:? "wrapS" Aeson..!= defaultWrap
+        wrapT <- v Aeson..:? "wrapT" Aeson..!= defaultWrap
         name <- v Aeson..:? "name"
         extensions <- v Aeson..:? "extensions"
         extras <- v Aeson..:? "extras"
@@ -687,11 +697,13 @@ fromVectorToMat4 v
     | otherwise = fail "bad array size"
 
 loadGLTFFile :: FilePath -> IO GLTF
-loadGLTFFile filepath = either error return =<< Aeson.eitherDecodeFileStrict' filepath
+loadGLTFFile filepath = either (throwIO . userError) return =<< Aeson.eitherDecodeFileStrict' filepath
 
-loadSceneFromFile :: FilePath -> Hree.Scene -> IO (GLTF, Supplement)
-loadSceneFromFile path scene = do
-    gltf <- loadGLTFFile path
+loadSceneFromGLTF :: FilePath -> GLTF -> Hree.Scene -> IO Supplement
+loadSceneFromGLTF = loadSceneFromGLTFInternal Nothing
+
+loadSceneFromGLTFInternal :: Maybe ByteString -> FilePath -> GLTF -> Hree.Scene -> IO Supplement
+loadSceneFromGLTFInternal maybeBuffer0 basepath gltf scene = do
     let buffers_ = gltfBuffers gltf
         bufferViews_ = gltfBufferViews gltf
         accessors_ = gltfAccessors gltf
@@ -705,9 +717,8 @@ loadSceneFromFile path scene = do
         animations_ = gltfAnimations gltf
         skins_ = gltfSkins gltf
         rootNodes = maybe mempty sceneNodes $ scenes_ BV.!? 0
-        basepath = dropFileName path
     defaultTexture <- Hree.mkDefaultTextureIfNotExists scene
-    bufferAndBss <- createBuffers basepath scene buffers_
+    bufferAndBss <- createBuffers maybeBuffer0 basepath scene buffers_
     let (buffers, bss) = BV.unzip bufferAndBss
     sources <- createTextureSources basepath scene bss bufferViews_ images_
     samplers <- createSamplers scene samplers_
@@ -719,7 +730,60 @@ loadSceneFromFile path scene = do
     animations <- createAnimations nodeIds bss bufferViews_ accessors_ animations_
     BV.imapM_ (createMeshNodes scene nodeIds meshes skinIds) nodes_
     let sup = Supplement nodeIds animations
+    return sup
+
+loadSceneFromFile :: FilePath -> Hree.Scene -> IO (GLTF, Supplement)
+loadSceneFromFile path scene
+    | takeExtension path == ".glb" = loadSceneFromGLBFile path scene
+    | otherwise = do
+        gltf <- loadGLTFFile path
+        sup <- loadSceneFromGLTF (dropFileName path) gltf scene
+        return (gltf, sup)
+
+loadSceneFromGLBFile :: FilePath -> Hree.Scene -> IO (GLTF, Supplement)
+loadSceneFromGLBFile path scene = do
+    bs <- ByteString.readFile path
+    loadSceneFromGLBBin (dropFileName path) bs scene
+
+loadSceneFromGLBBin :: FilePath -> ByteString -> Hree.Scene -> IO (GLTF, Supplement)
+loadSceneFromGLBBin basepath bs scene = do
+    GLBHeader _ _ totalLen <- parseGLBHeader bs
+    (gltf, chunk0Len) <- parseGLBChunk0 bs glbHeaderLen
+    let hasChunk1 = fromIntegral totalLen > (glbHeaderLen + chunkHeaderLen + fromIntegral chunk0Len)
+    maybeBuffer0 <- if hasChunk1
+        then Just <$> parseGLBChunk1 bs (glbHeaderLen + chunkHeaderLen + fromIntegral chunk0Len)
+        else return Nothing
+    sup <- loadSceneFromGLTFInternal maybeBuffer0 basepath gltf scene
     return (gltf, sup)
+    where
+    glbHeaderLen = 12
+    chunkHeaderLen = 8
+    parseGLBHeader a = do
+        let header = ByteString.take 12 a
+        ByteString.useAsCString header $ \p -> do
+            magic <- Foreign.peekByteOff p 0
+            version <- Foreign.peekByteOff p 4
+            len <- Foreign.peekByteOff p 8
+            unless (magic == 0x46546C67) . throwIO . userError $ "glb magic mismatch. magic=" ++ showHex magic ""
+            unless (version == 2) . throwIO . userError $ "unknown gltf version. version=" ++ show version
+            return $ GLBHeader magic version len
+    parseGLBChunk0 a offset = do
+        ChunkHeader len _ <- parseChunkHeader a offset 0x4E4F534A
+        let body = ByteString.take (fromIntegral len) . ByteString.drop (offset + 8) $ a
+        gltf <- either (throwIO . userError) return $ Aeson.eitherDecodeStrict' body
+        return (gltf, len)
+    parseGLBChunk1 a offset = do
+        ChunkHeader len _ <- parseChunkHeader a offset 0x004E4942
+        return . ByteString.take (fromIntegral len) . ByteString.drop (offset + 8) $ a
+
+    parseChunkHeader a offset expectedChunkType = do
+        let header = ByteString.take 8 . ByteString.drop offset $ a
+        ByteString.useAsCString header $ \p -> do
+            len <- Foreign.peekByteOff p 0
+            chunkType <- Foreign.peekByteOff p 4
+            unless (chunkType == expectedChunkType) . throwIO . userError $
+                "chunk type mismatch. chunkType=" ++ showHex chunkType ""
+            return $ ChunkHeader len chunkType
 
 parseUri :: FilePath -> Int -> ByteString -> IO ByteString
 parseUri cd byteLength uri =
@@ -740,13 +804,18 @@ parseUri cd byteLength uri =
     (scheme, remainder) = ByteString.break (== ':') uri
 
 createBuffer :: FilePath -> Hree.Scene -> Buffer -> IO (GLW.Buffer, ByteString)
-createBuffer cd scene (Buffer byteLength uri) = do
+createBuffer cd scene (Buffer byteLength (Just uri)) = do
     bs <- parseUri cd byteLength (Text.encodeUtf8 uri)
     buffer <- Hree.addBuffer scene (Hree.BufferSourceByteString bs GL.GL_STATIC_READ)
     return (buffer, bs)
+createBuffer _ _ (Buffer _ Nothing) =
+    throwIO . userError $ "createBuffer failed because data uri is unknown"
 
-createBuffers :: FilePath -> Hree.Scene -> BV.Vector Buffer -> IO (BV.Vector (GLW.Buffer, ByteString))
-createBuffers cd scene = BV.mapM (createBuffer cd scene)
+createBuffers :: Maybe ByteString -> FilePath -> Hree.Scene -> BV.Vector Buffer -> IO (BV.Vector (GLW.Buffer, ByteString))
+createBuffers Nothing cd scene buffers = BV.mapM (createBuffer cd scene) buffers
+createBuffers (Just bs0) cd scene buffers = do
+    buffer <- Hree.addBuffer scene (Hree.BufferSourceByteString bs0 GL.GL_STATIC_READ)
+    BV.cons (buffer, bs0) <$> BV.mapM (createBuffer cd scene) (BV.drop 1 buffers)
 
 createGLTFMeshes :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterial) (Hree.Mesh Hree.StandardMaterial))))
 createGLTFMeshes buffers bufferViews accessors materials =
