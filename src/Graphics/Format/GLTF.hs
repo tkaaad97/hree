@@ -95,7 +95,8 @@ import qualified Graphics.Hree.Material.StandardMaterial as Hree (StandardMateri
                                                                   StandardMaterialBlock(..),
                                                                   standardMaterial,
                                                                   standardMaterialBlock)
-import qualified Graphics.Hree.Math as Hree (Quaternion)
+import qualified Graphics.Hree.Math as Hree (Quaternion, Transform(..),
+                                             matrixToTransform)
 import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
                                                         glTextureMinFilter,
                                                         glTextureWrapS,
@@ -674,20 +675,20 @@ fromVectorToMat4 :: UV.Vector Float -> Aeson.Parser Hree.Mat4
 fromVectorToMat4 v
     | UV.length v == 16 =
         let a00 = v UV.! 0
-            a01 = v UV.! 1
-            a02 = v UV.! 2
-            a03 = v UV.! 3
-            a10 = v UV.! 4
+            a10 = v UV.! 1
+            a20 = v UV.! 2
+            a30 = v UV.! 3
+            a01 = v UV.! 4
             a11 = v UV.! 5
-            a12 = v UV.! 6
-            a13 = v UV.! 7
-            a20 = v UV.! 8
-            a21 = v UV.! 9
+            a21 = v UV.! 6
+            a31 = v UV.! 7
+            a02 = v UV.! 8
+            a12 = v UV.! 9
             a22 = v UV.! 10
-            a23 = v UV.! 11
-            a30 = v UV.! 12
-            a31 = v UV.! 13
-            a32 = v UV.! 14
+            a32 = v UV.! 11
+            a03 = v UV.! 12
+            a13 = v UV.! 13
+            a23 = v UV.! 14
             a33 = v UV.! 15
             r0 = Linear.V4 a00 a01 a02 a03
             r1 = Linear.V4 a10 a11 a12 a13
@@ -926,12 +927,17 @@ createNodes scene nodes rootNodes = do
     return nodeIds
 
 createNode :: Hree.Scene -> Node -> IO Hree.NodeId
-createNode scene a =
+createNode scene a = do
     Hree.addNode scene node False
     where
-    translation = fromMaybe Linear.zero (nodeTranslation a)
-    rotation = fromMaybe (Linear.Quaternion 1 (Linear.V3 0 0 0)) (nodeRotation a)
-    scale = fromMaybe (Linear.V3 1 1 1) (nodeScale a)
+    Hree.Transform translation rotation scale =
+        case nodeMatrix a of
+            Just mat -> Hree.matrixToTransform mat
+            Nothing ->
+                let t = fromMaybe Linear.zero (nodeTranslation a)
+                    r = fromMaybe (Linear.Quaternion 1 (Linear.V3 0 0 0)) (nodeRotation a)
+                    s = fromMaybe (Linear.V3 1 1 1) (nodeScale a)
+                in Hree.Transform t r s
     node = Hree.newNode
             { Hree.nodeName = nodeName a
             , Hree.nodeTranslation = translation

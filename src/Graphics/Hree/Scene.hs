@@ -343,7 +343,7 @@ addNode scene node isRoot = do
     let nodeId = nodeInfoId nodeInfo
         transform = Transform (nodeTranslation node) (nodeRotation node) (nodeScale node)
         transformInfo = TransformInfo transform True Time.epoch
-        matrix = transformMatrix transform
+        matrix = Linear.identity
         globalMatrix = Linear.identity
     Component.addComponent (sceneNodeStore scene) nodeId nodeInfo
     Component.addComponent (sceneNodeTransformStore scene) nodeId transformInfo
