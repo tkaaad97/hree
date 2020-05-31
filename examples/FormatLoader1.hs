@@ -31,7 +31,7 @@ main = do
     height = 480
     defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = Hree.perspective 90 defaultAspect 0.0001 10000.0
+    proj = Hree.perspective 90 defaultAspect 0.01 10000.0
 
     la = Hree.lookAt (V3 0 0 5) (V3 0 0 0) (V3 0 1 0)
 
