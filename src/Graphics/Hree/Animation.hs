@@ -20,6 +20,9 @@ module Graphics.Hree.Animation
     , linearRotation
     , linearScale
     , linearTranslation
+    , cubicSplineRotation
+    , cubicSplineScale
+    , cubicSplineTranslation
     , lowerBound
     , singleTransformChannel
     , singleTransformClip
@@ -38,18 +41,20 @@ import Data.Int (Int64)
 import Data.Maybe (fromMaybe)
 import qualified Data.Vector as BV (Vector, foldl, map, mapM_, maximum, null,
                                     singleton)
-import qualified Data.Vector.Generic as GV (Vector(..), head, last, null, (!))
+import qualified Data.Vector.Generic as GV (Vector(..), head, last, null, (!),
+                                            (!?))
 import qualified Data.Vector.Storable as SV (Vector)
 import qualified Data.Vector.Unboxed as UV (Vector, head, last, length, null,
                                             (!))
 import Graphics.Hree.Math (Quaternion, Transform(..), Vec3)
 import Graphics.Hree.Scene (applyTransformToNode, updateNode)
 import Graphics.Hree.Types (MeshId, Node(nodeMesh), NodeId, Scene)
-import Linear (Additive(..), slerp)
+import Linear (Additive(..), slerp, (*^), (^/))
 
 data Interpolation =
     InterpolationLinear |
-    InterpolationStep
+    InterpolationStep |
+    InterpolationCubicSpline
     deriving (Show, Eq)
 
 data TransformTrack =
@@ -117,6 +122,15 @@ linearRotation times values = KeyFrames InterpolationLinear times (TransformTrac
 
 linearScale :: UV.Vector Int64 -> UV.Vector Vec3 -> KeyFrames TransformTrack
 linearScale times values = KeyFrames InterpolationLinear times (TransformTrackScale values)
+
+cubicSplineTranslation :: UV.Vector Int64 -> UV.Vector Vec3 -> KeyFrames TransformTrack
+cubicSplineTranslation times values = KeyFrames InterpolationCubicSpline times (TransformTrackTranslation values)
+
+cubicSplineRotation :: UV.Vector Int64 -> UV.Vector Quaternion -> KeyFrames TransformTrack
+cubicSplineRotation times values = KeyFrames InterpolationCubicSpline times (TransformTrackRotation values)
+
+cubicSplineScale :: UV.Vector Int64 -> UV.Vector Vec3 -> KeyFrames TransformTrack
+cubicSplineScale times values = KeyFrames InterpolationCubicSpline times (TransformTrackScale values)
 
 transformChannel :: NodeId -> BV.Vector (KeyFrames TransformTrack) -> AnimationChannel
 transformChannel nodeId keyFrames = AnimationChannelTransform (TransformChannel nodeId keyFrames)
@@ -218,6 +232,12 @@ interpolateTransform (KeyFrames InterpolationLinear timepoints (TransformTrackRo
     trans { transformQuaternion = fromMaybe (transformQuaternion trans) $ interpolateQuaternion timepoints values t }
 interpolateTransform (KeyFrames InterpolationLinear timepoints (TransformTrackScale values)) t trans =
     trans { transformScale = fromMaybe (transformScale trans) $ interpolateLinear timepoints values t }
+interpolateTransform (KeyFrames InterpolationCubicSpline timepoints (TransformTrackTranslation values)) t trans =
+    trans { transformTranslation = fromMaybe (transformTranslation trans) $ interpolateCubicSpline timepoints values t }
+interpolateTransform (KeyFrames InterpolationCubicSpline timepoints (TransformTrackRotation values)) t trans =
+    trans { transformQuaternion = fromMaybe (transformQuaternion trans) $ interpolateCubicSpline timepoints values t }
+interpolateTransform (KeyFrames InterpolationCubicSpline timepoints (TransformTrackScale values)) t trans =
+    trans { transformScale = fromMaybe (transformScale trans) $ interpolateCubicSpline timepoints values t }
 
 interpolateVariation :: KeyFrames (VariationTrack (v a)) -> Timespan -> Maybe a
 interpolateVariation (KeyFrames _ timepoints (VariationTrackDiscrete values)) t =
@@ -226,6 +246,8 @@ interpolateVariation (KeyFrames InterpolationStep timepoints (VariationTrackVect
     interpolateStep timepoints values t
 interpolateVariation (KeyFrames InterpolationLinear timepoints (VariationTrackVector values)) t =
     interpolateLinear timepoints values t
+interpolateVariation (KeyFrames InterpolationCubicSpline timepoints (VariationTrackVector values)) t =
+    interpolateCubicSpline timepoints values t
 
 interpolateStep :: GV.Vector v a => UV.Vector Int64 -> v a -> Timespan -> Maybe a
 interpolateStep timepoints values (Timespan t) =
@@ -246,6 +268,30 @@ interpolateLinear timepoints values (Timespan t) =
                 v1 = values GV.! n
                 v = lerp (fromIntegral (t - t0) / fromIntegral (t1 - t0)) v1 v0
             in Just v
+
+interpolateCubicSpline :: (Additive f, Fractional a, GV.Vector v (f a)) => UV.Vector Int64 -> v (f a) -> Timespan -> Maybe (f a)
+interpolateCubicSpline timepoints values (Timespan t) =
+    case lowerBound timepoints t of
+        Nothing -> if GV.null values then Nothing else Just $ GV.last values
+        Just 0  -> if GV.null values then Nothing else Just $ GV.head values
+        Just n  -> do
+            t0 <- timepoints GV.!? (n - 1)
+            t1 <- timepoints GV.!? n
+            let dt = t1 - t0
+            v0 <- values GV.!? ((n - 1) * 3 + 1)
+            v1 <- values GV.!? (n * 3 + 1)
+            m0 <- values GV.!? ((n - 1) * 3)
+            m1 <- values GV.!? (n * 3 + 2)
+            let m0' = m0 ^/ fromIntegral dt
+                m1' = m1 ^/ fromIntegral dt
+            let s = fromIntegral (t - t0) / fromIntegral (t1 - t0)
+                ss = s * s
+                sss = ss * s
+                v = (2.0 * sss - 3.0 * ss + 1.0) *^ v0
+                    ^+^ (sss - 2.0 * ss + s) *^ m0'
+                    ^+^ ((-2.0) * sss  + 3.0 * ss) *^ v1
+                    ^+^ (sss - ss) *^ m1'
+            return v
 
 interpolateQuaternion :: UV.Vector Int64 -> UV.Vector Quaternion -> Timespan -> Maybe Quaternion
 interpolateQuaternion timepoints values (Timespan t) =

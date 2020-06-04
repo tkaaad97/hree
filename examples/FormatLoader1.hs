@@ -72,7 +72,7 @@ main = do
 
     onDisplay (r, s, c, Just taskBoard) w = do
         render
-        threadDelay 20000
+        threadDelay 10000
         GLFW.pollEvents
         t <- Time.now
         SceneTask.runSceneTasksOnBoard taskBoard t
@@ -85,7 +85,7 @@ main = do
 
     onDisplay (r, s, c, Nothing) w = do
         render
-        threadDelay 20000
+        threadDelay 10000
         GLFW.pollEvents
         onDisplay (r, s, c, Nothing) w
 

@@ -1029,7 +1029,7 @@ createKeyFrames ChannelTargetPathScale interpolation buffers bufferViews accesso
 convertInterpolation :: AnimationInterpolation -> Hree.Interpolation
 convertInterpolation AnimationInterpolationLinear = Hree.InterpolationLinear
 convertInterpolation AnimationInterpolationStep = Hree.InterpolationStep
-convertInterpolation AnimationInterpolationCubicSpline = Hree.InterpolationLinear
+convertInterpolation AnimationInterpolationCubicSpline = Hree.InterpolationCubicSpline
 
 createVectorFromBuffer ::
     forall a v.
