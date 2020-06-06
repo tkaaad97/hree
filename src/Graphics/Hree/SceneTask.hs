@@ -10,9 +10,12 @@ module Graphics.Hree.SceneTask
     , removeSceneTask
     , modifySceneTask
     , runSceneTasksOnBoard
+    , terminateSceneTask
     ) where
 
-import Chronos (Time, TimeInterval(..), Timespan(..), timeIntervalToTimespan)
+import Chronos (Time(..), TimeInterval(..), Timespan(..),
+                timeIntervalToTimespan)
+import Control.Exception (throwIO)
 import Control.Monad (when)
 import Data.Atomics.Counter (AtomicCounter)
 import qualified Data.Atomics.Counter as Counter (incrCounter, newCounter)
@@ -131,3 +134,20 @@ runSceneTasksOnBoard (SceneTaskBoard scene _ items lastRunRef) t = do
         return $ if remove
                 then taskId : removeTaskIds
                 else removeTaskIds
+
+terminateSceneTask :: SceneTaskBoard -> SceneTaskId -> IO ()
+terminateSceneTask (SceneTaskBoard scene _ items _) taskId = do
+    task <- maybe (throwIO . userError $ "task not found. taskId: " ++ show taskId) return
+                =<< HT.lookup items taskId
+    remove <- terminateSceneTask_ scene task
+    when remove $ HT.delete items taskId
+
+terminateSceneTask_ :: Scene -> SceneTask -> IO Bool
+terminateSceneTask_ _ Nop = return False
+terminateSceneTask_ scene task @ (AnimationTask start animation _) = do
+    let Timespan duration = animationClipDuration animation
+        Time st = start
+        endAt = Time (st + duration)
+    runSceneTask scene task Nothing endAt
+terminateSceneTask_ scene task @ (RemoveNodeTask at _) =
+    runSceneTask scene task Nothing at

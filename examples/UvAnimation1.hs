@@ -24,11 +24,7 @@ import Linear (V2(..), V3(..), (!*))
 import Prelude hiding (init)
 
 data CharacterInfo = CharacterInfo
-    { stillFront         :: !(V2 (V2 Float))
-    , stillBack          :: !(V2 (V2 Float))
-    , stillLeft          :: !(V2 (V2 Float))
-    , stillRight         :: !(V2 (V2 Float))
-    , animationWalkFront :: !Animation.AnimationClip
+    { animationWalkFront :: !Animation.AnimationClip
     , animationWalkBack  :: !Animation.AnimationClip
     , animationWalkLeft  :: !Animation.AnimationClip
     , animationWalkRight :: !Animation.AnimationClip
@@ -103,10 +99,6 @@ main =
             walkLeft = createUvAnimation uniformBlockBinder walkLeftUVs
             walkRight = createUvAnimation uniformBlockBinder walkRightUVs
             characterInfo = CharacterInfo
-                (uvOffsetScale $ UV.head walkFrontUVs)
-                (uvOffsetScale $ UV.head walkBackUVs)
-                (uvOffsetScale $ UV.head walkLeftUVs)
-                (uvOffsetScale $ UV.head walkRightUVs)
                 walkFront
                 walkBack
                 walkLeft
@@ -180,13 +172,9 @@ main =
                 SceneTask.modifySceneTask taskBoard (const $ SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOption True False Nothing)) taskId
             Nothing -> return ()
 
-    keyCallback ubb characterInfo taskBoard taskId _ key _ GLFW.KeyState'Released _ =
-        case resolveStillUV characterInfo key of
-            Just (V2 off scale) -> do
-                SceneTask.modifySceneTask taskBoard (const SceneTask.Nop) taskId
-                Hree.modifyUniformBlock (\a -> a { Material.uvOffset = off, Material.uvScale = scale }) ubb
-                return ()
-            Nothing -> return ()
+    keyCallback _ _ taskBoard taskId _ _ _ GLFW.KeyState'Released _ = do
+        SceneTask.terminateSceneTask taskBoard taskId
+        SceneTask.modifySceneTask taskBoard (const SceneTask.Nop) taskId
 
     keyCallback _ _ _ _ _ _ _ _ _ = return ()
 
@@ -195,9 +183,3 @@ main =
     resolveWalkAnimation characterInfo GLFW.Key'Left = Just $ animationWalkLeft characterInfo
     resolveWalkAnimation characterInfo GLFW.Key'Right = Just $ animationWalkRight characterInfo
     resolveWalkAnimation _ _ = Nothing
-
-    resolveStillUV characterInfo GLFW.Key'Up = Just $ stillBack characterInfo
-    resolveStillUV characterInfo GLFW.Key'Down = Just $ stillFront characterInfo
-    resolveStillUV characterInfo GLFW.Key'Left = Just $ stillLeft characterInfo
-    resolveStillUV characterInfo GLFW.Key'Right = Just $ stillRight characterInfo
-    resolveStillUV _ _ = Nothing
