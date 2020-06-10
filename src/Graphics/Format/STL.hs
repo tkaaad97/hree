@@ -5,13 +5,12 @@ module Graphics.Format.STL
     , loadGeometryFromFile
     ) where
 
-import Data.Binary (Binary(..))
-import qualified Data.Binary as Binary (decode)
-import qualified Data.Binary.Get as Binary (getFloatle, getWord16le,
-                                            getWord32le)
-import qualified Data.Binary.Put as Binary (putFloatle, putWord16le,
-                                            putWord32le)
-import qualified Data.ByteString.Lazy as ByteString (readFile)
+import Control.Exception (throwIO)
+import qualified Data.ByteString as ByteString (readFile)
+import Data.Serialize (Serialize(..))
+import qualified Data.Serialize as Serialize (decode, getFloat32le, getWord16le,
+                                              getWord32le, putFloat32le,
+                                              putWord16le, putWord32le)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Storable as SV
@@ -30,36 +29,36 @@ data Triangle = Triangle
     , triangleExtra   :: !Word16
     } deriving (Show, Eq)
 
-instance Binary Triangle where
+instance Serialize Triangle where
     put (Triangle (V3 n0 n1 n2) (V3 v10 v11 v12) (V3 v20 v21 v22) (V3 v30 v31 v32) ex) = do
-        Binary.putFloatle n0
-        Binary.putFloatle n1
-        Binary.putFloatle n2
-        Binary.putFloatle v10
-        Binary.putFloatle v11
-        Binary.putFloatle v12
-        Binary.putFloatle v20
-        Binary.putFloatle v21
-        Binary.putFloatle v22
-        Binary.putFloatle v30
-        Binary.putFloatle v31
-        Binary.putFloatle v32
-        Binary.putWord16le ex
+        Serialize.putFloat32le n0
+        Serialize.putFloat32le n1
+        Serialize.putFloat32le n2
+        Serialize.putFloat32le v10
+        Serialize.putFloat32le v11
+        Serialize.putFloat32le v12
+        Serialize.putFloat32le v20
+        Serialize.putFloat32le v21
+        Serialize.putFloat32le v22
+        Serialize.putFloat32le v30
+        Serialize.putFloat32le v31
+        Serialize.putFloat32le v32
+        Serialize.putWord16le ex
 
     get = do
-        n0 <- Binary.getFloatle
-        n1 <- Binary.getFloatle
-        n2 <- Binary.getFloatle
-        v10 <- Binary.getFloatle
-        v11 <- Binary.getFloatle
-        v12 <- Binary.getFloatle
-        v20 <- Binary.getFloatle
-        v21 <- Binary.getFloatle
-        v22 <- Binary.getFloatle
-        v30 <- Binary.getFloatle
-        v31 <- Binary.getFloatle
-        v32 <- Binary.getFloatle
-        ex <- Binary.getWord16le
+        n0 <- Serialize.getFloat32le
+        n1 <- Serialize.getFloat32le
+        n2 <- Serialize.getFloat32le
+        v10 <- Serialize.getFloat32le
+        v11 <- Serialize.getFloat32le
+        v12 <- Serialize.getFloat32le
+        v20 <- Serialize.getFloat32le
+        v21 <- Serialize.getFloat32le
+        v22 <- Serialize.getFloat32le
+        v30 <- Serialize.getFloat32le
+        v31 <- Serialize.getFloat32le
+        v32 <- Serialize.getFloat32le
+        ex <- Serialize.getWord16le
         return (Triangle (V3 n0 n1 n2) (V3 v10 v11 v12) (V3 v20 v21 v22) (V3 v30 v31 v32) ex)
 
 data STL = STL
@@ -71,15 +70,15 @@ data STL = STL
 stlHeaderLength :: Int
 stlHeaderLength = 80
 
-instance Binary STL where
+instance Serialize STL where
     put (STL header num triangles) = do
         Vector.mapM_ put header
-        Binary.putWord32le num
+        Serialize.putWord32le num
         Vector.mapM_ put triangles
 
     get = do
         header <- Vector.replicateM stlHeaderLength get
-        num <- Binary.getWord32le
+        num <- Serialize.getWord32le
         triangles <- Vector.replicateM (fromIntegral num) get
         return (STL header num triangles)
 
@@ -105,5 +104,5 @@ createGeometryFromSTL stl scene = do
 loadGeometryFromFile :: FilePath -> Scene -> IO Geometry
 loadGeometryFromFile path scene = do
     bs <- ByteString.readFile path
-    let stl = Binary.decode bs
+    stl <- either (throwIO . userError) return $ Serialize.decode bs
     fst <$> createGeometryFromSTL stl scene

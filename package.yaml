@@ -24,7 +24,6 @@ dependencies:
   - aeson
   - atomic-primops
   - attoparsec
-  - binary
   - bytestring
   - base64-bytestring
   - cereal
