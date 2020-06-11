@@ -4,7 +4,6 @@ services:
     build: .
     command: stack exec hree-example
     working_dir: $PWD
-    privileged: true
     environment:
       - DISPLAY=${DISPLAY}
       - MESA_GL_VERSION_OVERRIDE=4.5
