@@ -1,7 +1,6 @@
 .stack
 .stack/
 .stack-work/
-*.cabal
 *~
 *.swp
 *.o
