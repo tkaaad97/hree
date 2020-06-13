@@ -2,7 +2,6 @@ version: "2"
 services:
   app:
     build: .
-    command: stack exec hree-example
     working_dir: $PWD
     environment:
       - DISPLAY=${DISPLAY}
