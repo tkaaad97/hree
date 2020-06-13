@@ -5,9 +5,9 @@ module Graphics.Format.Tiled.JSON
 import qualified Codec.Compression.GZip as GZip (decompress)
 import qualified Codec.Compression.Zlib as Zlib (decompress)
 import Control.Exception (throwIO)
-import qualified Data.Aeson as DA (eitherDecodeFileStrict')
+import qualified Data.Aeson as DA (eitherDecodeStrict')
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString (length, useAsCString)
+import qualified Data.ByteString as ByteString (length, readFile, useAsCString)
 import qualified Data.ByteString.Base64 as Base64 (decode)
 import qualified Data.ByteString.Lazy as ByteString (fromStrict, toStrict)
 import Data.Text (Text)
@@ -23,7 +23,7 @@ import System.FilePath (dropFileName, (</>))
 
 loadTiledMap :: FilePath -> IO Map
 loadTiledMap path = do
-    mid <- either (throwIO . userError) return =<< DA.eitherDecodeFileStrict' path
+    mid <- either (throwIO . userError) return . DA.eitherDecodeStrict' =<< ByteString.readFile path
     let basepath = dropFileName path
     completeMap basepath mid
 
@@ -56,7 +56,7 @@ completeMap basepath m = do
 completeTileset :: FilePath -> TilesetSource -> IO Tileset
 completeTileset basepath (TilesetSourceFile firstgid sourcePath) = do
     path <- canonicalizePath $ basepath </> Text.unpack sourcePath
-    tileset <- either (throwIO . userError) return =<< DA.eitherDecodeFileStrict' path
+    tileset <- either (throwIO . userError) return . DA.eitherDecodeStrict' =<< ByteString.readFile path
     return tileset { tilesetFirstGid = firstgid }
 completeTileset _ (TilesetSourceInplace tileset) = return tileset
 

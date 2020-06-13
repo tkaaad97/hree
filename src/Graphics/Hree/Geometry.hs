@@ -42,13 +42,16 @@ addVerticesToGeometry geometry storage usage scene = do
     where
     Geometry attribBindings buffers indexBuffer c = geometry
     count = if c == 0 then Vector.length storage else c
-    bindingIndex = maybe 0 (+ 1) . fmap fst . IntMap.lookupMax $ buffers
+    bindingIndex = (+ 1) . lookupMaxKey 0 $ buffers
     VertexSpec bbs fields = vertexSpec (Proxy :: Proxy a)
     keys = map vertexFieldAttribName fields
     bindings = map toAttribBinding fields
     toAttribBinding (VertexField _ format) = AttribBinding (GLW.BindingIndex . fromIntegral $ bindingIndex) format
     newAttribBindings = Map.fromList $ zip keys bindings
     attribBindings' = Map.union attribBindings newAttribBindings
+    lookupMaxKey d m
+        | IntMap.null m = d
+        | otherwise = fst . IntMap.findMax $ m
 
 setIndexBuffer :: Geometry -> IndexBuffer -> Geometry
 setIndexBuffer geo indexBuffer = geo { geometryIndexBuffer = Just indexBuffer }

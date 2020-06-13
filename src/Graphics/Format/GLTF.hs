@@ -41,7 +41,6 @@ import qualified Codec.Picture as Picture
 import Control.Exception (throwIO)
 import Control.Monad (unless, void)
 import qualified Data.Aeson as Aeson (FromJSON(..), Object, Value,
-                                      eitherDecodeFileStrict',
                                       eitherDecodeStrict', withObject, withText,
                                       (.!=), (.:), (.:?))
 import qualified Data.Aeson.Types as Aeson (Parser)
@@ -698,7 +697,7 @@ fromVectorToMat4 v
     | otherwise = fail "bad array size"
 
 loadGLTFFile :: FilePath -> IO GLTF
-loadGLTFFile filepath = either (throwIO . userError) return =<< Aeson.eitherDecodeFileStrict' filepath
+loadGLTFFile filepath = either (throwIO . userError) return . Aeson.eitherDecodeStrict' =<< ByteString.readFile filepath
 
 loadSceneFromGLTF :: FilePath -> GLTF -> Hree.Scene -> IO Supplement
 loadSceneFromGLTF = loadSceneFromGLTFInternal Nothing
