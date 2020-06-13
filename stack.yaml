@@ -3,4 +3,4 @@ packages:
   - .
 extra-deps:
   - git: https://github.com/tkaaad97/gl-wrapper
-    commit: 2bfdfcd7a4f44a73a5b3f5502d1d37666defcfe3
+    commit: 603cbd23e465e80e596890f1a450c1392171f18f
