@@ -11,6 +11,9 @@ jobs:
   build:
     name: build and test with ghc-${{ matrix.ghc }}
 
+    env:
+      STACK_YAML: stack-ghc-${{ matrix.ghc }}.yaml
+
     strategy:
       matrix:
         ghc:
@@ -43,7 +46,6 @@ jobs:
           echo 'system-ghc: true' > ~/.stack/config.yaml
           echo 'install-ghc: false' >> ~/.stack/config.yaml
           echo 'allow-different-user: true' >> ~/.stack/config.yaml
-          export STACK_YAML=stack-ghc-${{ matrix.ghc }}.yaml
 
       - name: build
         run: stack build --test --no-run-tests
