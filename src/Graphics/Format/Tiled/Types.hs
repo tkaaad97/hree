@@ -130,7 +130,7 @@ parsePropertyValue "float" = fmap PropertyFloat . DA.parseJSON
 parsePropertyValue "bool" = fmap PropertyBool . DA.parseJSON
 parsePropertyValue "color" = fmap PropertyString . DA.parseJSON
 parsePropertyValue "file" = fmap PropertyFile . DA.parseJSON
-parsePropertyValue invalid = fail $ "unknown property type:" ++ Text.unpack invalid
+parsePropertyValue invalid = const . fail $ "unknown property type:" ++ Text.unpack invalid
 
 instance DA.ToJSON Properties where
     toJSON (Properties props) = DA.Array . BV.fromList . map propertyToJSON . Map.toList $ props

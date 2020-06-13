@@ -896,16 +896,16 @@ accessorByteStride accessor = num * componentByteSize componentType
 
 setIndexBuffer :: Hree.Geometry -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> Either String Hree.Geometry
 setIndexBuffer geometry buffers bufferViews accessors i = do
-    accessor <- maybe (fail $ "invalid accessor identifier: " ++ show i) return $ accessors BV.!? i
-    bufferView <- maybe (fail $ "invalid bufferView identifier: " ++ show (accessorBufferView accessor)) return $ bufferViews BV.!? accessorBufferView accessor
-    buffer <- maybe (fail $ "invalid buffer identifier: " ++ show (bufferViewBuffer bufferView)) return $ buffers BV.!? bufferViewBuffer bufferView
+    accessor <- maybe (Left $ "invalid accessor identifier: " ++ show i) return $ accessors BV.!? i
+    bufferView <- maybe (Left $ "invalid bufferView identifier: " ++ show (accessorBufferView accessor)) return $ bufferViews BV.!? accessorBufferView accessor
+    buffer <- maybe (Left $ "invalid buffer identifier: " ++ show (bufferViewBuffer bufferView)) return $ buffers BV.!? bufferViewBuffer bufferView
     indexBuffer <- createIndexBuffer buffer bufferView accessor
     return $ geometry { Hree.geometryIndexBuffer = Just indexBuffer }
 
 createIndexBuffer :: GLW.Buffer -> BufferView -> Accessor -> Either String Hree.IndexBuffer
 createIndexBuffer buffer bufferView accessor = do
     unless (accessorType accessor == Scalar) $
-        fail ("accessorType should be SCALAR. but actual accessorType: " ++ show (accessorType accessor))
+        Left ("accessorType should be SCALAR. but actual accessorType: " ++ show (accessorType accessor))
     dataType <- convertToIndexBufferDataType (accessorComponentType accessor)
     let count = accessorCount accessor
         offset = bufferViewByteOffset bufferView + accessorByteOffset accessor
@@ -915,7 +915,7 @@ convertToIndexBufferDataType :: ComponentType -> Either String GL.GLenum
 convertToIndexBufferDataType UnsignedByte' = return GL.GL_UNSIGNED_BYTE
 convertToIndexBufferDataType UnsignedShort' = return GL.GL_UNSIGNED_SHORT
 convertToIndexBufferDataType UnsignedInt' = return GL.GL_UNSIGNED_INT
-convertToIndexBufferDataType a = fail $ "invalid componentType: " ++ show a
+convertToIndexBufferDataType a = Left $ "invalid componentType: " ++ show a
 
 createNodes :: Hree.Scene -> BV.Vector Node -> BV.Vector Int -> IO (BV.Vector Hree.NodeId)
 createNodes scene nodes rootNodes = do
