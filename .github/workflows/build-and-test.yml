@@ -1,0 +1,55 @@
+name: build and test
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v*
+
+jobs:
+  build:
+    name: build and test with ghc-${{ matrix.ghc }}
+
+    strategy:
+      matrix:
+        ghc:
+          - "8.2.2"
+          - "8.4.4"
+          - "8.6.5"
+          - "8.8.3"
+
+    runs-on: ubuntu-20.04
+
+    container:
+      image: tkaaad97/hree-ci:ghc-${{ matrix.ghc }}
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: cache ~/.stack
+        uses: actions/cache@v2
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-ghc-${{ matrix.ghc }}-stack-${{ hashFiles('**/package.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-ghc-${{ matrix.ghc }}-stack-
+
+      - name: setup stack
+        run: |
+          mkdir -p ~/.stack
+          echo 'system-ghc: true' > ~/.stack/config.yaml
+          echo 'install-ghc: false' >> ~/.stack/config.yaml
+          echo 'allow-different-user: true' >> ~/.stack/config.yaml
+          export STACK_YAML=stack-ghc-${{ matrix.ghc }}.yaml
+
+      - name: build
+        run: stack build --test --no-run-tests
+
+      - name: build libglxoverride.so
+        run: gcc -shared -fPIC cbits/glxoverride.c -o libglxoverride.so
+
+      - name: run test
+        run: LD_PRELOAD=./libglxoverride.so stack test hree:hree-test

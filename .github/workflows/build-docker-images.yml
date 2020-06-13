@@ -1,0 +1,22 @@
+name: build docker images
+
+on:
+  schedule:
+    - cron: '0 0 1,15 * *'
+
+jobs:
+  build-docker-image:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        ghc:
+          - "8.2.2"
+          - "8.4.4"
+          - "8.6.5"
+          - "8.8.3"
+    steps:
+      - name: build
+        run: |
+          docker login -u tkaaad97 -p ${{ secrets.DOCKERHUB_TOKEN }}
+          docker build -t tkaaad97/hree-ci:ghc-${{ matrix.ghc }} -f docker/Dockerfile.ghc-${{ matrix.ghc }} .
+          docker push tkaaad97/hree-ci:ghc-${{ matrix.ghc }}
