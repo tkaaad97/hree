@@ -1,6 +1,1 @@
-resolver: lts-14.14
-packages:
-  - .
-extra-deps:
-  - git: https://github.com/tkaaad97/gl-wrapper
-    commit: 603cbd23e465e80e596890f1a450c1392171f18f
+stack-ghc-8.6.5.yaml

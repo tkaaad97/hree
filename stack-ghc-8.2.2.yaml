@@ -1,0 +1,12 @@
+resolver: lts-11.22
+packages:
+  - .
+extra-deps:
+  - Cabal-2.2.0.1
+  - GLFW-b-3.2.1.1
+  - bindings-GLFW-3.2.1.1
+  - chronos-1.1.1
+  - gl-0.9
+  - torsor-0.1
+  - git: https://github.com/tkaaad97/gl-wrapper
+    commit: 603cbd23e465e80e596890f1a450c1392171f18f
