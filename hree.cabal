@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7f199d900ad6bed4c27adfb93ac8f6f225945e0859ab63969cea5e8b7a7a8a45
+-- hash: 7da5d4b4b11db22ced03f58c5f924c38e5c30cca2339d79dc2cc54a715353d8b
 
 name:           hree
 version:        0.2.0
@@ -613,7 +613,7 @@ test-suite hree-test
       Paths_hree
   hs-source-dirs:
       test
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs
   extra-libraries:
       OSMesa
   build-depends:
