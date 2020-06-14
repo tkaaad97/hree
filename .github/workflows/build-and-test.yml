@@ -15,6 +15,7 @@ jobs:
       STACK_YAML: stack-ghc-${{ matrix.ghc }}.yaml
 
     strategy:
+      max-parallel: 1
       matrix:
         ghc:
           - "8.2.2"

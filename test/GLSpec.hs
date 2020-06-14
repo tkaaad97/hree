@@ -226,7 +226,7 @@ spec = do
                 stencil1 `shouldBe` stencil0
                 cmask1 `shouldBe` cmask0
 
-        it "set values if changed" . property $
+        it "set values if changed". withMaxSuccess 1000 . property $
                 \(RenderOptionGen beforeOption, RenderOptionGen option) -> ioProperty . runOnOSMesaContext 1 1 $ do
                     Hree.setRenderOption Nothing beforeOption
                     result1 <- Hree.getRenderOption

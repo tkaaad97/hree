@@ -1,7 +1,7 @@
 version: "2"
 services:
   app:
-    build: .
+    image: tkaaad97/hree-ci:ghc-8.6.5
     working_dir: $PWD
     environment:
       - DISPLAY=${DISPLAY}
