@@ -5,6 +5,7 @@
 *.swp
 *.o
 *.so
+*.yaml.lock
 docker-compose.override.yml
 .nvimrc
 .vimrc
