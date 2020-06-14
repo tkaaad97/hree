@@ -1,0 +1,649 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 7f199d900ad6bed4c27adfb93ac8f6f225945e0859ab63969cea5e8b7a7a8a45
+
+name:           hree
+version:        0.2.0
+homepage:       https://github.com/tkaaad97/hree#readme
+bug-reports:    https://github.com/tkaaad97/hree/issues
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    shader/basic-fragment.glsl
+    shader/basic-vertex.glsl
+    shader/flat-color-fragment.glsl
+    shader/flat-color-vertex.glsl
+    shader/lib/camerablock.glsl
+    shader/lib/lightblock.glsl
+    shader/lib/skin.glsl
+    shader/sprite-fragment.glsl
+    shader/sprite-vertex.glsl
+    shader/standard-fragment.glsl
+    shader/standard-vertex.glsl
+    shader/test-fragment.glsl
+    shader/test-vertex.glsl
+
+source-repository head
+  type: git
+  location: https://github.com/tkaaad97/hree
+
+library
+  exposed-modules:
+      Data.Component
+      Data.FilePreprocess
+      Graphics.Format.GLTF
+      Graphics.Format.PLY
+      Graphics.Format.STL
+      Graphics.Format.Tiled
+      Graphics.Format.Tiled.Internal
+      Graphics.Format.Tiled.JSON
+      Graphics.Format.Tiled.Types
+      Graphics.Hree
+      Graphics.Hree.Animation
+      Graphics.Hree.Camera
+      Graphics.Hree.CameraControl.SphericalControl
+      Graphics.Hree.Geometry
+      Graphics.Hree.Geometry.Box
+      Graphics.Hree.GL
+      Graphics.Hree.GL.Block
+      Graphics.Hree.GL.Types
+      Graphics.Hree.GL.UniformBlock
+      Graphics.Hree.GL.Vertex
+      Graphics.Hree.Light
+      Graphics.Hree.Material
+      Graphics.Hree.Material.BasicMaterial
+      Graphics.Hree.Material.FlatColorMaterial
+      Graphics.Hree.Material.SpriteMaterial
+      Graphics.Hree.Material.StandardMaterial
+      Graphics.Hree.Material.TestMaterial
+      Graphics.Hree.Material.UserMaterial
+      Graphics.Hree.Math
+      Graphics.Hree.Mesh
+      Graphics.Hree.Program
+      Graphics.Hree.Sampler
+      Graphics.Hree.Scene
+      Graphics.Hree.SceneTask
+      Graphics.Hree.Skin
+      Graphics.Hree.Texture
+      Graphics.Hree.Types
+  other-modules:
+      Paths_hree
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -O2
+  build-depends:
+      JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable child-node-1
+  main-is: ChildNode1.hs
+  other-modules:
+      Example
+      ChildNode1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is ChildNode1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable flat-color-1
+  main-is: FlatColor1.hs
+  other-modules:
+      Example
+      FlatColor1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is FlatColor1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable format-loader-1
+  main-is: FormatLoader1.hs
+  other-modules:
+      Example
+      FormatLoader1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is FormatLoader1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable geometry-box-1
+  main-is: GeometryBox1.hs
+  other-modules:
+      Example
+      GeometryBox1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is GeometryBox1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable gltf-minimal-1
+  main-is: GLTFMinimal1.hs
+  other-modules:
+      Example
+      GLTFMinimal1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is GLTFMinimal1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable node-mesh-animation-1
+  main-is: NodeMeshAnimation1.hs
+  other-modules:
+      Example
+      NodeMeshAnimation1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is NodeMeshAnimation1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable skinning-1
+  main-is: Skinning1.hs
+  other-modules:
+      Example
+      Skinning1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Skinning1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable sprite-instanced-1
+  main-is: SpriteInstanced1.hs
+  other-modules:
+      Example
+      SpriteInstanced1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is SpriteInstanced1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable standard-material-1
+  main-is: StandardMaterial1.hs
+  other-modules:
+      Example
+      StandardMaterial1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is StandardMaterial1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable texture-1
+  main-is: Texture1.hs
+  other-modules:
+      Example
+      Texture1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Texture1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable tiled-1
+  main-is: Tiled1.hs
+  other-modules:
+      Example
+      Tiled1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Tiled1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable transform-rotate-1
+  main-is: TransformRotate1.hs
+  other-modules:
+      Example
+      TransformRotate1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is TransformRotate1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+executable uv-animation-1
+  main-is: UvAnimation1.hs
+  other-modules:
+      Example
+      UvAnimation1
+  hs-source-dirs:
+      examples
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is UvAnimation1
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
+
+test-suite hree-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      AnimationSpec
+      ComponentSpec
+      GLContext
+      GLSpec
+      GLTFSpec
+      GLTypesGen
+      SceneSpec
+      TiledSpec
+      Paths_hree
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N
+  extra-libraries:
+      OSMesa
+  build-depends:
+      GLFW-b
+    , JuicyPixels >=3.2.9.5 && <3.4
+    , QuickCheck
+    , aeson >=1.2.4.0 && <1.6
+    , atomic-primops >=0.8 && <0.9
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.7 && <5
+    , base64-bytestring >=1.0.0.0 && <1.2
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.0.4 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , hree
+    , hspec
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , zlib >=0.5.3.1 && <0.7
+  default-language: Haskell2010
