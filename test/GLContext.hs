@@ -19,13 +19,14 @@ module GLContext
     , pattern OSMESA_CONTEXT_MINOR_VERSION
     ) where
 
-import Control.Exception (bracket)
 import Control.Monad (unless)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Foreign (Ptr, castPtr, nullPtr, withArray)
 import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr,
                            mallocForeignPtrBytes, withForeignPtr)
 import qualified Graphics.GL as GL
 import Prelude hiding (last)
+import qualified Test.Hspec as Hspec (SpecWith, afterAll_, beforeAll_, runIO)
 
 foreign import ccall "OSMesaCreateContextAttribs" ffiOSMesaCreateContextAttribs
     :: Ptr GL.GLint -> Ptr () -> IO (Ptr ())
@@ -45,26 +46,30 @@ stencilBits = 8
 accumBits :: GL.GLint
 accumBits = 0
 
-runOnOSMesaContext :: GL.GLsizei -> GL.GLsizei -> IO a -> IO a
-runOnOSMesaContext width height action =
-    bracket first last mid
+runOnOSMesaContext :: GL.GLsizei -> GL.GLsizei -> Hspec.SpecWith a -> Hspec.SpecWith a
+runOnOSMesaContext width height action = do
+    ref <- Hspec.runIO . newIORef $ Nothing
+    Hspec.beforeAll_ (before ref) . Hspec.afterAll_ (after ref) $ action
     where
-    first = do
+    before ref = do
         ctx <- createContext width height
         unless (ctx /= nullPtr) $
             error "OSMesaCreateContextAttribs failed"
         buffer <- mallocForeignPtrBytes (fromIntegral $ width * height * 4)
-        return (ctx, buffer)
+        writeIORef ref $ Just (ctx, buffer)
 
-    mid (ctx, buffer) = withForeignPtr (buffer :: ForeignPtr GL.GLubyte) $ \p -> do
-        r <- ffiOSMesaMakeCurrent ctx (castPtr p) GL.GL_UNSIGNED_BYTE width height
-        unless (r == GL.GL_TRUE) $
-            error "OSMesaMakeCurrent failed"
-        action
+        withForeignPtr (buffer :: ForeignPtr GL.GLubyte) $ \p -> do
+            r <- ffiOSMesaMakeCurrent ctx (castPtr p) GL.GL_UNSIGNED_BYTE width height
+            unless (r == GL.GL_TRUE) $
+                error "OSMesaMakeCurrent failed"
 
-    last (ctx, buffer) = do
-        ffiOSMesaDestroyContext ctx
-        finalizeForeignPtr buffer
+    after ref = do
+        v <- readIORef ref
+        case v of
+            Just (ctx, buffer) -> do
+                ffiOSMesaDestroyContext ctx
+                finalizeForeignPtr buffer
+            Nothing -> return ()
 
 createContext :: GL.GLint -> GL.GLint -> IO (Ptr ())
 createContext _ _ =

@@ -35,7 +35,7 @@ toBoolean False = GL.GL_FALSE
 spec :: Spec
 spec = do
     describe "setCullFace" $ do
-        it "enable cull face and set mode" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "enable cull face and set mode" $ do
             GL.glDisable GL.GL_CULL_FACE
             getBooleanv GL.GL_CULL_FACE >>= flip shouldBe GL.GL_FALSE
 
@@ -44,7 +44,7 @@ spec = do
             getBooleanv GL.GL_CULL_FACE >>= flip shouldBe GL.GL_TRUE
             getIntegerv GL.GL_CULL_FACE_MODE >>= flip shouldBe GL.GL_FRONT_AND_BACK
 
-        it "change cull face mode" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "change cull face mode" $ do
             GL.glEnable GL.GL_CULL_FACE
             GL.glCullFace GL.GL_BACK
             getBooleanv GL.GL_CULL_FACE >>= flip shouldBe GL.GL_TRUE
@@ -56,7 +56,7 @@ spec = do
             getBooleanv GL.GL_CULL_FACE >>= flip shouldBe GL.GL_TRUE
             getIntegerv GL.GL_CULL_FACE_MODE >>= flip shouldBe GL.GL_FRONT
 
-        it "disable cull face" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "disable cull face" $ do
             GL.glEnable GL.GL_CULL_FACE
             getBooleanv GL.GL_CULL_FACE >>= flip shouldBe GL.GL_TRUE
 
@@ -69,7 +69,7 @@ spec = do
             getBooleanv GL.GL_CULL_FACE >>= flip shouldBe GL.GL_FALSE
 
     describe "setDepthOption" $ do
-        it "enable depth test" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "enable depth test" $ do
             GL.glDisable GL.GL_DEPTH_TEST
             getBooleanv GL.GL_DEPTH_TEST >>= flip shouldBe GL.GL_FALSE
 
@@ -77,7 +77,7 @@ spec = do
 
             getBooleanv GL.GL_DEPTH_TEST >>= flip shouldBe GL.GL_TRUE
 
-        it "enable depth mask" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "enable depth mask" $ do
             GL.glDepthMask GL.GL_FALSE
             getBooleanv GL.GL_DEPTH_WRITEMASK >>= flip shouldBe GL.GL_FALSE
 
@@ -85,7 +85,7 @@ spec = do
 
             getBooleanv GL.GL_DEPTH_WRITEMASK >>= flip shouldBe GL.GL_TRUE
 
-        it "set depth function" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "set depth function" $ do
             GL.glDepthFunc GL.GL_LESS
             getIntegerv GL.GL_DEPTH_FUNC >>= flip shouldBe GL.GL_LESS
 
@@ -93,8 +93,8 @@ spec = do
 
             getIntegerv GL.GL_DEPTH_FUNC >>= flip shouldBe GL.GL_GREATER
 
-        it "set values if changed" . property $
-            \(DepthOptionGen beforeOption, DepthOptionGen option) -> ioProperty . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "set values if changed" . property $
+            \(DepthOptionGen beforeOption, DepthOptionGen option) -> ioProperty $ do
                 Hree.setDepthOption Nothing beforeOption
                 Hree.getDepthOption >>= flip shouldBe beforeOption
 
@@ -105,7 +105,7 @@ spec = do
                 Hree.getDepthOption >>= flip shouldBe option
 
     describe "setBlendingOption" $ do
-        it "enable blend" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "enable blend" $ do
             GL.glDisable GL.GL_BLEND
             getBooleanv GL.GL_BLEND >>= flip shouldBe GL.GL_FALSE
 
@@ -116,7 +116,7 @@ spec = do
 
             getBooleanv GL.GL_BLEND >>= flip shouldBe GL.GL_TRUE
 
-        it "set blend equation" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "set blend equation" $ do
             GL.glBlendEquation GL.GL_FUNC_ADD
             getIntegerv GL.GL_BLEND_EQUATION_RGB >>= flip shouldBe GL.GL_FUNC_ADD
             getIntegerv GL.GL_BLEND_EQUATION_ALPHA >>= flip shouldBe GL.GL_FUNC_ADD
@@ -129,7 +129,7 @@ spec = do
             getIntegerv GL.GL_BLEND_EQUATION_RGB >>= flip shouldBe GL.GL_FUNC_SUBTRACT
             getIntegerv GL.GL_BLEND_EQUATION_ALPHA >>= flip shouldBe GL.GL_FUNC_REVERSE_SUBTRACT
 
-        it "set blend function" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "set blend function" $ do
             GL.glBlendFunc GL.GL_ONE GL.GL_ZERO
             getIntegerv GL.GL_BLEND_SRC_RGB >>= flip shouldBe GL.GL_ONE
             getIntegerv GL.GL_BLEND_SRC_ALPHA >>= flip shouldBe GL.GL_ONE
@@ -146,8 +146,8 @@ spec = do
             getIntegerv GL.GL_BLEND_DST_RGB >>= flip shouldBe GL.GL_SRC_COLOR
             getIntegerv GL.GL_BLEND_DST_ALPHA >>= flip shouldBe GL.GL_SRC_ALPHA
 
-        it "set values if changed" . property $
-                \(BlendingOptionGen beforeOption_, BlendingOptionGen option) -> ioProperty . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "set values if changed" . property $
+                \(BlendingOptionGen beforeOption_, BlendingOptionGen option) -> ioProperty $ do
                     let beforeOption = beforeOption_ { Hree.blendingOptionEnabled = True }
                     Hree.setBlendingOption Nothing beforeOption
                     Hree.getBlendingOption >>= flip shouldBe beforeOption
@@ -161,7 +161,7 @@ spec = do
                         else Hree.getBlendingOption >>= flip shouldBe False . Hree.blendingOptionEnabled
 
     describe "setStencilOption" $ do
-        it "enable stencil test" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "enable stencil test" $ do
             GL.glDisable GL.GL_STENCIL_TEST
             getBooleanv GL.GL_STENCIL_TEST >>= flip shouldBe GL.GL_FALSE
 
@@ -175,7 +175,7 @@ spec = do
 
             getBooleanv GL.GL_STENCIL_TEST >>= flip shouldBe GL.GL_TRUE
 
-        it "set each face stencil option" . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "set each face stencil option" $ do
             let front = Hree.FaceStencilOption
                     (Hree.StencilFuncArgs StencilFunction.glAlways 0 0xF)
                     (Hree.StencilOpArgs StencilOp.glKeep StencilOp.glKeep StencilOp.glKeep)
@@ -188,8 +188,8 @@ spec = do
             Hree.setStencilOption Nothing option
             Hree.getStencilOption >>= flip shouldBe option
 
-        it "set values if changed" . property $
-                \(StencilOptionGen beforeOption, StencilOptionGen option) -> ioProperty . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "set values if changed" . property $
+                \(StencilOptionGen beforeOption, StencilOptionGen option) -> ioProperty $ do
                     Hree.setStencilOption Nothing beforeOption
                     Hree.getStencilOption >>= flip shouldBe beforeOption
 
@@ -200,8 +200,8 @@ spec = do
                     Hree.getStencilOption >>= flip shouldBe option
 
     describe "setColorMask" $ do
-        it "set values if changed" . property $
-                \((r0, g0, b0, a0), (r1, g1, b1, a1)) -> ioProperty . runOnOSMesaContext 1 1 $ do
+        runOnOSMesaContext 1 1 . it "set values if changed" . property $
+                \((r0, g0, b0, a0), (r1, g1, b1, a1)) -> ioProperty $ do
                     let beforeOption = V4 (toBoolean r0) (toBoolean g0) (toBoolean b0) (toBoolean a0)
                         option = V4 (toBoolean r1) (toBoolean g1) (toBoolean b1) (toBoolean a1)
                     Hree.setColorMask Nothing beforeOption
@@ -226,16 +226,16 @@ spec = do
                 stencil1 `shouldBe` stencil0
                 cmask1 `shouldBe` cmask0
 
-        it "set values if changed". withMaxSuccess 1000 . property $
-                \(RenderOptionGen beforeOption, RenderOptionGen option) -> ioProperty . runOnOSMesaContext 1 1 $ do
-                    Hree.setRenderOption Nothing beforeOption
-                    result1 <- Hree.getRenderOption
-                    assertRenderOption beforeOption result1
+        runOnOSMesaContext 1 1 . it "set values if changed" . withMaxSuccess 1000 . property $
+            \(RenderOptionGen beforeOption, RenderOptionGen option) -> ioProperty $ do
+                Hree.setRenderOption Nothing beforeOption
+                result1 <- Hree.getRenderOption
+                assertRenderOption beforeOption result1
 
-                    Hree.setRenderOption (Just option) option
-                    result2 <- Hree.getRenderOption
-                    assertRenderOption beforeOption result2
+                Hree.setRenderOption (Just option) option
+                result2 <- Hree.getRenderOption
+                assertRenderOption beforeOption result2
 
-                    Hree.setRenderOption (Just beforeOption) option
-                    result3 <- Hree.getRenderOption
-                    assertRenderOption option result3
+                Hree.setRenderOption (Just beforeOption) option
+                result3 <- Hree.getRenderOption
+                assertRenderOption option result3
