@@ -2,6 +2,7 @@ module Graphics.Format.Tiled
     ( module Graphics.Format.Tiled.Types
     , Rect(..)
     , TiledConfig(..)
+    , TilesetInfo(..)
     , createNodesFromTiledMap
     , createNodesFromTiledMapWithConfig
     , createTilesetInfo
