@@ -12,7 +12,7 @@ RUN apt-get update && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         ghc-8.8.3 ghc-8.8.3-prof ghc-8.8.3-dyn ghc-8.8.3-htmldocs cabal-install-3.2 \
-        zlib1g-dev  libtinfo-dev  libsqlite3-0  libsqlite3-dev  ca-certificates  g++  git  curl  xz-utils  make  cmake  netbase pkgconf  apitrace libgl1-mesa-dev libglu1-mesa-dev libosmesa6-dev libxcursor-dev  libxi-dev  libxinerama-dev  libxrandr-dev  libxxf86vm-dev xorg-dev && \
+        zlib1g-dev libtinfo-dev libsqlite3-0 libsqlite3-dev ca-certificates g++ git curl xz-utils make cmake netbase pkgconf apitrace libgl1-mesa-dev libglu1-mesa-dev libosmesa6-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev xorg-dev && \
     sh -c 'curl -sSL https://get.haskellstack.org/ | sh' && \
     /usr/local/bin/stack config set system-ghc --global true && \
     /usr/local/bin/stack config set install-ghc --global false && \

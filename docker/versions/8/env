@@ -1,1 +1,1 @@
-APT_PACKAGES="zlib1g-dev  libtinfo-dev  libsqlite3-0  libsqlite3-dev  ca-certificates  g++  git  curl  xz-utils  make  cmake  netbase pkgconf  apitrace libgl1-mesa-dev libglu1-mesa-dev libosmesa6-dev libxcursor-dev  libxi-dev  libxinerama-dev  libxrandr-dev  libxxf86vm-dev xorg-dev"
+APT_PACKAGES="zlib1g-dev libtinfo-dev libsqlite3-0 libsqlite3-dev ca-certificates g++ git curl xz-utils make cmake netbase pkgconf apitrace libgl1-mesa-dev libglu1-mesa-dev libosmesa6-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev xorg-dev"
