@@ -1,8 +1,11 @@
 module Graphics.Format.Tiled
-    ( Rect(..)
+    ( module Graphics.Format.Tiled.Types
+    , Rect(..)
     , TiledConfig(..)
     , createNodesFromTiledMap
     , createNodesFromTiledMapWithConfig
+    , createTilesetInfo
+    , createTilesetInfos
     , defaultTiledConfig
     , tileBoundingUpLeft
     , tileBoundingRect
