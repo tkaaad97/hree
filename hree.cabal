@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7da5d4b4b11db22ced03f58c5f924c38e5c30cca2339d79dc2cc54a715353d8b
+-- hash: 094f799799fccf3ae07afeeb1ae9fcdf7c872a3e3276696e8b348a776c8aa833
 
 name:           hree
-version:        0.2.0
+version:        0.2.1
 homepage:       https://github.com/tkaaad97/hree#readme
 bug-reports:    https://github.com/tkaaad97/hree/issues
 license:        BSD3
