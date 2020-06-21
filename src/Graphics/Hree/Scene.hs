@@ -69,7 +69,6 @@ import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Groups.PrimitiveType as PrimitiveType
 import qualified GLW.Internal.Groups as GLW (ClearBufferMask(..),
                                              PixelFormat(..))
-import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.GL

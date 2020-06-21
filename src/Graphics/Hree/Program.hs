@@ -64,7 +64,6 @@ import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Light (maxLightCount)
-import System.IO.Error (userError)
 
 data Options = Options
     { optionsGlslVersion             :: !(Maybe Int)

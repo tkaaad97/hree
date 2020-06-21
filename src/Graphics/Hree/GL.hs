@@ -44,11 +44,9 @@ import qualified GLW.Groups.FrontFaceDirection as FrontFaceDirection
 import qualified GLW.Internal.Groups as GLW (CullFaceMode(..),
                                              DepthFunction(..),
                                              StencilFunction(..), StencilOp(..))
-import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Linear (V4(..))
-import System.IO.Error (userError)
 
 render :: BV.Vector (ByteString, BufferBindingIndex) -> RenderInfo -> Maybe (GLW.Program, RenderOption) -> IO (Maybe (GLW.Program, RenderOption))
 render commons a cur = do
