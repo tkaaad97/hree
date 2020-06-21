@@ -10,7 +10,6 @@ import qualified Data.ByteString.Char8 as ByteString (break, breakEnd, concat,
                                                       stripPrefix, unlines,
                                                       unpack)
 import qualified Data.FileEmbed (bsToExp)
-import Data.Maybe (maybe)
 import Language.Haskell.TH.Syntax (Exp, Q, Quasi(qAddDependentFile), runIO)
 import System.Directory (canonicalizePath, doesFileExist, listDirectory)
 import System.FilePath ((</>))

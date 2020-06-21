@@ -11,10 +11,8 @@ import Example
 import Foreign (Storable(..), castPtr, plusPtr)
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Animation as Animation
 import Graphics.Hree.GL (attribFormat, attribIFormat)
 import qualified Graphics.Hree.Material.StandardMaterial as Material
-import qualified Graphics.Hree.SceneTask as SceneTask
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (Quaternion(..), V3(..), V4(..))
 import Prelude hiding (init)
@@ -137,12 +135,12 @@ main =
 
         _ <- Hree.updateNode scene nodeId0 (\n -> n { Hree.nodeMesh = Just meshId })
 
-        let track = Animation.linearRotation timePoints rotations
-            animation = Animation.singleTransformClip nodeId2 track
+        let track = Hree.linearRotation timePoints rotations
+            animation = Hree.singleTransformClip nodeId2 track
 
         st <- Time.now
-        taskBoard <- SceneTask.newSceneTaskBoard scene
-        _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOption True False Nothing))
+        taskBoard <- Hree.newSceneTaskBoard scene
+        _ <- Hree.addSceneTask taskBoard (Hree.AnimationTask st animation (Hree.AnimationTaskOption True False Nothing))
 
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
@@ -159,7 +157,7 @@ main =
         threadDelay 100000
         GLFW.pollEvents
         t <- Time.now
-        SceneTask.runSceneTasksOnBoard taskBoard t
+        Hree.runSceneTasksOnBoard taskBoard t
         onDisplay (r, s, c, taskBoard) w
 
         where

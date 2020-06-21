@@ -13,7 +13,6 @@ import qualified Graphics.Format.PLY as PLY (loadGeometryFromFile)
 import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
 import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Material.BasicMaterial as Material
-import qualified Graphics.Hree.SceneTask as SceneTask
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..))
 import Prelude hiding (init)
@@ -55,8 +54,8 @@ main = do
                 then return Nothing
                 else do
                     st <- Time.now
-                    taskBoard <- SceneTask.newSceneTaskBoard scene
-                    _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st (BV.head animations) (SceneTask.AnimationTaskOption True False Nothing))
+                    taskBoard <- Hree.newSceneTaskBoard scene
+                    _ <- Hree.addSceneTask taskBoard (Hree.AnimationTask st (BV.head animations) (Hree.AnimationTaskOption True False Nothing))
                     return (Just taskBoard)
 
         | otherwise = do
@@ -75,7 +74,7 @@ main = do
         threadDelay 10000
         GLFW.pollEvents
         t <- Time.now
-        SceneTask.runSceneTasksOnBoard taskBoard t
+        Hree.runSceneTasksOnBoard taskBoard t
         onDisplay (r, s, c, Just taskBoard) w
 
         where

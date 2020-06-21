@@ -13,10 +13,7 @@ import qualified Foreign (castPtr)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Animation as Animation
-import qualified Graphics.Hree.Material.SpriteMaterial as Hree (baseColorTexture,
-                                                                spriteMaterial)
-import qualified Graphics.Hree.SceneTask as SceneTask
+import qualified Graphics.Hree.Material.SpriteMaterial as Hree (baseColorTexture)
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..))
 import Prelude hiding (init)
@@ -26,10 +23,10 @@ data CharacterInfo = CharacterInfo
     , meshStillBack      :: Hree.MeshId
     , meshStillLeft      :: Hree.MeshId
     , meshStillRight     :: Hree.MeshId
-    , animationWalkFront :: Animation.AnimationClip
-    , animationWalkBack  :: Animation.AnimationClip
-    , animationWalkLeft  :: Animation.AnimationClip
-    , animationWalkRight :: Animation.AnimationClip
+    , animationWalkFront :: Hree.AnimationClip
+    , animationWalkBack  :: Hree.AnimationClip
+    , animationWalkLeft  :: Hree.AnimationClip
+    , animationWalkRight :: Hree.AnimationClip
     } deriving (Show)
 
 main :: IO ()
@@ -106,8 +103,8 @@ main =
         walkRight <- createNodeMeshAnimation scene material nodeId walkRightUVs
         let characterInfo = CharacterInfo stillFront stillBack stillLeft stillRight walkFront walkBack walkLeft walkRight
 
-        taskBoard <- SceneTask.newSceneTaskBoard scene
-        taskId <- SceneTask.addSceneTask taskBoard SceneTask.Nop
+        taskBoard <- Hree.newSceneTaskBoard scene
+        taskId <- Hree.addSceneTask taskBoard Hree.Nop
 
         GLFW.setKeyCallback w (Just $ keyCallback scene nodeId characterInfo taskBoard taskId)
 
@@ -122,7 +119,7 @@ main =
         threadDelay 100000
         GLFW.pollEvents
         t <- Time.now
-        SceneTask.runSceneTasksOnBoard taskBoard t
+        Hree.runSceneTasksOnBoard taskBoard t
         onDisplay (r, s, c, taskBoard) w
 
         where
@@ -155,19 +152,19 @@ main =
 
     createNodeMeshAnimation scene material nodeId uvs = do
         meshIds <- createMeshes scene material uvs
-        return $ Animation.stepMesh scene nodeId timepoints meshIds
+        return $ Hree.stepMesh scene nodeId timepoints meshIds
 
     keyCallback _ _ characterInfo taskBoard taskId _ key _ GLFW.KeyState'Pressed _ =
         case resolveWalkAnimation characterInfo key of
             Just animation -> do
                 st <- Time.now
-                SceneTask.modifySceneTask taskBoard (const $ SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOption True False Nothing)) taskId
+                Hree.modifySceneTask taskBoard (const $ Hree.AnimationTask st animation (Hree.AnimationTaskOption True False Nothing)) taskId
             Nothing -> return ()
 
     keyCallback scene nodeId characterInfo taskBoard taskId _ key _ GLFW.KeyState'Released _ =
         case resolveStillMesh characterInfo key of
             Just mesh -> do
-                SceneTask.modifySceneTask taskBoard (const SceneTask.Nop) taskId
+                Hree.modifySceneTask taskBoard (const Hree.Nop) taskId
                 _ <- Hree.updateNode scene nodeId (\node -> node { Hree.nodeMesh = Just mesh })
                 return ()
             Nothing -> return ()

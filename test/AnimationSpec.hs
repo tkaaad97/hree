@@ -3,7 +3,6 @@ module AnimationSpec
     ) where
 
 import Chronos (Timespan(..))
-import Data.Maybe (maybe)
 import qualified Data.Vector.Unboxed as UV
 import Graphics.Hree.Animation
 import Graphics.Hree.Math (Transform(..))

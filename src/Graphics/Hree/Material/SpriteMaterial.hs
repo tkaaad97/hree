@@ -6,7 +6,6 @@ module Graphics.Hree.Material.SpriteMaterial
     , spriteMaterial
     ) where
 
-import Data.Maybe (maybe)
 import qualified Data.Vector as BV (singleton)
 import qualified GLW.Groups.DepthFunction as DepthFunction
 import qualified Graphics.GL as GL

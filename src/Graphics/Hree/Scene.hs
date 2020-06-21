@@ -54,7 +54,7 @@ import qualified Data.Component as Component
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, isJust, maybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as GV (imapM_)

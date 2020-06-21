@@ -27,7 +27,7 @@ import qualified Data.ByteString.Char8 as BS (dropWhile, readInt, split, unpack)
 import qualified Data.Char as Char (isSpace)
 import Data.Int
 import qualified Data.List as List (filter, span)
-import Data.Maybe (fromMaybe, isJust, maybe)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Serialize as Serialize
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (concatMap, find, findIndex, foldM',

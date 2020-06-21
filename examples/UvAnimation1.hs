@@ -13,21 +13,18 @@ import qualified Foreign (castPtr)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import Graphics.Hree as Hree
-import qualified Graphics.Hree.Animation as Animation
-import qualified Graphics.Hree.GL.UniformBlock as Hree (modifyUniformBlock)
 import qualified Graphics.Hree.Material.SpriteMaterial as Material (SpriteMaterial(..),
                                                                     SpriteMaterialBlock(..),
                                                                     spriteMaterial)
-import qualified Graphics.Hree.SceneTask as SceneTask
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), (!*))
 import Prelude hiding (init)
 
 data CharacterInfo = CharacterInfo
-    { animationWalkFront :: !Animation.AnimationClip
-    , animationWalkBack  :: !Animation.AnimationClip
-    , animationWalkLeft  :: !Animation.AnimationClip
-    , animationWalkRight :: !Animation.AnimationClip
+    { animationWalkFront :: !Hree.AnimationClip
+    , animationWalkBack  :: !Hree.AnimationClip
+    , animationWalkLeft  :: !Hree.AnimationClip
+    , animationWalkRight :: !Hree.AnimationClip
     } deriving (Show)
 
 main :: IO ()
@@ -106,8 +103,8 @@ main =
 
         let node = Hree.newNode { Hree.nodeMesh = Just meshId }
         _ <- Hree.addNode scene node True
-        taskBoard <- SceneTask.newSceneTaskBoard scene
-        taskId <- SceneTask.addSceneTask taskBoard SceneTask.Nop
+        taskBoard <- Hree.newSceneTaskBoard scene
+        taskId <- Hree.addSceneTask taskBoard Hree.Nop
 
         GLFW.setKeyCallback w (Just $ keyCallback uniformBlockBinder characterInfo taskBoard taskId)
 
@@ -122,7 +119,7 @@ main =
         threadDelay 100000
         GLFW.pollEvents
         t <- Time.now
-        SceneTask.runSceneTasksOnBoard taskBoard t
+        Hree.runSceneTasksOnBoard taskBoard t
         onDisplay (r, s, c, taskBoard) w
 
         where
@@ -160,21 +157,21 @@ main =
     createUvAnimation ubb uvs =
         let uvs' = UV.map uvOffsetScale uvs
             setter (V2 off scale) = Hree.modifyUniformBlock (\a -> a { Material.uvOffset = off, Material.uvScale = scale }) ubb
-            track = Animation.VariationTrackDiscrete uvs'
-            keyFrames = Animation.KeyFrames Animation.InterpolationStep timepoints track
-            animation = Animation.singleVariationClip setter keyFrames
+            track = Hree.VariationTrackDiscrete uvs'
+            keyFrames = Hree.KeyFrames Hree.InterpolationStep timepoints track
+            animation = Hree.singleVariationClip setter keyFrames
         in animation
 
     keyCallback _ characterInfo taskBoard taskId _ key _ GLFW.KeyState'Pressed _ =
         case resolveWalkAnimation characterInfo key of
             Just animation -> do
                 st <- Time.now
-                SceneTask.modifySceneTask taskBoard (const $ SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOption True False Nothing)) taskId
+                Hree.modifySceneTask taskBoard (const $ Hree.AnimationTask st animation (Hree.AnimationTaskOption True False Nothing)) taskId
             Nothing -> return ()
 
     keyCallback _ _ taskBoard taskId _ _ _ GLFW.KeyState'Released _ = do
-        SceneTask.terminateSceneTask taskBoard taskId
-        SceneTask.modifySceneTask taskBoard (const SceneTask.Nop) taskId
+        Hree.terminateSceneTask taskBoard taskId
+        Hree.modifySceneTask taskBoard (const Hree.Nop) taskId
 
     keyCallback _ _ _ _ _ _ _ _ _ = return ()
 

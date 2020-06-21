@@ -6,9 +6,7 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Unboxed as UV
 import Example
 import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Animation as Animation
 import qualified Graphics.Hree.Material.FlatColorMaterial as Material
-import qualified Graphics.Hree.SceneTask as SceneTask
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..), V4(..), axisAngle, inv44)
 import Prelude hiding (init)
@@ -58,14 +56,14 @@ main =
         let ms = 1000000
             timepoints = UV.fromList . map (* ms) $ [0, 5000, 10000]
             rotations = UV.fromList [axisAngle (V3 0 0 1) 0, axisAngle (V3 0 0 1) pi, axisAngle (V3 0 0 1) (2 * pi)]
-            track = Animation.linearRotation timepoints rotations
-            channel1 = Animation.singleTransformChannel nodeId track
-            channel2 = Animation.singleTransformChannel childNodeId track
-            animation = Animation.animationClip (BV.fromList [channel1, channel2])
+            track = Hree.linearRotation timepoints rotations
+            channel1 = Hree.singleTransformChannel nodeId track
+            channel2 = Hree.singleTransformChannel childNodeId track
+            animation = Hree.animationClip (BV.fromList [channel1, channel2])
 
         st <- Time.now
-        taskBoard <- SceneTask.newSceneTaskBoard scene
-        _ <- SceneTask.addSceneTask taskBoard (SceneTask.AnimationTask st animation (SceneTask.AnimationTaskOption True False Nothing))
+        taskBoard <- Hree.newSceneTaskBoard scene
+        _ <- Hree.addSceneTask taskBoard (Hree.AnimationTask st animation (Hree.AnimationTaskOption True False Nothing))
 
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
@@ -77,7 +75,7 @@ main =
         render
         GLFW.pollEvents
         t <- Time.now
-        SceneTask.runSceneTasksOnBoard taskBoard t
+        Hree.runSceneTasksOnBoard taskBoard t
         onDisplay (r, s, c, taskBoard) w
 
         where

@@ -6,7 +6,6 @@ module Graphics.Hree.Material.BasicMaterial
     , basicMaterial
     ) where
 
-import Data.Maybe (maybe)
 import qualified Data.Vector as BV (singleton)
 import qualified Graphics.GL as GL (GLfloat)
 import Graphics.Hree.GL.Block (Block(..))

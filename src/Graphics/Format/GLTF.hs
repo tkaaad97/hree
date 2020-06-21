@@ -50,14 +50,13 @@ import qualified Data.ByteString as ByteString (drop, isPrefixOf, readFile,
 import qualified Data.ByteString.Base64 as Base64 (decode)
 import qualified Data.ByteString.Char8 as ByteString (break, dropWhile, unpack,
                                                       useAsCString)
-import Data.Either (either)
 import Data.Function ((&))
 import Data.Int (Int16, Int8)
 import qualified Data.IntSet as IntSet (empty, fromList, isSubsetOf, member,
                                         union)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (singleton, toList)
-import Data.Maybe (fromMaybe, maybe)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
