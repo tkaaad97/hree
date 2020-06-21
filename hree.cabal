@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 094f799799fccf3ae07afeeb1ae9fcdf7c872a3e3276696e8b348a776c8aa833
+-- hash: 6f1b9bb49edaece734ea9307fb1c850c21e86685030f3e71d1f7beffb832ea74
 
 name:           hree
 version:        0.2.1
@@ -62,6 +62,7 @@ library
       Graphics.Hree.Material.StandardMaterial
       Graphics.Hree.Material.TestMaterial
       Graphics.Hree.Material.UserMaterial
+      Graphics.Hree.MaterialExports
       Graphics.Hree.Math
       Graphics.Hree.Mesh
       Graphics.Hree.Program

@@ -9,6 +9,7 @@ module Graphics.Hree
     , module Graphics.Hree.GL.Vertex
     , module Graphics.Hree.Light
     , module Graphics.Hree.Material
+    , module Graphics.Hree.MaterialExports
     , module Graphics.Hree.Math
     , module Graphics.Hree.Sampler
     , module Graphics.Hree.Scene
@@ -30,6 +31,7 @@ import Graphics.Hree.GL.Vertex (BasicVertex(..), PositionAndNormal(..),
                                 Vertex(..), VertexField(..), VertexSpec(..))
 import Graphics.Hree.Light
 import Graphics.Hree.Material
+import Graphics.Hree.MaterialExports
 import Graphics.Hree.Math
 import Graphics.Hree.Sampler
 import Graphics.Hree.Scene
