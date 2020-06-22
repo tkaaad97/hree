@@ -23,7 +23,6 @@ import Prelude hiding (init)
 data CharacterInfo = CharacterInfo
     { animationWalkFront :: !Hree.AnimationClip
     , animationWalkBack  :: !Hree.AnimationClip
-    , animationWalkLeft  :: !Hree.AnimationClip
     , animationWalkRight :: !Hree.AnimationClip
     } deriving (Show)
 
@@ -45,7 +44,7 @@ main =
     V2 twidth' theight' = fmap fromIntegral tsize
     uvCoordMat = V2 (V2 (1 / twidth') 0) (V2 0 (1 / theight'))
 
-    uvOffsetScale (V2 p s) = V2 (uvCoordMat !* p) s
+    uvOffset p = uvCoordMat !* p
 
     timepoints :: UV.Vector Int64
     timepoints = UV.map (* 1000000) $ UV.fromList
@@ -56,49 +55,40 @@ main =
         , 1000
         ]
 
-    walkFrontUVs, walkBackUVs, walkLeftUVs, walkRightUVs :: UV.Vector (V2 (V2 Float))
+    walkFrontUVs, walkBackUVs, walkRightUVs :: UV.Vector (V2 Float)
     walkFrontUVs = UV.fromList
-        [ V2 (V2 16 31) (V2 1 (-1))
-        , V2 (V2 16 48) (V2 1 (-1))
-        , V2 (V2 16 31) (V2 1 (-1))
-        , V2 (V2 16 64) (V2 1 (-1))
-        , V2 (V2 16 31) (V2 1 (-1))
+        [ V2 16 31
+        , V2 16 48
+        , V2 16 31
+        , V2 16 64
+        , V2 16 31
         ]
     walkBackUVs = UV.fromList
-        [ V2 (V2 48 31) (V2 1 (-1))
-        , V2 (V2 48 48) (V2 1 (-1))
-        , V2 (V2 48 31) (V2 1 (-1))
-        , V2 (V2 48 64) (V2 1 (-1))
-        , V2 (V2 48 31) (V2 1 (-1))
-        ]
-    walkLeftUVs = UV.fromList
-        [ V2 (V2 48 31) (V2 (-1) (-1))
-        , V2 (V2 48 48) (V2 (-1) (-1))
-        , V2 (V2 48 31) (V2 (-1) (-1))
-        , V2 (V2 48 64) (V2 (-1) (-1))
-        , V2 (V2 48 31) (V2 (-1) (-1))
+        [ V2 48 31
+        , V2 48 48
+        , V2 48 31
+        , V2 48 64
+        , V2 48 31
         ]
     walkRightUVs = UV.fromList
-        [ V2 (V2 32 31) (V2 1 (-1))
-        , V2 (V2 32 48) (V2 1 (-1))
-        , V2 (V2 32 31) (V2 1 (-1))
-        , V2 (V2 32 64) (V2 1 (-1))
-        , V2 (V2 32 31) (V2 1 (-1))
+        [ V2 32 31
+        , V2 32 48
+        , V2 32 31
+        , V2 32 64
+        , V2 32 31
         ]
 
     init w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        material <- createMaterial scene (uvOffsetScale $ UV.head walkFrontUVs)
-        Hree.AddedMesh meshId uniformBlockBinder <- createMesh scene material (V2 16 16)
+        material <- createMaterial scene (uvOffset $ UV.head walkFrontUVs)
+        Hree.AddedMesh meshId uniformBlockBinder <- createMesh scene material (V2 16 (-16))
         let walkFront = createUvAnimation uniformBlockBinder walkFrontUVs
             walkBack = createUvAnimation uniformBlockBinder walkBackUVs
-            walkLeft = createUvAnimation uniformBlockBinder walkLeftUVs
             walkRight = createUvAnimation uniformBlockBinder walkRightUVs
             characterInfo = CharacterInfo
                 walkFront
                 walkBack
-                walkLeft
                 walkRight
 
         let node = Hree.newNode { Hree.nodeMesh = Just meshId }
@@ -130,7 +120,7 @@ main =
     -- image source https://opengameart.org/sites/default/files/RPG_assets.png
     imagePath = "examples/images/RPG_assets.png"
 
-    createMaterial scene (V2 off scale) = do
+    createMaterial scene off = do
         image <- either (throwIO . userError) (return . Picture.convertRGBA8) =<< Picture.readImage imagePath
         let settings = Hree.TextureSettings 1 GL.GL_RGBA8 twidth theight False
         (_, texture) <- SV.unsafeWith (Picture.imageData image) $ \ptr -> do
@@ -142,7 +132,6 @@ main =
         let material = Material.spriteMaterial
                 { Material.uniformBlock = (Material.uniformBlock Material.spriteMaterial)
                     { Material.uvOffset = off
-                    , Material.uvScale = scale
                     }
                 , Material.baseColorTexture = Just $ Hree.Texture (texture, sampler)
                 }
@@ -155,17 +144,18 @@ main =
         Hree.addMesh scene $ Mesh geo' material (Just 1)
 
     createUvAnimation ubb uvs =
-        let uvs' = UV.map uvOffsetScale uvs
-            setter (V2 off scale) = Hree.modifyUniformBlock (\a -> a { Material.uvOffset = off, Material.uvScale = scale }) ubb
+        let uvs' = UV.map uvOffset uvs
+            setter off = Hree.modifyUniformBlock (\a -> a { Material.uvOffset = off }) ubb
             track = Hree.VariationTrackDiscrete uvs'
             keyFrames = Hree.KeyFrames Hree.InterpolationStep timepoints track
             animation = Hree.singleVariationClip setter keyFrames
         in animation
 
-    keyCallback _ characterInfo taskBoard taskId _ key _ GLFW.KeyState'Pressed _ =
+    keyCallback ubb characterInfo taskBoard taskId _ key _ GLFW.KeyState'Pressed _ =
         case resolveWalkAnimation characterInfo key of
-            Just animation -> do
+            Just (animation, flipH) -> do
                 st <- Time.now
+                Hree.modifyUniformBlock (\a -> a { Material.uvFlippedHorizontally = flipH }) ubb
                 Hree.modifySceneTask taskBoard (const $ Hree.AnimationTask st animation (Hree.AnimationTaskOption True False Nothing)) taskId
             Nothing -> return ()
 
@@ -175,8 +165,8 @@ main =
 
     keyCallback _ _ _ _ _ _ _ _ _ = return ()
 
-    resolveWalkAnimation characterInfo GLFW.Key'Up = Just $ animationWalkBack characterInfo
-    resolveWalkAnimation characterInfo GLFW.Key'Down = Just $ animationWalkFront characterInfo
-    resolveWalkAnimation characterInfo GLFW.Key'Left = Just $ animationWalkLeft characterInfo
-    resolveWalkAnimation characterInfo GLFW.Key'Right = Just $ animationWalkRight characterInfo
+    resolveWalkAnimation characterInfo GLFW.Key'Up = Just $ (animationWalkBack characterInfo, GL.GL_FALSE)
+    resolveWalkAnimation characterInfo GLFW.Key'Down = Just $ (animationWalkFront characterInfo, GL.GL_FALSE)
+    resolveWalkAnimation characterInfo GLFW.Key'Left = Just $ (animationWalkRight characterInfo, GL.GL_TRUE)
+    resolveWalkAnimation characterInfo GLFW.Key'Right = Just $ (animationWalkRight characterInfo, GL.GL_FALSE)
     resolveWalkAnimation _ _ = Nothing
