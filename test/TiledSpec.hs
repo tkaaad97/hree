@@ -26,8 +26,8 @@ spec = do
 
     testJSON "Tile"
         "{\"id\":1,\"terrain\":[0, 1, 0, 1]}"
-        (Tile 1 Nothing Nothing Nothing (Just $ Linear.V4 0 1 0 1) Nothing (Properties mempty))
-        (DA.object [("image", DA.Null), "terrain" .= ([0, 1, 0, 1] :: [Word32]), ("objectgroup", DA.Null), ("probability", DA.Null), ("imageheight", DA.Null), ("imagewidth", DA.Null), "id" .= (1 :: Word32), ("type", DA.Null), ("properties", DA.Null)])
+        (Tile Nothing 1 Nothing Nothing Nothing (Just $ Linear.V4 0 1 0 1) Nothing (Properties mempty))
+        (DA.object [("image", DA.Null), "terrain" .= ([0, 1, 0, 1] :: [Word32]), ("objectgroup", DA.Null), ("probability", DA.Null), ("imageheight", DA.Null), ("imagewidth", DA.Null), "id" .= (1 :: Word32), ("type", DA.Null), ("animation", DA.Null), ("properties", DA.Null)])
 
     testJSON "Terrain" "{\"name\":\"ground\",\"tile\":12}" (Terrain "ground" 12) (DA.object ["name" .= ("ground" :: Text), "tile" .= (12 :: Int)])
 

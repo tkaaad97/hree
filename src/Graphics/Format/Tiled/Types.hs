@@ -289,8 +289,14 @@ data ObjectGroup = ObjectGroup
     , objectGroupObjects :: !(BV.Vector Object)
     } deriving (Show, Eq)
 
+data Frame = Frame
+    { frameDuration :: !Word32
+    , frameTileId   :: !Word32
+    } deriving (Show, Eq)
+
 data Tile = Tile
-    { tileId          :: !Word32
+    { tileAnimation   :: !(Maybe (BV.Vector Frame))
+    , tileId          :: !Word32
     , tileImage       :: !(Maybe Image)
     , tileObjectGroup :: !(Maybe ObjectGroup)
     , tileProbability :: !(Maybe Double)
@@ -320,6 +326,17 @@ data Tileset = Tileset
     , tilesetWangsets   :: !(BV.Vector Wangset)
     , tilesetProperties :: !Properties
     } deriving (Show, Eq)
+
+instance DA.FromJSON Frame where
+    parseJSON (DA.Object v) = do
+        Frame <$> v .: "duration" <*> v .: "tileid"
+    parseJSON invalid = DA.typeMismatch "Frame" invalid
+
+instance DA.ToJSON Frame where
+    toJSON (Frame duration tid) = DA.object
+        [ "duration" .= duration
+        , "tileid" .= tid
+        ]
 
 instance DA.FromJSON TilesetSource where
     parseJSON o @ (DA.Object v) = do
@@ -637,7 +654,8 @@ instance DA.FromJSON Tile where
         let image = Image <$> imgSource <*> imgWidth <*> imgHeight
         terrain <- maybe (return Nothing) (fmap Just . fromVectorToV4) =<< v .:? "terrain"
         Tile
-            <$> v .: "id"
+            <$> v .:? "animation"
+            <*> v .: "id"
             <*> return image
             <*> v .:? "objectgroup"
             <*> v .:? "probability"
@@ -648,10 +666,11 @@ instance DA.FromJSON Tile where
     parseJSON invalid = DA.typeMismatch "Tile" invalid
 
 instance DA.ToJSON Tile where
-    toJSON (Tile tid image objectgroup probability terrain type' p @ (Properties props)) =
+    toJSON (Tile animation tid image objectgroup probability terrain type' p @ (Properties props)) =
         let p' = if Map.null props then Nothing else Just p
         in DA.object
-            [ "id" .= tid
+            [ "animation" .= animation
+            , "id" .= tid
             , "image" .= (imageSource <$> image)
             , "imagewidth" .= (imageWidth <$> image)
             , "imageheight" .= (imageHeight <$> image)
