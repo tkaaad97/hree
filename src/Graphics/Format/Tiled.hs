@@ -1,10 +1,11 @@
 module Graphics.Format.Tiled
     ( module Graphics.Format.Tiled.Types
+    , LoadInfo(..)
     , Rect(..)
     , TiledConfig(..)
     , TilesetInfo(..)
-    , createNodesFromTiledMap
-    , createNodesFromTiledMapWithConfig
+    , loadTiledMap
+    , loadTiledMapWithConfig
     , createTilesetInfo
     , createTilesetInfos
     , defaultTiledConfig
@@ -75,6 +76,11 @@ data TiledConfig = TiledConfig
     , tiledConfigLayerDeltaZ :: !Float
     , tiledConfigOriginPixel :: !(V2 Int)
     } deriving (Show, Eq)
+
+data LoadInfo = LoadInfo
+    { loadInfoMap          :: !Map
+    , loadInfoLayerNodeIds :: !(BV.Vector Hree.NodeId)
+    } deriving (Show)
 
 defaultTiledConfig :: TiledConfig
 defaultTiledConfig = TiledConfig 1024 0 0 (V2 0 0)
@@ -191,13 +197,14 @@ nostaggeredRenderOrderIndex RenderOrderLeftUp (V2 w h) i =
     let (d, m) = divMod i w
     in w * (h - 1 - d) + w - 1 - m
 
-createNodesFromTiledMap :: Hree.Scene -> FilePath -> Map -> IO (BV.Vector Hree.NodeId)
-createNodesFromTiledMap scene cd = createNodesFromTiledMapWithConfig scene cd defaultTiledConfig
+loadTiledMap :: Hree.Scene -> FilePath -> Map -> IO LoadInfo
+loadTiledMap scene cd = loadTiledMapWithConfig scene cd defaultTiledConfig
 
-createNodesFromTiledMapWithConfig :: Hree.Scene -> FilePath -> TiledConfig -> Map -> IO (BV.Vector Hree.NodeId)
-createNodesFromTiledMapWithConfig scene cd config map = do
+loadTiledMapWithConfig :: Hree.Scene -> FilePath -> TiledConfig -> Map -> IO LoadInfo
+loadTiledMapWithConfig scene cd config map = do
     tilesetInfos <- createTilesetInfos scene cd tilesets
-    BV.mapMaybe id <$> BV.imapM (createNodeFromLayer scene config map tilesetInfos gidRanges) layers
+    nodeIds <- BV.mapMaybe id <$> BV.imapM (createNodeFromLayer scene config map tilesetInfos gidRanges) layers
+    return (LoadInfo map nodeIds)
     where
     tilesets = mapTilesets map
     gidRanges = tilesetGidRanges tilesets

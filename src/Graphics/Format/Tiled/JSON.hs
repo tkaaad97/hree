@@ -1,5 +1,11 @@
 module Graphics.Format.Tiled.JSON
-    ( loadTiledMap
+    ( module Graphics.Format.Tiled.Types
+    , Tiled.LoadInfo(..)
+    , Tiled.TiledConfig(..)
+    , Tiled.defaultTiledConfig
+    , readTiledMap
+    , loadTiledMap
+    , loadTiledMapWithConfig
     ) where
 
 import qualified Codec.Compression.GZip as GZip (decompress)
@@ -17,15 +23,28 @@ import qualified Data.Vector as BV (mapM)
 import qualified Data.Vector.Unboxed as UV (Vector, generateM)
 import Data.Word (Word32)
 import qualified Foreign (castPtr, peekByteOff)
+import qualified Graphics.Format.Tiled as Tiled (LoadInfo(..), TiledConfig(..),
+                                                 defaultTiledConfig,
+                                                 loadTiledMapWithConfig)
 import Graphics.Format.Tiled.Types
+import qualified Graphics.Hree as Hree (Scene)
 import System.Directory (canonicalizePath)
 import System.FilePath (dropFileName, (</>))
 
-loadTiledMap :: FilePath -> IO Map
-loadTiledMap path = do
+readTiledMap :: FilePath -> IO Map
+readTiledMap path = do
     mid <- either (throwIO . userError) return . DA.eitherDecodeStrict' =<< ByteString.readFile path
     let basepath = dropFileName path
     completeMap basepath mid
+
+loadTiledMap :: Hree.Scene -> FilePath -> IO Tiled.LoadInfo
+loadTiledMap scene path = do
+    loadTiledMapWithConfig scene (dropFileName path) Tiled.defaultTiledConfig
+
+loadTiledMapWithConfig :: Hree.Scene -> FilePath -> Tiled.TiledConfig -> IO Tiled.LoadInfo
+loadTiledMapWithConfig scene path config = do
+    m <- readTiledMap path
+    Tiled.loadTiledMapWithConfig scene (dropFileName path) config m
 
 completeMap :: FilePath -> MapMid -> IO Map
 completeMap basepath m = do

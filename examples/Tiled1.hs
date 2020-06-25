@@ -3,14 +3,13 @@ module Tiled1 where
 
 import Control.Concurrent (threadDelay)
 import Example
-import qualified Graphics.Format.Tiled as Tiled (createNodesFromTiledMap)
-import qualified Graphics.Format.Tiled.JSON as Tiled (loadTiledMap)
+import qualified Graphics.Format.Tiled.JSON as Tiled (LoadInfo(..),
+                                                      loadTiledMap)
 import Graphics.Hree as Hree
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..))
 import Prelude hiding (init)
 import System.Environment (getArgs)
-import System.FilePath (dropFileName)
 
 main :: IO ()
 main = do
@@ -40,8 +39,7 @@ main = do
         return (renderer, scene, camera)
 
     load scene path = do
-        m <- Tiled.loadTiledMap path
-        nodeIds <- Tiled.createNodesFromTiledMap scene (dropFileName path) m
+        Tiled.LoadInfo _ nodeIds <- Tiled.loadTiledMap scene path
         _ <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = nodeIds } True
         return ()
 
