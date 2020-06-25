@@ -36,22 +36,19 @@ import qualified Foreign (Ptr, castPtr, copyArray, plusPtr, sizeOf)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import Graphics.Format.Tiled.Types
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree.Geometry as Hree (addVerticesToGeometry,
-                                                 newSpriteGeometry)
-import qualified Graphics.Hree.GL.Types as Hree (Texture(..))
-import qualified Graphics.Hree.GL.Vertex as Hree (SpriteVertex(..))
+import qualified Graphics.Hree as Hree (Geometry, Mesh(..), MeshId, Node(..),
+                                        NodeId, Scene, SpriteVertex(..),
+                                        Texture(..), TextureSettings(..),
+                                        TextureSourceData(..), addMesh, addNode,
+                                        addSampler, addTexture,
+                                        addVerticesToGeometry, addedMeshId,
+                                        newNode, newSpriteGeometry)
 import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial,
                                                                 baseColorTexture,
                                                                 spriteMaterial)
 import qualified Graphics.Hree.Sampler as Hree (glTextureMagFilter,
                                                 glTextureMinFilter,
                                                 setSamplerParameter)
-import qualified Graphics.Hree.Scene as Hree (addMesh, addNode, addSampler,
-                                              addTexture, addedMeshId, newNode)
-import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
-                                                TextureSourceData(..))
-import qualified Graphics.Hree.Types as Hree (Geometry, Mesh(..), MeshId,
-                                              Node(..), NodeId, Scene)
 import Linear (V2(..), V3(..), (^-^))
 import Prelude hiding (map)
 import System.Directory (canonicalizePath)
