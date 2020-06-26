@@ -6,6 +6,7 @@ module Graphics.Format.Tiled.Types
     , Coord(..)
     , Ellipse(..)
     , EncodingType(..)
+    , Frame(..)
     , Gid
     , Image(..)
     , ImageLayer(..)

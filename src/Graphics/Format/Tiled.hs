@@ -20,29 +20,41 @@ import qualified Codec.Picture as Picture (Image(..), PixelRGBA8, convertRGBA8,
 import qualified Codec.Picture.Types as Picture (MutableImage(..),
                                                  PixelBaseComponent,
                                                  freezeImage, newMutableImage)
-import Control.Exception (throwIO)
+import Control.Exception (bracket, throwIO)
 import Data.Bits (complement, (.&.))
 import Data.Function ((&))
+import qualified Data.IntMap.Strict as IntMap (findMax)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
-import qualified Data.Vector as BV (Vector, findIndex, fromList, imapM, mapM,
-                                    mapMaybe, postscanl', reverse, zip, (!?))
-import qualified Data.Vector.Storable as SV (generate, mapMaybe, unsafeWith)
+import qualified Data.Vector as BV (Vector, concatMap, findIndex, fromList,
+                                    generate, imapM, length, map, mapM,
+                                    mapMaybe, postscanl', reverse, zip, (!),
+                                    (!?))
+import qualified Data.Vector.Storable as SV (generate, unsafeWith)
 import qualified Data.Vector.Storable.Mutable as MSV (unsafeWith)
-import qualified Data.Vector.Unboxed as UV (Vector, generate, ifoldl', (!))
+import qualified Data.Vector.Unboxed as UV (Vector, findIndices, generate,
+                                            ifoldl', length, map, mapM_, scanl,
+                                            (!))
 import Data.Word (Word32)
-import qualified Foreign (Ptr, castPtr, copyArray, plusPtr, sizeOf)
+import qualified Foreign (Ptr, castPtr, copyArray, peekElemOff, plusPtr,
+                          pokeElemOff, sizeOf)
+import qualified GLW (Buffer, glMapNamedBuffer, glUnmapNamedBuffer)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import Graphics.Format.Tiled.Types
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree as Hree (Geometry, Mesh(..), MeshId, Node(..),
-                                        NodeId, Scene, SpriteVertex(..),
-                                        Texture(..), TextureSettings(..),
-                                        TextureSourceData(..), addMesh, addNode,
+import qualified Graphics.Hree as Hree (AnimationClip,
+                                        Geometry(geometryBuffers),
+                                        Interpolation(..), KeyFrames(..),
+                                        Mesh(..), Node(..), NodeId, Scene,
+                                        SpriteVertex(..), Texture(..),
+                                        TextureSettings(..),
+                                        TextureSourceData(..),
+                                        VariationTrack(..), addMesh, addNode,
                                         addSampler, addTexture,
                                         addVerticesToGeometry, addedMeshId,
-                                        newNode, newSpriteGeometry)
+                                        newNode, newSpriteGeometry,
+                                        singleVariationClip)
 import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial,
                                                                 baseColorTexture,
                                                                 spriteMaterial)
@@ -75,8 +87,20 @@ data TiledConfig = TiledConfig
     } deriving (Show, Eq)
 
 data LoadInfo = LoadInfo
-    { loadInfoMap          :: !Map
-    , loadInfoLayerNodeIds :: !(BV.Vector Hree.NodeId)
+    { loadInfoMap        :: !Map
+    , loadInfoNodeIds    :: !(BV.Vector Hree.NodeId)
+    , loadInfoAnimations :: !(BV.Vector Hree.AnimationClip)
+    , loadInfoLayers     :: !(BV.Vector LayerLoadInfo)
+    } deriving (Show)
+
+data LayerLoadInfo = LayerLoadInfo
+    { layerLoadInfoNodeId  :: !Hree.NodeId
+    , layerLoadInfoRegions :: !(BV.Vector RegionLoadInfo)
+    } deriving (Show)
+
+data RegionLoadInfo = RegionLoadInfo
+    { regionLoadInfoNodeId     :: !Hree.NodeId
+    , regionLoadInfoAnimations :: !(BV.Vector Hree.AnimationClip)
     } deriving (Show)
 
 defaultTiledConfig :: TiledConfig
@@ -200,24 +224,24 @@ loadTiledMap scene cd = loadTiledMapWithConfig scene cd defaultTiledConfig
 loadTiledMapWithConfig :: Hree.Scene -> FilePath -> TiledConfig -> Map -> IO LoadInfo
 loadTiledMapWithConfig scene cd config map = do
     tilesetInfos <- createTilesetInfos scene cd tilesets
-    nodeIds <- BV.mapMaybe id <$> BV.imapM (createNodeFromLayer scene config map tilesetInfos gidRanges) layers
-    return (LoadInfo map nodeIds)
+    layers <- BV.mapMaybe id <$> BV.imapM (loadLayer scene config map tilesetInfos gidRanges) (mapLayers map)
+    let nodeIds = BV.map layerLoadInfoNodeId layers
+        animations = BV.concatMap (BV.concatMap regionLoadInfoAnimations . layerLoadInfoRegions) $ layers
+    return (LoadInfo map nodeIds animations layers)
     where
     tilesets = mapTilesets map
     gidRanges = tilesetGidRanges tilesets
-    layers = mapLayers map
 
-createNodeFromLayer :: Hree.Scene -> TiledConfig -> Map -> BV.Vector (Maybe TilesetInfo) -> BV.Vector (V2 Gid) -> Int -> Layer -> IO (Maybe Hree.NodeId)
-createNodeFromLayer scene config map tilesetInfos gidRanges layerIndex (LayerTileLayer layer) = do
-    meshIds <- createMeshesFromTileLayer scene config map tilesetInfos gidRanges layerIndex layer
-    nodeIds <- BV.mapM mkNode meshIds
-    Just <$> Hree.addNode scene Hree.newNode { Hree.nodeChildren = nodeIds } False
-    where
-    mkNode meshId = Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
-createNodeFromLayer _ _ _ _ _ _ _ = return Nothing
+loadLayer :: Hree.Scene -> TiledConfig -> Map -> BV.Vector (Maybe TilesetInfo) -> BV.Vector (V2 Gid) -> Int -> Layer -> IO (Maybe LayerLoadInfo)
+loadLayer scene config map tilesetInfos gidRanges layerIndex (LayerTileLayer layer) = do
+    regions <- loadRegions scene config map tilesetInfos gidRanges layerIndex layer
+    let regionNodeIds = BV.map regionLoadInfoNodeId regions
+    nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = regionNodeIds } False
+    return . Just $ (LayerLoadInfo nodeId regions)
+loadLayer _ _ _ _ _ _ _ = return Nothing
 
-createMeshesFromTileLayer :: Hree.Scene -> TiledConfig -> Map -> BV.Vector (Maybe TilesetInfo) -> BV.Vector (V2 Gid) -> Int -> TileLayer -> IO (BV.Vector Hree.MeshId)
-createMeshesFromTileLayer scene config map tilesetInfos gidRanges layerIndex tileLayer = BV.mapM (uncurry $ createMeshFromTiles scene config map layerData origin z) groups
+loadRegions :: Hree.Scene -> TiledConfig -> Map -> BV.Vector (Maybe TilesetInfo) -> BV.Vector (V2 Gid) -> Int -> TileLayer -> IO (BV.Vector RegionLoadInfo)
+loadRegions scene config map tilesetInfos gidRanges layerIndex tileLayer = BV.mapM (uncurry $ loadRegionFromTiles scene config map layerData origin z) groups
     where
     go [] i gid = [(resolveTileset tilesetInfos gidRanges gid, V2 i 1)]
     go ((Nothing, V2 i0 n) : xs) _ gid = (resolveTileset tilesetInfos gidRanges gid, V2 i0 (n + 1)) : xs
@@ -240,18 +264,59 @@ createMeshesFromTileLayer scene config map tilesetInfos gidRanges layerIndex til
     origin = tiledConfigOriginPixel config
     z = tiledConfigStartZ config + tiledConfigLayerDeltaZ config * fromIntegral layerIndex
 
-createMeshFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> V2 Int -> IO Hree.MeshId
-createMeshFromTiles scene config map layerData origin z tilesetInfo tiles @ (V2 _ n) = do
-    geometry <- createGeometryFromTiles scene config map layerData origin z tilesetInfo tiles
-    let material = tilesetInfoMaterial tilesetInfo
-        mesh = Hree.Mesh geometry material (Just n)
-    Hree.addedMeshId <$> Hree.addMesh scene mesh
+loadRegionFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> V2 Int -> IO RegionLoadInfo
+loadRegionFromTiles scene config map layerData origin z tilesetInfo tiles @ (V2 _ n) = do
+    (geometry, geometryGids, buffer) <- createGeometryFromTiles scene config map layerData origin z tilesetInfo tiles
+    let mesh = Hree.Mesh geometry material (Just n)
+    meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+    nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
+    let animations = BV.mapMaybe (\a -> createTileAnimation geometryGids buffer (tileId a) (tileAnimation a)) . tilesetTiles $ tileset
+    return (RegionLoadInfo nodeId animations)
+    where
+    material = tilesetInfoMaterial tilesetInfo
+    tileset = tilesetInfoTileset tilesetInfo
+    V2 firstGid _ = tilesetInfoGidRange tilesetInfo
+    createTileAnimation gids buffer localTileId (Just frames)
+        | UV.length offsets > 0 && BV.length frames > 0 =
+            let durations = UV.generate (BV.length frames) ((* 1000000) . fromIntegral . frameDuration . (frames BV.!))
+                timepoints = UV.scanl (+) 0 durations
+                tileGids = UV.generate (BV.length frames + 1) ((+ firstGid) . frameTileId . (frames BV.!) . max 0 . (flip (-) 1))
+                uvs = UV.map gidToUvRect tileGids
+                track = Hree.VariationTrackDiscrete uvs
+                keyFrames = Hree.KeyFrames Hree.InterpolationStep timepoints track
+                writeVertexUv ptr (V2 uv uvSize) off = do
+                    vertex <- Foreign.peekElemOff ptr off
+                    Foreign.pokeElemOff ptr off vertex { Hree.svUv = uv, Hree.svUvSize = uvSize }
+                setter uvRect = bracket
+                    (GLW.glMapNamedBuffer buffer GL.GL_READ_WRITE)
+                    (\ptr -> UV.mapM_ (writeVertexUv (Foreign.castPtr ptr) uvRect) offsets)
+                    (const $ GLW.glUnmapNamedBuffer buffer >> return ())
+                animation = Hree.singleVariationClip setter keyFrames
+            in Just animation
+        | otherwise = Nothing
+        where
+        offsets = findOffsetsInRegion gids (firstGid + localTileId)
+    createTileAnimation _ _ _ _ = Nothing
+    gidToUvRect gid =
+        maybe (V2 (V2 0 0) (V2 0 0)) (\(Rect uv uvSize) -> V2 uv uvSize) $ uvBoundingRect tilesetInfo gid
 
-createGeometryFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> V2 Int -> IO Hree.Geometry
+findOffsetsInRegion :: UV.Vector Gid -> Gid -> UV.Vector Int
+findOffsetsInRegion gids target = offsets
+    where
+    offsets = UV.findIndices f gids
+    f gidWithFlags = unsetGidFlags gidWithFlags == target
+
+createGeometryFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> V2 Int -> IO (Hree.Geometry, UV.Vector Gid, GLW.Buffer)
 createGeometryFromTiles scene config map layerData origin z tilesetInfo (V2 i0 n) = do
-    let vertices = SV.mapMaybe mkVertex $ SV.generate n ((renderOrderIndex orientation renderOrder staggerAxis staggerIndex (V2 columns rows)) . (+ i0))
+    let orderedIndices = BV.generate n ((renderOrderIndex orientation renderOrder staggerAxis staggerIndex (V2 columns rows)) . (+ i0))
+        vertexAndGids = BV.mapMaybe mkVertex orderedIndices
+        vertices = SV.generate (BV.length vertexAndGids) (fst . (vertexAndGids BV.!))
+        gids = UV.generate (BV.length vertexAndGids) (snd . (vertexAndGids BV.!))
     (geo, _) <- Hree.newSpriteGeometry scene
-    Hree.addVerticesToGeometry geo vertices GL.GL_STATIC_READ scene
+    geometry <- Hree.addVerticesToGeometry geo vertices GL.GL_STATIC_READ scene
+    let buffers = Hree.geometryBuffers geometry
+        (_, (buffer, _)) = IntMap.findMax buffers
+    return (geometry, gids, buffer)
     where
     columns = mapWidth map
     rows = mapHeight map
@@ -277,7 +342,7 @@ createGeometryFromTiles scene config map layerData origin z tilesetInfo (V2 i0 n
         uvRect <- uvBoundingRect tilesetInfo gid
         let rect = tileBoundingRect orientation origin mapSize mapTileSize tilesetTileSize offset (V2 ix iy) unit staggerAxis staggerIndex hexSide
             vertex = tileBoundingSpriteVertex rect z uvRect orientation hflip vflip dflip rotated
-        return vertex
+        return (vertex, gid)
 
 flipRectHorizontally :: Rect -> Rect
 flipRectHorizontally (Rect (V2 x y) (V2 w h)) = Rect (V2 (x + w) y) (V2 (-w) h)

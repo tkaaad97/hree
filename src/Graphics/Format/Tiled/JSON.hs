@@ -38,8 +38,8 @@ readTiledMap path = do
     completeMap basepath mid
 
 loadTiledMap :: Hree.Scene -> FilePath -> IO Tiled.LoadInfo
-loadTiledMap scene path = do
-    loadTiledMapWithConfig scene (dropFileName path) Tiled.defaultTiledConfig
+loadTiledMap scene path =
+    loadTiledMapWithConfig scene path Tiled.defaultTiledConfig
 
 loadTiledMapWithConfig :: Hree.Scene -> FilePath -> Tiled.TiledConfig -> IO Tiled.LoadInfo
 loadTiledMapWithConfig scene path config = do

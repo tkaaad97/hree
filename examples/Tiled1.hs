@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Tiled1 where
 
+import qualified Chronos as Time (now)
 import Control.Concurrent (threadDelay)
+import qualified Data.Vector as BV (mapM_)
 import Example
 import qualified Graphics.Format.Tiled.JSON as Tiled (LoadInfo(..),
                                                       loadTiledMap)
@@ -26,28 +28,36 @@ main = do
 
     proj = Hree.perspective 90 defaultAspect 0.1 10000.0
 
-    la = Hree.lookAt (V3 0 0 0.1) (V3 0 0 0) (V3 0 1 0)
+    la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     init path w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        load scene path
+        taskBoard <- Hree.newSceneTaskBoard scene
+        load scene taskBoard path
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
 
         GLFW.setWindowSizeCallback w (Just (resizeWindowWithCamera camera))
-        return (renderer, scene, camera)
+        return (renderer, scene, camera, taskBoard)
 
-    load scene path = do
-        Tiled.LoadInfo _ nodeIds <- Tiled.loadTiledMap scene path
+    load scene board path = do
+        t <- Time.now
+        Tiled.LoadInfo _ nodeIds animations _ <- Tiled.loadTiledMap scene path
         _ <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = nodeIds } True
+        BV.mapM_ (addAnimationTask board t) animations
         return ()
 
-    onDisplay (r, s, c) w = do
+    addAnimationTask board t animation =
+        Hree.addSceneTask board (Hree.AnimationTask t animation (Hree.AnimationTaskOption True False Nothing))
+
+    onDisplay (r, s, c, b) w = do
+        t <- Time.now
+        Hree.runSceneTasksOnBoard b t
         render
-        threadDelay 20000
+        threadDelay 100000
         GLFW.pollEvents
-        onDisplay (r, s, c) w
+        onDisplay (r, s, c, b) w
 
         where
         render = do
