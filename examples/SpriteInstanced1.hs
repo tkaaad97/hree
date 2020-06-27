@@ -27,9 +27,9 @@ main =
     delta = 0.2
 
     spriteVertices = Vector.fromList
-        $  map (\x -> SpriteVertex (V3 (fromIntegral x * delta) 0 0) (V3 delta delta 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1)) ([0..9] :: [Int])
-        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) delta 0) (V3 (delta * 2) delta 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1)) ([0..4] :: [Int])
-        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) (delta * 2) 0) (V3 (delta * 2) delta 0) (V3 0 0 0) (pi * 0.2) (V2 0 0) (V2 1 1)) ([0..4] :: [Int])
+        $  map (\x -> SpriteVertex (V3 (fromIntegral x * delta) 0 0) (V3 delta delta 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1) GL.GL_FALSE 0) ([0..9] :: [Int])
+        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) delta 0) (V3 (delta * 2) delta 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1) GL.GL_FALSE 0) ([0..4] :: [Int])
+        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) (delta * 2) 0) (V3 (delta * 2) delta 0) (V3 0 0 0) (pi * 0.2) (V2 0 0) (V2 1 1) GL.GL_FALSE 0) ([0..4] :: [Int])
 
     proj = perspective 90 defaultAspect 0.1 10.0
 

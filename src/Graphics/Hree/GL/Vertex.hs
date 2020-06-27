@@ -20,7 +20,7 @@ import Data.Proxy (Proxy)
 import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
 import qualified Graphics.GL as GL
-import Graphics.Hree.GL (attribFormat)
+import Graphics.Hree.GL (attribFormat, attribIFormat)
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Math
 
@@ -166,16 +166,18 @@ instance Vertex SpriteOffset where
         bbs = BindBufferSetting 0 (sizeOf (undefined :: SpriteOffset)) 0
 
 data SpriteVertex = SpriteVertex
-    { svPosition :: !Vec3
-    , svSize     :: !Vec3
-    , svCenter   :: !Vec3
-    , svAngle    :: !Float
-    , svUv       :: !Vec2
-    , svUvSize   :: !Vec2
+    { svPosition  :: !Vec3
+    , svSize      :: !Vec3
+    , svCenter    :: !Vec3
+    , svAngle     :: !Float
+    , svUv        :: !Vec2
+    , svUvSize    :: !Vec2
+    , svUseTile   :: !GL.GLuint
+    , svTileIndex :: !GL.GLuint
     } deriving (Show, Eq)
 
 instance Storable SpriteVertex where
-    sizeOf _ = 56
+    sizeOf _ = 64
 
     alignment _ = 4
 
@@ -186,15 +188,19 @@ instance Storable SpriteVertex where
         a <- peek $ castPtr ptr `plusPtr` 36
         u <- peek $ castPtr ptr `plusPtr` 40
         us <- peek $ castPtr ptr `plusPtr` 48
-        return $ SpriteVertex p s c a u us
+        useTile <- peek $ castPtr ptr `plusPtr` 56
+        tileIndex <- peek $ castPtr ptr `plusPtr` 60
+        return $ SpriteVertex p s c a u us useTile tileIndex
 
-    poke ptr (SpriteVertex p s c a u us) = do
+    poke ptr (SpriteVertex p s c a u us useTile tileIndex) = do
         poke (castPtr ptr `plusPtr` 0) p
         poke (castPtr ptr `plusPtr` 12) s
         poke (castPtr ptr `plusPtr` 24) c
         poke (castPtr ptr `plusPtr` 36) a
         poke (castPtr ptr `plusPtr` 40) u
         poke (castPtr ptr `plusPtr` 48) us
+        poke (castPtr ptr `plusPtr` 56) useTile
+        poke (castPtr ptr `plusPtr` 60) tileIndex
 
 instance Vertex SpriteVertex where
     vertexSpec _ = VertexSpec bbs fields
@@ -206,6 +212,8 @@ instance Vertex SpriteVertex where
         angleField = VertexField "angle" (attribFormat 1 GL.GL_FLOAT False 36)
         uvField = VertexField "uv" (attribFormat 2 GL.GL_FLOAT False 40)
         uvSizeField = VertexField "uvSize" (attribFormat 2 GL.GL_FLOAT False 48)
+        useTileField = VertexField "useTile" (attribIFormat 1 GL.GL_UNSIGNED_INT 56)
+        tileIndexField = VertexField "tileIndex" (attribIFormat 1 GL.GL_UNSIGNED_INT 60)
         fields =
             [ positionField
             , sizeField
@@ -213,5 +221,7 @@ instance Vertex SpriteVertex where
             , angleField
             , uvField
             , uvSizeField
+            , useTileField
+            , tileIndexField
             ]
         bbs = BindBufferSetting 0 (sizeOf (undefined :: SpriteVertex)) 1

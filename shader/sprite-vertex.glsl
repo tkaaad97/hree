@@ -6,6 +6,8 @@ in vec3 center;
 in float angle;
 in vec2 uv;
 in vec2 uvSize;
+in uint useTile;
+in uint tileIndex;
 
 out vec2 fragmentUv;
 
@@ -13,12 +15,24 @@ out vec2 fragmentUv;
 
 uniform mat4 modelMatrix = mat4(1.0);
 
+struct Tile {
+    bool flippedHorizontally;
+    bool flippedVertically;
+    vec2 uv;
+    vec2 uvSize;
+};
+
+struct TileArray {
+    int count;
+    Tile items[MAX_SPRITE_TILE_COUNT];
+};
+
 layout(std140) uniform MaterialBlock {
     vec3 rotateAxis;
-    bool uvFlippedHorizontally;
     vec2 uvOffset;
-    vec2 uvScale;
+    bool uvFlippedHorizontally;
     bool uvFlippedVertically;
+    TileArray spriteTileArray;
 } materialBlock;
 
 mat3 rotateMatrix(vec3 axis, float angle)
@@ -44,9 +58,13 @@ void main()
     vec3 offset = position + center + rotateMatrix(materialBlock.rotateAxis, angle) * vec3(size.x * positionOffset.x - center.x, size.y * positionOffset.y - center.y, size.z * positionOffset.z - center.z);
     gl_Position = cameraBlock.projectionMatrix * cameraBlock.viewMatrix * modelMatrix * vec4(offset, 1.0);
 
-    float uvoffx = (materialBlock.uvFlippedHorizontally) ? (1.0 - uvOffset.x) : uvOffset.x;
-    float uvoffy = (materialBlock.uvFlippedVertically) ? (1.0 - uvOffset.y) : uvOffset.y;
-    float uvx = uv.x + uvoffx * uvSize.x;
-    float uvy = uv.y + uvoffy * uvSize.y;
-    fragmentUv = materialBlock.uvOffset + vec2(uvx * materialBlock.uvScale.x, uvy * materialBlock.uvScale.y);
+    bool flipH = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].flippedHorizontally : materialBlock.uvFlippedHorizontally;
+    bool flipV = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].flippedVertically : materialBlock.uvFlippedVertically;
+    vec2 uv1 = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].uv : uv;
+    vec2 uvSize1 = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].uvSize : uvSize;
+    float uvoffx = flipH ? (1.0 - uvOffset.x) : uvOffset.x;
+    float uvoffy = flipV ? (1.0 - uvOffset.y) : uvOffset.y;
+    float uvx = uv1.x + uvoffx * uvSize1.x;
+    float uvy = uv1.y + uvoffy * uvSize1.y;
+    fragmentUv = materialBlock.uvOffset + vec2(uvx, uvy);
 }

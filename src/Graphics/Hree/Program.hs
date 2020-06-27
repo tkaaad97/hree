@@ -76,6 +76,7 @@ data Options = Options
     , optionsHasVertexTangent        :: !Bool
     , optionsMaxJointCount           :: !Int
     , optionsMaxLightCount           :: !Int
+    , optionsMaxSpriteTileCount      :: !Int
     , optionsUseVertexSkinning       :: !Bool
     } deriving (Show, Eq, Generic)
 
@@ -119,6 +120,7 @@ defaultOptions = Options
     , optionsHasVertexColor = False
     , optionsMaxJointCount = 128
     , optionsMaxLightCount = maxLightCount
+    , optionsMaxSpriteTileCount = 0
     , optionsUseVertexSkinning = False
     }
 
@@ -274,6 +276,7 @@ renderOptions options = ByteString.intercalate "\n" . catMaybes $
         else Nothing
     , Just $ "#define MAX_JOINT_COUNT " `mappend` (ByteString.pack . show . optionsMaxJointCount $ options)
     , Just $ "#define MAX_LIGHT_COUNT " `mappend` (ByteString.pack . show . optionsMaxLightCount $ options)
+    , Just $ "#define MAX_SPRITE_TILE_COUNT " `mappend` (ByteString.pack . show . optionsMaxSpriteTileCount $ options)
     , if optionsUseVertexSkinning options
         then Just "#define USE_VERTEX_SKINNING"
         else Nothing
