@@ -33,6 +33,7 @@ module Graphics.Format.Tiled.Types
     , TileLayer(..)
     , TileLayerMid(..)
     , TileLayerData(..)
+    , TileObject(..)
     , Tileset(..)
     , TilesetSource(..)
     , Wangcolor(..)
