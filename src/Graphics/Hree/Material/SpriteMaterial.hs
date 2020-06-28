@@ -105,7 +105,8 @@ instance Material SpriteMaterial where
     materialProgramSpec _ options =
         EmbeddedProgram SpriteProgram options { optionsMaxSpriteTileCount = maxSpriteTileCount }
     materialRenderOption _ = defaultRenderOption
-        { renderOptionDepth = DepthOption
+        { renderOptionCullFace = Nothing
+        , renderOptionDepth = DepthOption
             { depthOptionDepthTest = False
             , depthOptionDepthMask = True
             , depthOptionDepthFunction = DepthFunction.glLequal
