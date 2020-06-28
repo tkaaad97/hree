@@ -16,8 +16,8 @@ out vec2 fragmentUv;
 uniform mat4 modelMatrix = mat4(1.0);
 
 struct Tile {
-    bool flippedHorizontally;
-    bool flippedVertically;
+    bool uvFlippedHorizontally;
+    bool uvFlippedVertically;
     vec2 uv;
     vec2 uvSize;
 };
@@ -58,13 +58,12 @@ void main()
     vec3 offset = position + center + rotateMatrix(materialBlock.rotateAxis, angle) * vec3(size.x * positionOffset.x - center.x, size.y * positionOffset.y - center.y, size.z * positionOffset.z - center.z);
     gl_Position = cameraBlock.projectionMatrix * cameraBlock.viewMatrix * modelMatrix * vec4(offset, 1.0);
 
-    bool flipH = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].flippedHorizontally : materialBlock.uvFlippedHorizontally;
-    bool flipV = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].flippedVertically : materialBlock.uvFlippedVertically;
+    bool flipH = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].uvFlippedHorizontally : materialBlock.uvFlippedHorizontally;
+    bool flipV = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].uvFlippedVertically : materialBlock.uvFlippedVertically;
     vec2 uv1 = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].uv : uv;
     vec2 uvSize1 = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].uvSize : uvSize;
-    float uvoffx = flipH ? (1.0 - uvOffset.x) : uvOffset.x;
-    float uvoffy = flipV ? (1.0 - uvOffset.y) : uvOffset.y;
-    float uvx = uv1.x + uvoffx * uvSize1.x;
-    float uvy = uv1.y + uvoffy * uvSize1.y;
-    fragmentUv = materialBlock.uvOffset + vec2(uvx, uvy);
+    vec2 uvoff = vec2(
+        flipH ? (1.0 - uvOffset.x) : uvOffset.x,
+        flipV ? (1.0 - uvOffset.y) : uvOffset.y);
+    fragmentUv = materialBlock.uvOffset + uv1 + uvoff * uvSize1;
 }
