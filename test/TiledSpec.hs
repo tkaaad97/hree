@@ -37,7 +37,7 @@ spec = do
         (DA.object ["firstgid" .= (Just 1 :: Maybe Int), "image" .= ("../image/fishbaddie_parts.png" :: Text), "name" .= ("tileset1" :: Text), "tilewidth" .= (32 :: Int), "tileheight" .= (32 :: Int), "imagewidth" .= (640 :: Int), "imageheight" .= (480 :: Int), "tileoffset" .= Coord (-12) (-12), "properties" .= [DA.object ["name" .= ("myProperty1" :: Text), "type" .= ("string" :: Text), "value" .= ("myProperty1_value" :: Text)]], "margin" .= (3 :: Int), "spacing" .= (1 :: Int), "columns" .= (19 :: Int), "tilecount" .= (266 :: Int), ("terrains", DA.Null), ("tiles", DA.Null), ("wangsets", DA.Null)])
 
     testJSON "Object Rectangle"
-        "{\"gid\":5,\"height\":0,\"id\":1,\"name\":\"villager\",\"properties\":[{\"name\":\"hp\",\"type\":\"string\",\"value\":\"12\"}],\"rotation\":0,\"type\":\"npc\",\"visible\":true,\"width\":0,\"x\":32,\"y\":48}"
+        "{\"height\":0,\"id\":1,\"name\":\"villager\",\"properties\":[{\"name\":\"hp\",\"type\":\"string\",\"value\":\"12\"}],\"rotation\":0,\"type\":\"npc\",\"visible\":true,\"width\":0,\"x\":32,\"y\":48}"
         (ObjectRectangle (Rectangle (ObjectCommon 1 "npc" 0 0 "villager" (Properties $ Map.singleton "hp" (PropertyString "12")) True 32 48 0)))
         (DA.object ["id" .= (1 :: Int), "type" .= ("npc" :: Text), "width" .= (0 :: Int), "height" .= (0 :: Int), "name" .= ("villager" :: Text), "properties" .= [DA.object ["name" .= ("hp" :: Text), "type" .= ("string" :: Text), "value" .= ("12" :: Text)]], "visible" .= True, "x" .= (32 :: Int), "y" .= (48 :: Int), "rotation" .= (0 :: Double)])
 
