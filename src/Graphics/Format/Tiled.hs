@@ -29,9 +29,9 @@ import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
 import qualified Data.Vector as BV (Vector, concatMap, findIndex, fromList,
-                                    generate, imap, imapM, length, map, mapM,
-                                    mapMaybe, postscanl', reverse, zip, (!),
-                                    (!?))
+                                    generate, imapM, imapMaybe, length, map,
+                                    mapM, mapMaybe, postscanl', reverse, zip,
+                                    (!), (!?))
 import qualified Data.Vector.Storable as SV (generate, replicate, unsafeWith,
                                              (//))
 import qualified Data.Vector.Storable.Mutable as MSV (unsafeWith)
@@ -276,36 +276,26 @@ loadRegionFromTiles scene config map layerData origin z tilesetInfo tiles @ (V2 
     let mesh = Hree.Mesh geometry material (Just n)
     Hree.AddedMesh meshId binder <- Hree.addMesh scene mesh
     nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
-    let animations = if useTileAnimation
-            then BV.imap (createTileAnimation binder) (tilesetInfoAnimationFrames tilesetInfo)
-            else BV.mapMaybe (\a -> createVboAnimation geometryGids buffer (tileId a) (tileAnimation a)) . tilesetTiles $ tileset
+    let animations = BV.imapMaybe (createTileAnimation buffer binder geometryGids) (tilesetInfoAnimationFrames tilesetInfo)
     when useTileAnimation $ Hree.modifyUniformBlock setSpriteTileVectorSize binder
     return (RegionLoadInfo nodeId animations)
     where
     material = tilesetInfoMaterial tilesetInfo
-    tileset = tilesetInfoTileset tilesetInfo
     animationGids = tilesetInfoAnimationGids tilesetInfo
     useTileAnimation = UV.length animationGids > 0 && UV.length animationGids <= Hree.maxSpriteTileCount
     V2 firstGid _ = tilesetInfoGidRange tilesetInfo
+
     setSpriteTileVectorSize block =
         let tile = Hree.SpriteTile GL.GL_FALSE GL.GL_FALSE (V2 0 0) (V2 0 0)
             v = Hree.LimitedVector (SV.replicate (UV.length animationGids) (Hree.Elem tile))
         in block { Hree.spriteTiles = v }
+
     updateBlockTile index (V2 uv usSize) block =
         let v = Hree.unLimitedVector . Hree.spriteTiles $ block
             spriteTile = Hree.SpriteTile GL.GL_FALSE GL.GL_FALSE uv usSize
         in block { Hree.spriteTiles = Hree.LimitedVector (v SV.// [(index, Hree.Elem spriteTile)]) }
-    createTileAnimation binder index frames =
-        let durations = UV.generate (BV.length frames) ((* 1000000) . fromIntegral . frameDuration . (frames BV.!))
-            timepoints = UV.scanl (+) 0 durations
-            tileGids = UV.generate (BV.length frames + 1) ((+ firstGid) . frameTileId . (frames BV.!) . max 0 . (flip (-) 1))
-            uvs = UV.map gidToUvRect tileGids
-            track = Hree.VariationTrackDiscrete uvs
-            keyFrames = Hree.KeyFrames Hree.InterpolationStep timepoints track
-            setter uvRect = Hree.modifyUniformBlock (updateBlockTile index uvRect) binder
-            animation = Hree.singleVariationClip setter keyFrames
-        in animation
-    createVboAnimation gids buffer localTileId (Just frames)
+
+    createTileAnimation buffer binder gids index frames
         | UV.length offsets > 0 && BV.length frames > 0 =
             let durations = UV.generate (BV.length frames) ((* 1000000) . fromIntegral . frameDuration . (frames BV.!))
                 timepoints = UV.scanl (+) 0 durations
@@ -313,19 +303,27 @@ loadRegionFromTiles scene config map layerData origin z tilesetInfo tiles @ (V2 
                 uvs = UV.map gidToUvRect tileGids
                 track = Hree.VariationTrackDiscrete uvs
                 keyFrames = Hree.KeyFrames Hree.InterpolationStep timepoints track
-                writeVertexUv ptr (V2 uv uvSize) off = do
-                    vertex <- Foreign.peekElemOff ptr off
-                    Foreign.pokeElemOff ptr off vertex { Hree.svUv = uv, Hree.svUvSize = uvSize }
-                setter uvRect = bracket
-                    (GLW.glMapNamedBuffer buffer GL.GL_READ_WRITE)
-                    (\ptr -> UV.mapM_ (writeVertexUv (Foreign.castPtr ptr) uvRect) offsets)
-                    (const $ GLW.glUnmapNamedBuffer buffer >> return ())
+                setter = if useTileAnimation
+                            then spriteTileSetter binder index
+                            else vboUvSetter buffer offsets
                 animation = Hree.singleVariationClip setter keyFrames
             in Just animation
         | otherwise = Nothing
         where
-        offsets = findOffsetsInRegion gids (firstGid + localTileId)
-    createVboAnimation _ _ _ _ = Nothing
+        animationGid = animationGids UV.! index
+        offsets = findOffsetsInRegion gids animationGid
+
+    spriteTileSetter binder index uvRect = Hree.modifyUniformBlock (updateBlockTile index uvRect) binder
+
+    writeVertexUv ptr (V2 uv uvSize) off = do
+        vertex <- Foreign.peekElemOff ptr off
+        Foreign.pokeElemOff ptr off vertex { Hree.svUv = uv, Hree.svUvSize = uvSize }
+
+    vboUvSetter buffer offsets uvRect = bracket
+        (GLW.glMapNamedBuffer buffer GL.GL_READ_WRITE)
+        (\ptr -> UV.mapM_ (writeVertexUv (Foreign.castPtr ptr) uvRect) offsets)
+        (const $ GLW.glUnmapNamedBuffer buffer >> return ())
+
     gidToUvRect gid =
         maybe (V2 (V2 0 0) (V2 0 0)) (\(Rect uv uvSize) -> V2 uv uvSize) $ uvBoundingRect tilesetInfo gid
 
