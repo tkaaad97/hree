@@ -147,8 +147,8 @@ propertyToJSON (name, PropertyFile v) = DA.object ["name" .= name, "type" .= ("f
 data ObjectCommon = ObjectCommon
     { objectCommonId         :: !Int
     , objectCommonType       :: !Text
-    , objectCommonWidth      :: !Int
-    , objectCommonHeight     :: !Int
+    , objectCommonWidth      :: !Double
+    , objectCommonHeight     :: !Double
     , objectCommonName       :: !Text
     , objectCommonProperties :: !Properties
     , objectCommonVisible    :: !Bool
@@ -164,6 +164,7 @@ data Object
     | ObjectPoint !Point
     | ObjectPolygon !Polygon
     | ObjectPolyline !Polyline
+    | ObjectTile !TileObject
     deriving (Show, Eq)
 
 newtype Rectangle = Rectangle ObjectCommon
@@ -185,6 +186,11 @@ data Polyline = Polyline
     , polylineCoords :: !(BV.Vector Coord)
     } deriving (Show, Eq)
 
+data TileObject = TileObject
+    { tileObjectCommon :: !ObjectCommon
+    , tileObjectGid    :: !Gid
+    } deriving (Show, Eq)
+
 instance DA.FromJSON Object where
     parseJSON (DA.Object v) = do
         common <- parseObjectCommon
@@ -192,8 +198,9 @@ instance DA.FromJSON Object where
         isPoint <- withDefault v "point" False
         polygon <- v .:? "polygon"
         polyline <- v .:? "polyline"
+        gid <- v .:? "gid"
 
-        return $ parseObject common isEllipse isPoint polygon polyline
+        return $ parseObject common isEllipse isPoint polygon polyline gid
 
         where
 
@@ -209,15 +216,17 @@ instance DA.FromJSON Object where
             <*> v .: "y"
             <*> v .: "rotation"
 
-        parseObject c True _ _ _                      = ObjectEllipse $ Ellipse c
+        parseObject c True _ _ _ _                     = ObjectEllipse $ Ellipse c
 
-        parseObject c False True _ _                  = ObjectPoint $ Point c
+        parseObject c False True _ _ _                 = ObjectPoint $ Point c
 
-        parseObject c False False (Just poly) _       = ObjectPolygon $ Polygon c poly
+        parseObject c False False (Just poly) _ _      = ObjectPolygon $ Polygon c poly
 
-        parseObject c False False Nothing (Just poly) = ObjectPolyline $ Polyline c poly
+        parseObject c False False Nothing (Just poly) _ = ObjectPolyline $ Polyline c poly
 
-        parseObject c False False Nothing Nothing     = ObjectRectangle $ Rectangle c
+        parseObject c False False Nothing _ (Just gid) = ObjectTile $ TileObject c gid
+
+        parseObject c False False Nothing Nothing Nothing  = ObjectRectangle $ Rectangle c
 
     parseJSON invalid = DA.typeMismatch "Object" invalid
 
@@ -239,6 +248,10 @@ instance DA.ToJSON Object where
     toJSON (ObjectPolyline (Polyline common coords)) =
         let fields = objectCommonFields common
         in DA.object $ fields ++ ["polyline" .= coords]
+
+    toJSON (ObjectTile (TileObject common gid)) =
+        let fields = objectCommonFields common
+        in DA.object $ fields ++ ["gid" .= gid]
 
 objectCommonFields :: ObjectCommon -> [(Text, DA.Value)]
 objectCommonFields = fields . DA.toJSON
