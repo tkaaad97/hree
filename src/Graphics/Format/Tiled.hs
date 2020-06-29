@@ -528,7 +528,9 @@ loadObjectGroup scene config map tilesetInfos gidRanges layerIndex (ObjectGroup 
             Nothing -> return i
 
 loadObject :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Object -> IO (Maybe (RegionLoadInfo, Double))
-loadObject scene config map tilesetInfos gidRanges layerIndex (ObjectTile (TileObject object gidWithFlags)) = go (resolveObjectMaterial tilesetInfos gidRanges gid)
+loadObject scene config map tilesetInfos gidRanges layerIndex (ObjectTile (TileObject object gidWithFlags))
+    | objectCommonVisible object = go (resolveObjectMaterial tilesetInfos gidRanges gid)
+    | otherwise = return Nothing
     where
     gid = unsetGidFlags gidWithFlags
     hflip = flippedHorizontally gidWithFlags
