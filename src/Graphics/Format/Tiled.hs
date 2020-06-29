@@ -26,12 +26,15 @@ import Data.Bits (complement, (.&.))
 import Data.Function ((&))
 import qualified Data.IntMap.Strict as IntMap (findMax)
 import Data.Maybe (fromMaybe, isJust)
+import Data.Ord (comparing)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
-import qualified Data.Vector as BV (Vector, concatMap, findIndex, fromList,
-                                    generate, imapM, imapMaybe, length, map,
-                                    mapM, mapMaybe, postscanl', reverse, zip,
-                                    (!), (!?))
+import qualified Data.Vector as BV (Vector, concatMap, findIndex, foldM',
+                                    freeze, fromList, generate, imapM,
+                                    imapMaybe, length, map, mapM, mapMaybe,
+                                    postscanl', reverse, zip, (!), (!?))
+import Data.Vector.Algorithms.Merge (sortBy)
+import qualified Data.Vector.Mutable as MBV (new, slice, write)
 import qualified Data.Vector.Storable as SV (generate, replicate, singleton,
                                              unsafeWith, (//))
 import qualified Data.Vector.Storable.Mutable as MSV (unsafeWith)
@@ -262,10 +265,10 @@ loadLayer scene config map tilesetInfos gidRanges layerIndex (LayerTileLayer lay
     nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = regionNodeIds } False
     return . Just $ (LayerLoadInfo nodeId regions)
 loadLayer scene config map tilesetInfos gidRanges layerIndex (LayerObjectGroup layer) = do
-    objects <- loadObjectGroup scene config map tilesetInfos gidRanges layerIndex layer
-    let objectNodeIds = BV.map regionLoadInfoNodeId objects
+    regions <- loadObjectGroup scene config map tilesetInfos gidRanges layerIndex layer
+    let objectNodeIds = BV.map regionLoadInfoNodeId regions
     nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = objectNodeIds } False
-    return . Just $ (LayerLoadInfo nodeId objects)
+    return . Just $ (LayerLoadInfo nodeId regions)
 loadLayer _ _ _ _ _ _ _ = return Nothing
 
 loadRegions :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> TileLayer -> IO (BV.Vector RegionLoadInfo)
@@ -511,10 +514,20 @@ createTilesetInfos scene cd tilesets =
     in BV.imapM (createTilesetInfo scene cd) (BV.zip tilesets gidRanges)
 
 loadObjectGroup :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> ObjectGroup -> IO (BV.Vector RegionLoadInfo)
-loadObjectGroup scene config map tilesetInfos gidRanges layerIndex (ObjectGroup _ objects) =
-    BV.mapMaybe id <$> BV.mapM (loadObject scene config map tilesetInfos gidRanges layerIndex) objects
+loadObjectGroup scene config map tilesetInfos gidRanges layerIndex (ObjectGroup _ objects) = do
+    regions <- MBV.new (BV.length objects)
+    len <- BV.foldM' (go regions) 0 objects
+    let sliced = MBV.slice 0 len regions
+    sortBy (comparing snd) sliced
+    BV.map fst <$> BV.freeze sliced
+    where
+    go regions i object = do
+        r <- loadObject scene config map tilesetInfos gidRanges layerIndex object
+        case r of
+            Just v  -> MBV.write regions i v >> return (i + 1)
+            Nothing -> return i
 
-loadObject :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Object -> IO (Maybe RegionLoadInfo)
+loadObject :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Object -> IO (Maybe (RegionLoadInfo, Double))
 loadObject scene config map tilesetInfos gidRanges layerIndex (ObjectTile (TileObject object gidWithFlags)) = go (resolveObjectMaterial tilesetInfos gidRanges gid)
     where
     gid = unsetGidFlags gidWithFlags
@@ -529,32 +542,37 @@ loadObject scene config map tilesetInfos gidRanges layerIndex (ObjectTile (TileO
     ow = realToFrac $ (objectCommonWidth object) / fromIntegral unit
     oh = realToFrac $ (objectCommonHeight object) / fromIntegral unit
     rotation = realToFrac $ - objectCommonRotation object * pi / 180.0
+
     go (Just (ObjectMaterialTileset tilesetInfo material)) = do
         let Rect uv uvSize = fromMaybe (Rect (V2 0 0) (V2 0 0)) $ uvBoundingRect tilesetInfo gid
-            Rect (V2 x y) (V2 w h) = (Rect (V2 ox oy) (V2 ow oh))
+            Rect (V2 x y) (V2 w h) = Rect (V2 ox oy) (V2 ow oh)
                 & applyWhen hflip flipRectHorizontally
                 & applyWhen vflip flipRectVertically
             vertex = Hree.SpriteVertex (V3 x y z) (V3 w h 0) (V3 0 0 0) rotation uv uvSize 0 0
-        (geo, _) <- Hree.newSpriteGeometry scene
-        geometry <- Hree.addVerticesToGeometry geo (SV.singleton vertex) GL.GL_STATIC_READ scene
-        Hree.AddedMesh meshId _ <- Hree.addMesh scene (Hree.Mesh geometry material (Just 1))
-        nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
-        return . Just $ RegionLoadInfo nodeId mempty
+        region <- loadRegion vertex material
+        return (Just (region, objectCommonY object))
+
     go (Just (ObjectMaterialTileImage (Image _ iwidth iheight) (material, V2 twidth theight))) = do
         let uvw = fromIntegral (iwidth - 1) / (fromIntegral twidth)
             uvh = fromIntegral (iheight - 1) / (fromIntegral theight)
             uv = V2 (0.5 / fromIntegral twidth) (uvh + 0.5 / fromIntegral theight)
             uvSize = V2 uvw (-uvh)
-            Rect (V2 x y) (V2 w h) = (Rect (V2 ox oy) (V2 ow oh))
+            Rect (V2 x y) (V2 w h) = Rect (V2 ox oy) (V2 ow oh)
                 & applyWhen hflip flipRectHorizontally
                 & applyWhen vflip flipRectVertically
             vertex = Hree.SpriteVertex (V3 x y z) (V3 w h 0) (V3 0 0 0) rotation uv uvSize 0 0
+        region <- loadRegion vertex material
+        return (Just (region, objectCommonY object))
+
+    go Nothing = return Nothing
+
+    loadRegion vertex material = do
         (geo, _) <- Hree.newSpriteGeometry scene
         geometry <- Hree.addVerticesToGeometry geo (SV.singleton vertex) GL.GL_STATIC_READ scene
         Hree.AddedMesh meshId _ <- Hree.addMesh scene (Hree.Mesh geometry material (Just 1))
         nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
-        return . Just $ RegionLoadInfo nodeId mempty
-    go Nothing = return Nothing
+        return (RegionLoadInfo nodeId mempty)
+
 loadObject _ _ _ _ _ _ _ = return Nothing
 
 resolveObjectMaterial :: BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Gid -> Maybe ObjectMaterial
