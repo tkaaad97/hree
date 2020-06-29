@@ -438,8 +438,6 @@ tileBoundingRect orientation origin mapSize mapTileSize tilesetTileSize offset i
 tileBoundingSpriteVertex :: Rect -> Float -> Rect -> GL.GLuint -> GL.GLuint -> Orientation -> Bool -> Bool -> Bool -> Bool -> Hree.SpriteVertex
 tileBoundingSpriteVertex rect z (Rect uv uvSize) useSpriteTile spriteTileIndex orientation hflip vflip dflip rotated =
     let isHexagonal = orientation == OrientationHexagonal || orientation == OrientationStaggered
-        applyWhen True f = f
-        applyWhen _ _    = id
         Rect (V2 x y) (V2 width height) =
             if isHexagonal
                 then rect
@@ -517,8 +515,11 @@ loadObjectGroup scene config map tilesetInfos gidRanges layerIndex (ObjectGroup 
     BV.mapMaybe id <$> BV.mapM (loadObject scene config map tilesetInfos gidRanges layerIndex) objects
 
 loadObject :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Object -> IO (Maybe RegionLoadInfo)
-loadObject scene config map tilesetInfos gidRanges layerIndex (ObjectTile (TileObject object gid)) = go (resolveObjectMaterial tilesetInfos gidRanges gid)
+loadObject scene config map tilesetInfos gidRanges layerIndex (ObjectTile (TileObject object gidWithFlags)) = go (resolveObjectMaterial tilesetInfos gidRanges gid)
     where
+    gid = unsetGidFlags gidWithFlags
+    hflip = flippedHorizontally gidWithFlags
+    vflip = flippedVertically gidWithFlags
     mapH = fromIntegral $ mapHeight map * mapTileHeight map
     z = tiledConfigStartZ config + tiledConfigLayerDeltaZ config * fromIntegral layerIndex
     V2 x0 y0 = fmap fromIntegral $ tiledConfigOriginPixel config
@@ -530,18 +531,24 @@ loadObject scene config map tilesetInfos gidRanges layerIndex (ObjectTile (TileO
     rotation = realToFrac $ - objectCommonRotation object * pi / 180.0
     go (Just (ObjectMaterialTileset tilesetInfo material)) = do
         let Rect uv uvSize = fromMaybe (Rect (V2 0 0) (V2 0 0)) $ uvBoundingRect tilesetInfo gid
-            vertex = Hree.SpriteVertex (V3 ox oy z) (V3 ow oh 0) (V3 0 0 0) rotation uv uvSize 0 0
+            Rect (V2 x y) (V2 w h) = (Rect (V2 ox oy) (V2 ow oh))
+                & applyWhen hflip flipRectHorizontally
+                & applyWhen vflip flipRectVertically
+            vertex = Hree.SpriteVertex (V3 x y z) (V3 w h 0) (V3 0 0 0) rotation uv uvSize 0 0
         (geo, _) <- Hree.newSpriteGeometry scene
         geometry <- Hree.addVerticesToGeometry geo (SV.singleton vertex) GL.GL_STATIC_READ scene
         Hree.AddedMesh meshId _ <- Hree.addMesh scene (Hree.Mesh geometry material (Just 1))
         nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
         return . Just $ RegionLoadInfo nodeId mempty
     go (Just (ObjectMaterialTileImage (Image _ iwidth iheight) (material, V2 twidth theight))) = do
-        let w = fromIntegral (iwidth - 1) / (fromIntegral twidth)
-            h = fromIntegral (iheight - 1) / (fromIntegral theight)
-            uv = V2 (0.5 / fromIntegral twidth) (h + 0.5 / fromIntegral theight)
-            uvSize = V2 w (-h)
-            vertex = Hree.SpriteVertex (V3 ox oy z) (V3 ow oh 0) (V3 0 0 0) rotation uv uvSize 0 0
+        let uvw = fromIntegral (iwidth - 1) / (fromIntegral twidth)
+            uvh = fromIntegral (iheight - 1) / (fromIntegral theight)
+            uv = V2 (0.5 / fromIntegral twidth) (uvh + 0.5 / fromIntegral theight)
+            uvSize = V2 uvw (-uvh)
+            Rect (V2 x y) (V2 w h) = (Rect (V2 ox oy) (V2 ow oh))
+                & applyWhen hflip flipRectHorizontally
+                & applyWhen vflip flipRectVertically
+            vertex = Hree.SpriteVertex (V3 x y z) (V3 w h 0) (V3 0 0 0) rotation uv uvSize 0 0
         (geo, _) <- Hree.newSpriteGeometry scene
         geometry <- Hree.addVerticesToGeometry geo (SV.singleton vertex) GL.GL_STATIC_READ scene
         Hree.AddedMesh meshId _ <- Hree.addMesh scene (Hree.Mesh geometry material (Just 1))
@@ -624,3 +631,7 @@ resizeImage width height source =
         let sp' = Foreign.plusPtr sp (i * sourceWidth * byteSize) :: Foreign.Ptr (Picture.PixelBaseComponent Picture.PixelRGBA8)
             dp' = Foreign.plusPtr dp (i * width * byteSize) :: Foreign.Ptr (Picture.PixelBaseComponent Picture.PixelRGBA8)
         Foreign.copyArray sp' dp' minWidth
+
+applyWhen :: Bool -> (a -> a) -> a -> a
+applyWhen True f = f
+applyWhen _ _    = id
