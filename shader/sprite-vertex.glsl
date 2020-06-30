@@ -10,6 +10,7 @@ in uint useTile;
 in uint tileIndex;
 
 out vec2 fragmentUv;
+out float opacityFactor;
 
 #include <camerablock.glsl>
 
@@ -29,6 +30,7 @@ struct TileArray {
 
 layout(std140) uniform MaterialBlock {
     vec3 rotateAxis;
+    float opacityFactor;
     vec2 uvOffset;
     bool uvFlippedHorizontally;
     bool uvFlippedVertically;
@@ -66,4 +68,5 @@ void main()
         flipH ? (1.0 - uvOffset.x) : uvOffset.x,
         flipV ? (1.0 - uvOffset.y) : uvOffset.y);
     fragmentUv = materialBlock.uvOffset + uv1 + uvoff * uvSize1;
+    opacityFactor = materialBlock.opacityFactor;
 }

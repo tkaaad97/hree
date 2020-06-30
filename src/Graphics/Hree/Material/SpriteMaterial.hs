@@ -40,6 +40,7 @@ data SpriteTile = SpriteTile
 
 data SpriteMaterialBlock = SpriteMaterialBlock
     { rotateAxis            :: !(V3 Float)
+    , opacityFactor         :: !Float
     , uvOffset              :: !(V2 Float)
     , uvFlippedHorizontally :: !GL.GLboolean
     , uvFlippedVertically   :: !GL.GLboolean
@@ -78,14 +79,16 @@ instance Block SpriteMaterialBlock where
 
     peekByteOffStd140 ptr off = do
         axis <- peekByteOffStd140 ptr off
+        opacity <- peekByteOffStd140 ptr (off + 12)
         uvo <- peekByteOffStd140 ptr (off + 16)
         flipH <- peekByteOffStd140 ptr (off + 24)
         flipV <- peekByteOffStd140 ptr (off + 28)
         tiles <- peekByteOffStd140 ptr (off + 32)
-        return $ SpriteMaterialBlock axis uvo flipH flipV tiles
+        return $ SpriteMaterialBlock axis opacity uvo flipH flipV tiles
 
-    pokeByteOffStd140 ptr off (SpriteMaterialBlock axis uvo flipH flipV tiles) = do
+    pokeByteOffStd140 ptr off (SpriteMaterialBlock axis opacity uvo flipH flipV tiles) = do
         pokeByteOffStd140 ptr off axis
+        pokeByteOffStd140 ptr (off + 12) opacity
         pokeByteOffStd140 ptr (off + 16) uvo
         pokeByteOffStd140 ptr (off + 24) flipH
         pokeByteOffStd140 ptr (off + 28) flipV
@@ -119,6 +122,6 @@ instance Material SpriteMaterial where
         }
 
 spriteMaterial :: SpriteMaterial
-spriteMaterial = SpriteMaterial (SpriteMaterialBlock (V3 0 0 1) (V2 0 0) GL.GL_FALSE GL.GL_FALSE tiles) Nothing
+spriteMaterial = SpriteMaterial (SpriteMaterialBlock (V3 0 0 1) 1 (V2 0 0) GL.GL_FALSE GL.GL_FALSE tiles) Nothing
     where
     tiles = LimitedVector . SV.singleton . Elem $ SpriteTile GL.GL_FALSE GL.GL_FALSE (V2 0 0) (V2 0 0)

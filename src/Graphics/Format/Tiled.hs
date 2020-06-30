@@ -60,7 +60,8 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip, Elem(..),
                                         addVerticesToGeometry,
                                         modifyUniformBlock, newNode,
                                         newSpriteGeometry, singleVariationClip)
-import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial, SpriteMaterialBlock(..),
+import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial(..),
+                                                                SpriteMaterialBlock(..),
                                                                 SpriteTile(..),
                                                                 baseColorTexture,
                                                                 maxSpriteTileCount,
@@ -514,7 +515,7 @@ createTilesetInfos scene cd tilesets =
     in BV.imapM (createTilesetInfo scene cd) (BV.zip tilesets gidRanges)
 
 loadObjectGroup :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> ObjectGroup -> IO (BV.Vector RegionLoadInfo)
-loadObjectGroup scene config map tilesetInfos gidRanges layerIndex (ObjectGroup _ objects) = do
+loadObjectGroup scene config map tilesetInfos gidRanges layerIndex (ObjectGroup layerCommon objects) = do
     regions <- MBV.new (BV.length objects)
     len <- BV.foldM' (go regions) 0 objects
     let sliced = MBV.slice 0 len regions
@@ -522,14 +523,15 @@ loadObjectGroup scene config map tilesetInfos gidRanges layerIndex (ObjectGroup 
     BV.map fst <$> BV.freeze sliced
     where
     go regions i object = do
-        r <- loadObject scene config map tilesetInfos gidRanges layerIndex object
+        r <- loadObject scene config map tilesetInfos gidRanges layerIndex opacity object
         case r of
             Just v  -> MBV.write regions i v >> return (i + 1)
             Nothing -> return i
+    opacity = realToFrac $ layerCommonOpacity layerCommon
 
-loadObject :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Object -> IO (Maybe (RegionLoadInfo, Double))
-loadObject scene config map tilesetInfos gidRanges layerIndex (ObjectTile (TileObject object gidWithFlags))
-    | objectCommonVisible object = go (resolveObjectMaterial tilesetInfos gidRanges gid)
+loadObject :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Float -> Object -> IO (Maybe (RegionLoadInfo, Double))
+loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTile (TileObject object gidWithFlags))
+    | objectCommonVisible object = go (resolveObjectMaterial opacity tilesetInfos gidRanges gid)
     | otherwise = return Nothing
     where
     gid = unsetGidFlags gidWithFlags
@@ -575,18 +577,25 @@ loadObject scene config map tilesetInfos gidRanges layerIndex (ObjectTile (TileO
         nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
         return (RegionLoadInfo nodeId mempty)
 
-loadObject _ _ _ _ _ _ _ = return Nothing
+loadObject _ _ _ _ _ _ _ _ = return Nothing
 
-resolveObjectMaterial :: BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Gid -> Maybe ObjectMaterial
-resolveObjectMaterial tilesets gidRanges gid = do
+resolveObjectMaterial :: Float -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Gid -> Maybe ObjectMaterial
+resolveObjectMaterial opacityFactor tilesets gidRanges gid = do
     tilesetIndex <- BV.findIndex (\(V2 firstGid nextGid) -> firstGid <= gid && gid < nextGid) $ gidRanges
     tileset <- tilesets BV.!? tilesetIndex
     let imageGids = tilesetInfoImageGids tileset
         imageSources = tilesetInfoImageSources tileset
         imageMaterials = tilesetInfoImageMaterials tileset
     case (UV.findIndex (== gid) imageGids, tilesetInfoMaterial tileset) of
-        (Just imageIndex, _) -> Just $ ObjectMaterialTileImage (imageSources BV.! imageIndex) (imageMaterials BV.! imageIndex)
-        (Nothing, Just tilesetMaterial) -> Just $ ObjectMaterialTileset tileset tilesetMaterial
+        (Just imageIndex, _) ->
+            let (material, textureSize) = imageMaterials BV.! imageIndex
+                block = Hree.uniformBlock material
+                material' = material { Hree.uniformBlock = block { Hree.opacityFactor = opacityFactor } }
+            in Just $ ObjectMaterialTileImage (imageSources BV.! imageIndex) (material', textureSize)
+        (Nothing, Just material) ->
+            let block = Hree.uniformBlock material
+                material' = material { Hree.uniformBlock = block { Hree.opacityFactor = opacityFactor } }
+            in Just $ ObjectMaterialTileset tileset material'
         _ -> Nothing
 
 createTilesetInfo :: Hree.Scene -> FilePath -> Int -> (Tileset, V2 Gid) -> IO TilesetInfo
