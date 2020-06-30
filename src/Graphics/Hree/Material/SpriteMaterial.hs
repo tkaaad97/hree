@@ -22,8 +22,8 @@ import Graphics.Hree.GL.Types (BlendingOption(..), BlendingSeparateOption(..),
                                RenderOption(..), Texture)
 import Graphics.Hree.Material (Material(..), TextureMappingType(..),
                                defaultRenderOption)
-import Graphics.Hree.Program (EmbeddedProgramType(..), Options(..),
-                              ProgramSpec(..))
+import Graphics.Hree.Program (EmbeddedProgramType(..), ProgramSpec(..),
+                              programOptionMaxSpriteTileCount)
 import Linear (V2(..), V3(..))
 
 type MaxSpriteTileCount = (64 :: Nat)
@@ -105,8 +105,8 @@ instance Material SpriteMaterial where
         where
         hasColorMapping BaseColorMapping (Just _) = True
         hasColorMapping _ _                       = False
-    materialProgramSpec _ options =
-        EmbeddedProgram SpriteProgram options { optionsMaxSpriteTileCount = maxSpriteTileCount }
+    materialProgramSpec _ programOption =
+        EmbeddedProgram SpriteProgram programOption { programOptionMaxSpriteTileCount = pure maxSpriteTileCount }
     materialRenderOption _ = defaultRenderOption
         { renderOptionCullFace = Nothing
         , renderOptionDepth = DepthOption

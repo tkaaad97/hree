@@ -18,7 +18,7 @@ import Graphics.Hree.GL.Types (BlendingOption(..), BlendingSeparateOption(..),
                                DepthOption(..), FaceStencilOption(..),
                                RenderOption(..), StencilFuncArgs(..),
                                StencilOpArgs(..), StencilOption(..), Texture)
-import Graphics.Hree.Program (Options, ProgramSpec)
+import Graphics.Hree.Program (ProgramOption, ProgramSpec)
 import Linear (V4(..))
 
 data TextureMappingType =
@@ -33,7 +33,7 @@ class Block (MaterialUniformBlock a) => Material a where
     materialTextures          :: a -> BV.Vector (ByteString, Texture)
     materialHasTextureMapping :: a -> TextureMappingType -> Bool
     materialRenderOption      :: a -> RenderOption
-    materialProgramSpec       :: a -> Options -> ProgramSpec
+    materialProgramSpec       :: a -> ProgramOption -> ProgramSpec
 
     materialRenderOption _ = defaultRenderOption
 

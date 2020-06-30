@@ -16,7 +16,7 @@ resolveProgramSpec :: Material b => Mesh b -> Maybe Skin -> ProgramSpec
 resolveProgramSpec mesh maybeSkin =
     let geo = meshGeometry mesh
         material = meshMaterial mesh
-        options = defaultOptions
+        options = defaultProgramOption
             & applyWhen (hasAttribute geo "jointIndices") (`setHasJointIndices` True)
             & applyWhen (hasAttribute geo "jointWeights") (`setHasJointWeights` True)
             & applyWhen (hasAttribute geo "normal") (`setHasVertexNormal` True)
