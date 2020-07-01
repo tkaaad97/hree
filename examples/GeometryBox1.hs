@@ -9,7 +9,6 @@ import qualified Foreign (castPtr)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.BasicMaterial as Material
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
 import Prelude hiding (init)
@@ -43,8 +42,8 @@ main =
         (geometry, _) <- Hree.createBoxGeometry 0.5 0.5 0.5 scene
         geometry' <- Hree.addVerticesToGeometry geometry vs GL.GL_STATIC_READ scene
         texture <- mkTexture scene
-        let material = (Material.basicMaterial (V3 0.5 (-1) (-1)))
-                { Material.baseColorTexture = Just texture
+        let material = (Hree.basicMaterial (V3 0.5 (-1) (-1)))
+                { Hree.materialTextures = pure (Hree.BaseColorMapping, texture)
                 }
             mesh = Hree.Mesh geometry' material Nothing
         meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh

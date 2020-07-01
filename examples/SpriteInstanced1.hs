@@ -8,8 +8,7 @@ import Foreign (Ptr)
 import qualified Foreign (castPtr)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
-import Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.SpriteMaterial as Material
+import qualified Graphics.Hree as Hree
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), V4(..))
 import Prelude hiding (init)
@@ -27,26 +26,26 @@ main =
     delta = 0.2
 
     spriteVertices = Vector.fromList
-        $  map (\x -> SpriteVertex (V3 (fromIntegral x * delta) 0 0) (V3 delta delta 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1) GL.GL_FALSE 0) ([0..9] :: [Int])
-        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) delta 0) (V3 (delta * 2) delta 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1) GL.GL_FALSE 0) ([0..4] :: [Int])
-        ++ map (\x -> SpriteVertex (V3 (fromIntegral x * delta * 2) (delta * 2) 0) (V3 (delta * 2) delta 0) (V3 0 0 0) (pi * 0.2) (V2 0 0) (V2 1 1) GL.GL_FALSE 0) ([0..4] :: [Int])
+        $  map (\x -> Hree.SpriteVertex (V3 (fromIntegral x * delta) 0 0) (V3 delta delta 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1) GL.GL_FALSE 0) ([0..9] :: [Int])
+        ++ map (\x -> Hree.SpriteVertex (V3 (fromIntegral x * delta * 2) delta 0) (V3 (delta * 2) delta 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1) GL.GL_FALSE 0) ([0..4] :: [Int])
+        ++ map (\x -> Hree.SpriteVertex (V3 (fromIntegral x * delta * 2) (delta * 2) 0) (V3 (delta * 2) delta 0) (V3 0 0 0) (pi * 0.2) (V2 0 0) (V2 1 1) GL.GL_FALSE 0) ([0..4] :: [Int])
 
-    proj = perspective 90 defaultAspect 0.1 10.0
+    proj = Hree.perspective 90 defaultAspect 0.1 10.0
 
-    la = lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
+    la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     init w = do
-        renderer <- newRenderer
-        scene <- newScene
+        renderer <- Hree.newRenderer
+        scene <- Hree.newScene
 
         (geo, _) <- Hree.newSpriteGeometry scene
         geo' <- Hree.addVerticesToGeometry geo spriteVertices GL.GL_STATIC_READ scene
         texture <- mkTexture scene
-        let material = Material.spriteMaterial { Material.baseColorTexture = Just texture }
-            mesh = Mesh geo' material (Just . Vector.length $ spriteVertices)
-        meshId <- addedMeshId <$> addMesh scene mesh
-        _ <- addNode scene newNode{ nodeMesh = Just meshId } True
-        camera <- newCamera proj la
+        let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, texture) }
+            mesh = Hree.Mesh geo' material (Just . Vector.length $ spriteVertices)
+        meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+        _ <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } True
+        camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
 
         GLFW.setWindowSizeCallback w (Just (resizeWindowWithCamera camera))
@@ -59,7 +58,7 @@ main =
 
         where
         render = do
-            renderScene r s c
+            Hree.renderScene r s c
             GLFW.swapBuffers w
 
     mkTexture :: Hree.Scene -> IO Hree.Texture

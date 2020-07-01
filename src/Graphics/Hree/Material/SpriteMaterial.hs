@@ -3,15 +3,15 @@
 {-# LANGUAGE TypeFamilies      #-}
 module Graphics.Hree.Material.SpriteMaterial
     ( MaxSpriteTileCount
-    , SpriteMaterial(..)
+    , SpriteMaterial
     , SpriteMaterialBlock(..)
     , SpriteTile(..)
     , maxSpriteTileCount
     , spriteMaterial
     ) where
 
+import Data.Function ((&))
 import Data.Proxy (Proxy(..))
-import qualified Data.Vector as BV (singleton)
 import qualified Data.Vector.Storable as SV (singleton)
 import GHC.TypeNats (Nat, natVal)
 import qualified GLW.Groups.DepthFunction as DepthFunction
@@ -19,17 +19,20 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..))
 import Graphics.Hree.GL.Types (BlendingOption(..), BlendingSeparateOption(..),
                                DepthOption(..), LimitedVector(..),
-                               RenderOption_(..), Texture)
-import Graphics.Hree.Material (Material(..), TextureMappingType(..),
-                               defaultRenderOption)
+                               setPartialRenderOptionBlending,
+                               setPartialRenderOptionCullFace,
+                               setPartialRenderOptionDepth)
 import Graphics.Hree.Program (EmbeddedProgramType(..), ProgramSpec(..),
-                              programOptionMaxSpriteTileCount)
+                              setPartialMaxSpriteTileCount)
+import Graphics.Hree.Types (Material(..))
 import Linear (V2(..), V3(..))
 
 type MaxSpriteTileCount = (64 :: Nat)
 
 maxSpriteTileCount :: Int
 maxSpriteTileCount = fromIntegral . natVal $ (Proxy :: Proxy MaxSpriteTileCount)
+
+type SpriteMaterial = Material SpriteMaterialBlock
 
 data SpriteTile = SpriteTile
     { spriteTileFlippedHorizontally :: !GL.GLboolean
@@ -45,11 +48,6 @@ data SpriteMaterialBlock = SpriteMaterialBlock
     , uvFlippedHorizontally :: !GL.GLboolean
     , uvFlippedVertically   :: !GL.GLboolean
     , spriteTiles           :: !(LimitedVector MaxSpriteTileCount (Elem SpriteTile))
-    } deriving (Show, Eq)
-
-data SpriteMaterial = SpriteMaterial
-    { uniformBlock     :: !SpriteMaterialBlock
-    , baseColorTexture :: !(Maybe Texture)
     } deriving (Show, Eq)
 
 instance Block SpriteTile where
@@ -97,31 +95,27 @@ instance Block SpriteMaterialBlock where
 spriteMaterialBlockByteSize :: Int
 spriteMaterialBlockByteSize = 32 + sizeOfStd140 (Proxy :: Proxy (LimitedVector MaxSpriteTileCount (Elem SpriteTile)))
 
-instance Material SpriteMaterial where
-    type MaterialUniformBlock SpriteMaterial = SpriteMaterialBlock
-    materialUniformBlock = uniformBlock
-    materialTextures = maybe mempty (BV.singleton . (,) "baseColorMaterial") . baseColorTexture
-    materialHasTextureMapping a mappingType = hasColorMapping mappingType (baseColorTexture a)
-        where
-        hasColorMapping BaseColorMapping (Just _) = True
-        hasColorMapping _ _                       = False
-    materialProgramSpec _ programOption =
-        EmbeddedProgram SpriteProgram programOption { programOptionMaxSpriteTileCount = pure maxSpriteTileCount }
-    materialRenderOption _ = defaultRenderOption
-        { renderOptionCullFace = pure Nothing
-        , renderOptionDepth = pure DepthOption
+spriteMaterial :: Material SpriteMaterialBlock
+spriteMaterial = Material
+    { materialUniformBlock = block
+    , materialTextures = mempty
+    , materialRenderOption = renderOption
+    , materialProgramOption = programOption
+    , materialProgramSpec = EmbeddedProgram SpriteProgram
+    }
+    where
+    tiles = LimitedVector . SV.singleton . Elem $ SpriteTile GL.GL_FALSE GL.GL_FALSE (V2 0 0) (V2 0 0)
+    block = SpriteMaterialBlock (V3 0 0 1) 1 (V2 0 0) GL.GL_FALSE GL.GL_FALSE tiles
+    renderOption = mempty
+        & flip setPartialRenderOptionCullFace (Just Nothing)
+        & flip setPartialRenderOptionDepth (Just DepthOption
             { depthOptionDepthTest = False
             , depthOptionDepthMask = True
             , depthOptionDepthFunction = DepthFunction.glLequal
-            }
-        , renderOptionBlending = pure BlendingOption
+            })
+        & flip setPartialRenderOptionBlending (Just BlendingOption
             { blendingOptionEnabled = True
             , blendingOptionRGB = BlendingSeparateOption GL.GL_FUNC_ADD (GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
             , blendingOptionAlpha = BlendingSeparateOption GL.GL_FUNC_ADD (GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
-            }
-        }
-
-spriteMaterial :: SpriteMaterial
-spriteMaterial = SpriteMaterial (SpriteMaterialBlock (V3 0 0 1) 1 (V2 0 0) GL.GL_FALSE GL.GL_FALSE tiles) Nothing
-    where
-    tiles = LimitedVector . SV.singleton . Elem $ SpriteTile GL.GL_FALSE GL.GL_FALSE (V2 0 0) (V2 0 0)
+            })
+    programOption = mempty & flip setPartialMaxSpriteTileCount (Just maxSpriteTileCount)

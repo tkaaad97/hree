@@ -1,42 +1,46 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies      #-}
 module Graphics.Hree.Material
-    ( Material(..)
-    , TextureMappingType(..)
+    ( module Graphics.Hree.Material.BasicMaterial
+    , module Graphics.Hree.Material.FlatColorMaterial
+    , module Graphics.Hree.Material.SpriteMaterial
+    , module Graphics.Hree.Material.StandardMaterial
+    , module Graphics.Hree.Material.UserMaterial
     , defaultRenderOption
+    , materialHasTextureMapping
+    , textureMappingUniformName
     ) where
 
 import Data.ByteString (ByteString)
-import qualified Data.Vector as BV (Vector)
+import Data.Maybe (isJust)
+import qualified Data.Vector as BV (find)
 import qualified GLW.Groups.CullFaceMode as CullFaceMode
 import qualified GLW.Groups.DepthFunction as DepthFunction
 import qualified GLW.Groups.StencilFunction as StencilFunction
 import qualified GLW.Groups.StencilOp as StencilOp
 import qualified Graphics.GL as GL
-import Graphics.Hree.GL.Block (Block(..))
 import Graphics.Hree.GL.Types (BlendingOption(..), BlendingSeparateOption(..),
                                DepthOption(..), FaceStencilOption(..),
                                RenderOption, RenderOption_(..),
                                StencilFuncArgs(..), StencilOpArgs(..),
-                               StencilOption(..), Texture)
-import Graphics.Hree.Program (ProgramOption, ProgramSpec)
+                               StencilOption(..))
+import Graphics.Hree.Types (Material(..), TextureMappingType(..))
 import Linear (V4(..))
 
-data TextureMappingType =
-    BaseColorMapping |
-    NormalMapping |
-    MetallicRoughnessMapping
-    deriving (Show, Eq, Enum)
-
-class Block (MaterialUniformBlock a) => Material a where
-    type MaterialUniformBlock a
-    materialUniformBlock      :: a -> MaterialUniformBlock a
-    materialTextures          :: a -> BV.Vector (ByteString, Texture)
-    materialHasTextureMapping :: a -> TextureMappingType -> Bool
-    materialRenderOption      :: a -> RenderOption
-    materialProgramSpec       :: a -> ProgramOption -> ProgramSpec
-
-    materialRenderOption _ = defaultRenderOption
+import Graphics.Hree.Material.BasicMaterial (BasicMaterial, BasicMaterialBlock,
+                                             basicMaterial)
+import Graphics.Hree.Material.FlatColorMaterial (FlatColorMaterial,
+                                                 FlatColorMaterialBlock,
+                                                 flatColorMaterial)
+import Graphics.Hree.Material.SpriteMaterial (SpriteMaterial,
+                                              SpriteMaterialBlock,
+                                              spriteMaterial)
+import Graphics.Hree.Material.StandardMaterial (StandardMaterial,
+                                                StandardMaterialBlock,
+                                                standardMaterial,
+                                                standardMaterialBlock)
+import Graphics.Hree.Material.UserMaterial (userMaterial)
 
 defaultRenderOption :: RenderOption
 defaultRenderOption = RenderOption
@@ -75,3 +79,11 @@ defaultFaceStencilOption = FaceStencilOption
     , faceStencilOptionStencilOp = StencilOpArgs StencilOp.glKeep StencilOp.glKeep StencilOp.glKeep
     , faceStencilOptionStencilMask = 0xFF
     }
+
+materialHasTextureMapping :: Material b -> TextureMappingType -> Bool
+materialHasTextureMapping material textureMappingType = isJust . BV.find ((== textureMappingType) . fst) $ materialTextures material
+
+textureMappingUniformName :: TextureMappingType -> ByteString
+textureMappingUniformName BaseColorMapping         = "baseColorTexture"
+textureMappingUniformName NormalMapping            = "normalTexture"
+textureMappingUniformName MetallicRoughnessMapping = "metallicRoughnessTexture"

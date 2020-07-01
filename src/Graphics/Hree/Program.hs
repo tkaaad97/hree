@@ -35,6 +35,18 @@ module Graphics.Hree.Program
     , setMaxLightCount
     , setMaxSpriteTileCount
     , setUseVertexSkinning
+    , setPartialGlslVersion
+    , setPartialHasJointIndices
+    , setPartialHasJointWeights
+    , setPartialHasMetallicRoughnessMap
+    , setPartialHasNormalMap
+    , setPartialHasVertexNormal
+    , setPartialHasVertexTangent
+    , setPartialHasVertexColor
+    , setPartialMaxJointCount
+    , setPartialMaxLightCount
+    , setPartialMaxSpriteTileCount
+    , setPartialUseVertexSkinning
     , spriteProgramSpec
     , standardProgramSpec
     , testProgramSpec
@@ -48,13 +60,15 @@ import qualified Data.ByteString as ByteString (intercalate)
 import qualified Data.ByteString.Char8 as ByteString (pack, packCStringLen,
                                                       useAsCString,
                                                       useAsCStringLen)
+import Data.Coerce (coerce)
 import Data.FilePreprocess (preprocessFile)
 import Data.Functor.Identity (Identity(..))
 import Data.Hashable (Hashable(..))
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
-import Data.Monoid (Last(..), Monoid(..))
+import Data.Monoid (Monoid(..))
 import Data.Proxy (Proxy(..))
+import Data.Semigroup (Last(..), Semigroup)
 import Data.Text (Text)
 import qualified Data.Text as Text (replace)
 import qualified Data.Text.Lazy as Text (toStrict)
@@ -89,13 +103,19 @@ data ProgramOption_ f = ProgramOption
     , programOptionUseVertexSkinning       :: !(f Bool)
     } deriving (Generic)
 
+newtype LastMaybe a = LastMaybe
+    { unLastMaybe :: Last (Maybe a)
+    } deriving (Show, Eq, Semigroup)
 type ProgramOption = ProgramOption_ Identity
-type PartialProgramOption = ProgramOption_ Last
+type PartialProgramOption = ProgramOption_ LastMaybe
 
 deriving instance Eq ProgramOption
 deriving instance Eq PartialProgramOption
 deriving instance Show ProgramOption
 deriving instance Show PartialProgramOption
+
+instance Monoid (LastMaybe a) where
+    mempty = LastMaybe (Last Nothing)
 
 instance Hashable ProgramOption where
 
@@ -133,18 +153,18 @@ instance Monoid PartialProgramOption where
 
 applyPartialProgramOption :: ProgramOption -> PartialProgramOption -> ProgramOption
 applyPartialProgramOption a b = ProgramOption
-    { programOptionGlslVersion = maybe (programOptionGlslVersion a) pure . getLast $ programOptionGlslVersion b
-    , programOptionHasJointIndices = maybe (programOptionHasJointIndices a) pure . getLast $ programOptionHasJointIndices b
-    , programOptionHasJointWeights = maybe (programOptionHasJointWeights a) pure . getLast $ programOptionHasJointWeights b
-    , programOptionHasMetallicRoughnessMap = maybe (programOptionHasMetallicRoughnessMap a) pure . getLast $ programOptionHasMetallicRoughnessMap b
-    , programOptionHasNormalMap = maybe (programOptionHasNormalMap a) pure . getLast $ programOptionHasNormalMap b
-    , programOptionHasVertexColor = maybe (programOptionHasVertexColor a) pure . getLast $ programOptionHasVertexColor b
-    , programOptionHasVertexNormal = maybe (programOptionHasVertexNormal a) pure . getLast $ programOptionHasVertexNormal b
-    , programOptionHasVertexTangent = maybe (programOptionHasVertexTangent a) pure . getLast $ programOptionHasVertexTangent b
-    , programOptionMaxJointCount = maybe (programOptionMaxJointCount a) pure . getLast $ programOptionMaxJointCount b
-    , programOptionMaxLightCount = maybe (programOptionMaxLightCount a) pure . getLast $ programOptionMaxLightCount b
-    , programOptionMaxSpriteTileCount = maybe (programOptionMaxSpriteTileCount a) pure . getLast $ programOptionMaxSpriteTileCount b
-    , programOptionUseVertexSkinning = maybe (programOptionUseVertexSkinning a) pure . getLast $ programOptionUseVertexSkinning b
+    { programOptionGlslVersion = maybe (programOptionGlslVersion a) pure . getLast . coerce $ programOptionGlslVersion b
+    , programOptionHasJointIndices = maybe (programOptionHasJointIndices a) pure . coerce $ programOptionHasJointIndices b
+    , programOptionHasJointWeights = maybe (programOptionHasJointWeights a) pure . coerce $ programOptionHasJointWeights b
+    , programOptionHasMetallicRoughnessMap = maybe (programOptionHasMetallicRoughnessMap a) pure . coerce $ programOptionHasMetallicRoughnessMap b
+    , programOptionHasNormalMap = maybe (programOptionHasNormalMap a) pure . coerce $ programOptionHasNormalMap b
+    , programOptionHasVertexColor = maybe (programOptionHasVertexColor a) pure . coerce $ programOptionHasVertexColor b
+    , programOptionHasVertexNormal = maybe (programOptionHasVertexNormal a) pure . coerce $ programOptionHasVertexNormal b
+    , programOptionHasVertexTangent = maybe (programOptionHasVertexTangent a) pure . coerce $ programOptionHasVertexTangent b
+    , programOptionMaxJointCount = maybe (programOptionMaxJointCount a) pure . coerce $ programOptionMaxJointCount b
+    , programOptionMaxLightCount = maybe (programOptionMaxLightCount a) pure . coerce $ programOptionMaxLightCount b
+    , programOptionMaxSpriteTileCount = maybe (programOptionMaxSpriteTileCount a) pure . coerce $ programOptionMaxSpriteTileCount b
+    , programOptionUseVertexSkinning = maybe (programOptionUseVertexSkinning a) pure . coerce $ programOptionUseVertexSkinning b
     }
 
 data EmbeddedProgramType =
@@ -161,10 +181,7 @@ data ShaderSource = ShaderSource
     } deriving (Show, Eq)
 
 data ProgramSpec =
-    EmbeddedProgram
-        !EmbeddedProgramType
-        !ProgramOption
-    |
+    EmbeddedProgram !EmbeddedProgramType |
     UserProgram
         !ShaderSource -- vertexShaderSource
         !ShaderSource -- fragmentShaderSource
@@ -227,28 +244,64 @@ setMaxSpriteTileCount programOption a = programOption { programOptionMaxSpriteTi
 setUseVertexSkinning :: ProgramOption -> Bool -> ProgramOption
 setUseVertexSkinning programOption a = programOption { programOptionUseVertexSkinning = pure a }
 
-basicProgramSpec :: ProgramOption -> ProgramSpec
+setPartialGlslVersion :: PartialProgramOption -> Maybe (Maybe Int) -> PartialProgramOption
+setPartialGlslVersion programOption a = programOption { programOptionGlslVersion = coerce a }
+
+setPartialHasJointIndices :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasJointIndices programOption a = programOption { programOptionHasJointIndices = coerce a }
+
+setPartialHasJointWeights :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasJointWeights programOption a = programOption { programOptionHasJointWeights = coerce a }
+
+setPartialHasNormalMap :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasNormalMap programOption a = programOption { programOptionHasNormalMap = coerce a }
+
+setPartialHasMetallicRoughnessMap :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasMetallicRoughnessMap programOption a = programOption { programOptionHasMetallicRoughnessMap = coerce a }
+
+setPartialHasVertexNormal :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasVertexNormal programOption a = programOption { programOptionHasVertexNormal = coerce a }
+
+setPartialHasVertexTangent :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasVertexTangent programOption a = programOption { programOptionHasVertexTangent = coerce a }
+
+setPartialHasVertexColor :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasVertexColor programOption a = programOption { programOptionHasVertexColor = coerce a }
+
+setPartialMaxJointCount :: PartialProgramOption -> Maybe Int -> PartialProgramOption
+setPartialMaxJointCount programOption a = programOption { programOptionMaxJointCount = coerce a }
+
+setPartialMaxLightCount :: PartialProgramOption -> Maybe Int -> PartialProgramOption
+setPartialMaxLightCount programOption a = programOption { programOptionMaxLightCount = coerce a }
+
+setPartialMaxSpriteTileCount :: PartialProgramOption -> Maybe Int -> PartialProgramOption
+setPartialMaxSpriteTileCount programOption a = programOption { programOptionMaxSpriteTileCount = coerce a }
+
+setPartialUseVertexSkinning :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialUseVertexSkinning programOption a = programOption { programOptionUseVertexSkinning = coerce a }
+
+basicProgramSpec :: ProgramSpec
 basicProgramSpec = EmbeddedProgram BasicProgram
 
-flatColorProgramSpec :: ProgramOption -> ProgramSpec
+flatColorProgramSpec :: ProgramSpec
 flatColorProgramSpec = EmbeddedProgram FlatColorProgram
 
-spriteProgramSpec :: ProgramOption -> ProgramSpec
+spriteProgramSpec :: ProgramSpec
 spriteProgramSpec = EmbeddedProgram SpriteProgram
 
-standardProgramSpec :: ProgramOption -> ProgramSpec
+standardProgramSpec :: ProgramSpec
 standardProgramSpec = EmbeddedProgram StandardProgram
 
-testProgramSpec :: ProgramOption -> ProgramSpec
-testProgramSpec programOption = EmbeddedProgram TestProgram programOption { programOptionGlslVersion = pure Nothing }
+testProgramSpec :: ProgramSpec
+testProgramSpec = EmbeddedProgram TestProgram
 
-getProgramName :: ProgramSpec -> ProgramName
-getProgramName (EmbeddedProgram progType programOption) = ProgramName . Text.toStrict . Text.Builder.toLazyText $
+getProgramName :: ProgramSpec -> ProgramOption -> ProgramName
+getProgramName (EmbeddedProgram progType) programOption = ProgramName . Text.toStrict . Text.Builder.toLazyText $
     Text.Builder.fromText "embedded:" `mappend`
     Text.Builder.fromText (embeddedProgramName progType) `mappend`
     Text.Builder.singleton ':' `mappend`
     (Text.Builder.decimal . hash $ programOption)
-getProgramName (UserProgram (ShaderSource vname _) (ShaderSource fname _) _) = ProgramName . Text.toStrict . Text.Builder.toLazyText $
+getProgramName (UserProgram (ShaderSource vname _) (ShaderSource fname _) _) _ = ProgramName . Text.toStrict . Text.Builder.toLazyText $
     Text.Builder.fromText "user:" `mappend`
     Text.Builder.fromText vname' `mappend`
     Text.Builder.singleton ':' `mappend`
@@ -267,14 +320,14 @@ embeddedProgramName TestProgram      = "test"
 embeddedProgramBindingPoints :: EmbeddedProgramType -> BV.Vector (ByteString, BufferBindingIndex)
 embeddedProgramBindingPoints _ = mempty
 
-mkProgram :: ProgramSpec -> IO ProgramInfo
-mkProgram (EmbeddedProgram progType programOption) = do
+mkProgram :: ProgramSpec -> ProgramOption -> IO ProgramInfo
+mkProgram (EmbeddedProgram progType) programOption = do
     let header = renderProgramOption programOption
         vsource = header `mappend` getEmbeddedVertexShaderSource progType
         fsource = header `mappend` getEmbeddedFragmentShaderSource progType
         bindingPoints = embeddedProgramBindingPoints progType
     mkProgram' vsource fsource bindingPoints
-mkProgram (UserProgram (ShaderSource _ vsource) (ShaderSource _ fsource) bindingPoints) =
+mkProgram (UserProgram (ShaderSource _ vsource) (ShaderSource _ fsource) bindingPoints) _ =
     mkProgram' vsource fsource bindingPoints
 
 mkProgram' :: ByteString -> ByteString -> BV.Vector (ByteString, BufferBindingIndex) -> IO ProgramInfo

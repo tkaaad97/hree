@@ -51,19 +51,19 @@ import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip, Elem(..),
                                         Geometry(geometryBuffers),
                                         Interpolation(..), KeyFrames(..),
-                                        LimitedVector(..), Mesh(..), Node(..),
-                                        NodeId, Scene, SpriteVertex(..),
-                                        Texture(..), TextureSettings(..),
+                                        LimitedVector(..), Material(..),
+                                        Mesh(..), Node(..), NodeId, Scene,
+                                        SpriteVertex(..), Texture(..),
+                                        TextureMappingType(..),
+                                        TextureSettings(..),
                                         TextureSourceData(..),
                                         VariationTrack(..), addMesh, addNode,
                                         addSampler, addTexture,
                                         addVerticesToGeometry,
                                         modifyUniformBlock, newNode,
                                         newSpriteGeometry, singleVariationClip)
-import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial(..),
-                                                                SpriteMaterialBlock(..),
+import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial, SpriteMaterialBlock(..),
                                                                 SpriteTile(..),
-                                                                baseColorTexture,
                                                                 maxSpriteTileCount,
                                                                 spriteMaterial)
 import qualified Graphics.Hree.Sampler as Hree (glTextureMagFilter,
@@ -589,12 +589,12 @@ resolveObjectMaterial opacityFactor tilesets gidRanges gid = do
     case (UV.findIndex (== gid) imageGids, tilesetInfoMaterial tileset) of
         (Just imageIndex, _) ->
             let (material, textureSize) = imageMaterials BV.! imageIndex
-                block = Hree.uniformBlock material
-                material' = material { Hree.uniformBlock = block { Hree.opacityFactor = opacityFactor } }
+                block = Hree.materialUniformBlock material
+                material' = material { Hree.materialUniformBlock = block { Hree.opacityFactor = opacityFactor } }
             in Just $ ObjectMaterialTileImage (imageSources BV.! imageIndex) (material', textureSize)
         (Nothing, Just material) ->
-            let block = Hree.uniformBlock material
-                material' = material { Hree.uniformBlock = block { Hree.opacityFactor = opacityFactor } }
+            let block = Hree.materialUniformBlock material
+                material' = material { Hree.materialUniformBlock = block { Hree.opacityFactor = opacityFactor } }
             in Just $ ObjectMaterialTileset tileset material'
         _ -> Nothing
 
@@ -635,7 +635,7 @@ createMaterialFromImage scene cd (Image sourcePath width height) = do
     (_, sampler) <- Hree.addSampler scene sname
     Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
     Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
-    let material = Hree.spriteMaterial { Hree.baseColorTexture = Just $ Hree.Texture (texture, sampler) }
+    let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
     return (material, V2 twidth theight)
     where
     nextPow2 = nextPow2_ 1

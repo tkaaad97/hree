@@ -1,20 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies      #-}
 module Graphics.Hree.Material.StandardMaterial
-    ( StandardMaterial(..)
+    ( StandardMaterial
     , StandardMaterialBlock(..)
     , standardMaterial
     , standardMaterialBlock
     ) where
 
-import Data.Maybe (catMaybes)
-import qualified Data.Vector as BV (fromList)
 import qualified Graphics.GL as GL (GLfloat)
 import Graphics.Hree.GL.Block (Block(..))
-import Graphics.Hree.GL.Types (Texture)
-import Graphics.Hree.Material (Material(..), TextureMappingType(..))
 import Graphics.Hree.Program (EmbeddedProgramType(..), ProgramSpec(..))
+import Graphics.Hree.Types (Material(..))
 import Linear (V3(..), V4(..))
+
+type StandardMaterial = Material StandardMaterialBlock
 
 data StandardMaterialBlock = StandardMaterialBlock
     { baseColorFactor    :: !(V4 GL.GLfloat)
@@ -22,13 +21,6 @@ data StandardMaterialBlock = StandardMaterialBlock
     , metallicFactor     :: !GL.GLfloat
     , roughnessFactor    :: !GL.GLfloat
     , normalScale        :: !GL.GLfloat
-    } deriving (Show, Eq)
-
-data StandardMaterial = StandardMaterial
-    { uniformBlock             :: !StandardMaterialBlock
-    , baseColorTexture         :: !(Maybe Texture)
-    , normalTexture            :: !(Maybe Texture)
-    , metallicRoughnessTexture :: !(Maybe Texture)
     } deriving (Show, Eq)
 
 instance Block StandardMaterialBlock where
@@ -50,31 +42,13 @@ instance Block StandardMaterialBlock where
         pokeByteOffStd140 ptr (off + 32) roughness
         pokeByteOffStd140 ptr (off + 36) nscale
 
-instance Material StandardMaterial where
-    type MaterialUniformBlock StandardMaterial = StandardMaterialBlock
-    materialUniformBlock = uniformBlock
-    materialTextures a = BV.fromList . catMaybes $
-        [ texture (baseColorTexture a) "baseColorTexture"
-        , texture (normalTexture a) "normalTexture"
-        , texture (metallicRoughnessTexture a) "metallicRoughnessTexture"
-        ]
-        where
-        texture Nothing _  = Nothing
-        texture (Just t) n = Just (n, t)
-    materialHasTextureMapping a mappingType = hasColorMapping mappingType (baseColorTexture a) (normalTexture a) (metallicRoughnessTexture a)
-        where
-        hasColorMapping BaseColorMapping (Just _) _ _         = True
-        hasColorMapping NormalMapping _ (Just _) _            = True
-        hasColorMapping MetallicRoughnessMapping _ _ (Just _) = True
-        hasColorMapping _ _ _ _                               = False
-    materialProgramSpec _ = EmbeddedProgram StandardProgram
-
-standardMaterial :: StandardMaterialBlock -> StandardMaterial
-standardMaterial block = StandardMaterial
-    { uniformBlock = block
-    , baseColorTexture = Nothing
-    , normalTexture = Nothing
-    , metallicRoughnessTexture = Nothing
+standardMaterial :: StandardMaterialBlock -> Material StandardMaterialBlock
+standardMaterial block = Material
+    { materialUniformBlock = block
+    , materialTextures = mempty
+    , materialRenderOption = mempty
+    , materialProgramOption = mempty
+    , materialProgramSpec = EmbeddedProgram StandardProgram
     }
 
 standardMaterialBlock :: StandardMaterialBlock

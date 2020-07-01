@@ -13,7 +13,6 @@ import qualified Foreign (castPtr)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.SpriteMaterial as Hree (baseColorTexture)
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..))
 import Prelude hiding (init)
@@ -139,7 +138,7 @@ main =
         (_, sampler) <- Hree.addSampler scene "material1"
         Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
         Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
-        let material = Hree.spriteMaterial { Hree.baseColorTexture = Just $ Hree.Texture (texture, sampler) }
+        let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
         return material
 
     createMesh scene material (V2 (V2 x y) (V2 w h)) = do

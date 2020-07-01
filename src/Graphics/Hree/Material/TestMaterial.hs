@@ -1,21 +1,16 @@
 {-# LANGUAGE TypeFamilies #-}
 module Graphics.Hree.Material.TestMaterial
-    ( TestMaterial(..)
-    , testMaterial
+    ( testMaterial
     ) where
 
-import Graphics.Hree.Material (Material(..))
 import Graphics.Hree.Program (EmbeddedProgramType(..), ProgramSpec(..))
+import Graphics.Hree.Types (Material(..))
 
-data TestMaterial = TestMaterial
-    deriving (Show, Eq)
-
-instance Material TestMaterial where
-    type MaterialUniformBlock TestMaterial = ()
-    materialUniformBlock _ = ()
-    materialTextures = mempty
-    materialHasTextureMapping _ _ = False
-    materialProgramSpec _ = EmbeddedProgram TestProgram
-
-testMaterial :: TestMaterial
-testMaterial = TestMaterial
+testMaterial :: Material ()
+testMaterial = Material
+    { materialUniformBlock = ()
+    , materialTextures = mempty
+    , materialRenderOption = mempty
+    , materialProgramOption = mempty
+    , materialProgramSpec = EmbeddedProgram TestProgram
+    }

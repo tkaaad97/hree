@@ -74,42 +74,35 @@ import qualified Foreign (Ptr, Storable(..), castPtr, peekByteOff)
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree.Animation as Hree (AnimationClip(..),
-                                                  Interpolation(..),
-                                                  KeyFrames(..),
-                                                  TransformChannel(..),
-                                                  TransformTrack(..),
-                                                  animationClipTransform)
-import qualified Graphics.Hree.Geometry as Hree (addAttribBindings, newGeometry)
+import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip(..),
+                                        AttributeFormat(..),
+                                        BindBufferSetting(..), BufferSource(..),
+                                        FlatColorMaterialBlock, Geometry(..),
+                                        IndexBuffer(..), Interpolation(..),
+                                        KeyFrames(..), Mat4, Material(..),
+                                        Mesh(..), MeshId, Node(..), NodeId,
+                                        Quaternion, Scene, SkinId,
+                                        StandardMaterial, StandardMaterialBlock,
+                                        Texture(..), TextureMappingType(..),
+                                        Transform(..), TransformChannel(..),
+                                        TransformTrack(..), Vec3, Vec4,
+                                        addAttribBindings, addBuffer, addMesh,
+                                        addNode, addRootNodes, addSampler,
+                                        addSkin, addSkinnedMesh, addTexture,
+                                        animationClipTransform,
+                                        flatColorMaterial, matrixToTransform,
+                                        mkDefaultTextureIfNotExists,
+                                        newGeometry, newNode, standardMaterial,
+                                        standardMaterialBlock, updateNode)
 import qualified Graphics.Hree.GL as Hree (attribFormat, attribIFormat)
-import qualified Graphics.Hree.GL.Types as Hree (AttributeFormat(..),
-                                                 BindBufferSetting(..),
-                                                 BufferSource(..),
-                                                 IndexBuffer(..), Mat4,
-                                                 Texture(..), Vec3, Vec4)
-import qualified Graphics.Hree.Material.FlatColorMaterial as Hree (FlatColorMaterial,
-                                                                   flatColorMaterial)
-import qualified Graphics.Hree.Material.StandardMaterial as Hree (StandardMaterial(..),
-                                                                  StandardMaterialBlock(..),
-                                                                  standardMaterial,
-                                                                  standardMaterialBlock)
-import qualified Graphics.Hree.Math as Hree (Quaternion, Transform(..),
-                                             matrixToTransform)
+import qualified Graphics.Hree.Material.StandardMaterial as StandardMaterial (StandardMaterialBlock(..))
 import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
                                                         glTextureMinFilter,
                                                         glTextureWrapS,
                                                         glTextureWrapT,
                                                         setSamplerParameter)
-import qualified Graphics.Hree.Scene as Hree (AddedMesh(..), addBuffer, addMesh,
-                                              addNode, addRootNodes, addSampler,
-                                              addSkin, addSkinnedMesh,
-                                              addTexture,
-                                              mkDefaultTextureIfNotExists,
-                                              newNode, updateNode)
 import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
                                                 TextureSourceData(..))
-import qualified Graphics.Hree.Types as Hree (Geometry(..), Mesh(..), MeshId,
-                                              Node(..), NodeId, Scene, SkinId)
 import qualified Linear (Quaternion(..), V3(..), V4(..), transpose, zero)
 import Numeric (showHex)
 import System.Directory (canonicalizePath)
@@ -816,15 +809,15 @@ createBuffers (Just bs0) cd scene buffers = do
     buffer <- Hree.addBuffer scene (Hree.BufferSourceByteString bs0 GL.GL_STATIC_READ)
     BV.cons (buffer, bs0) <$> BV.mapM (createBuffer cd scene) (BV.drop 1 buffers)
 
-createGLTFMeshes :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterial) (Hree.Mesh Hree.StandardMaterial))))
+createGLTFMeshes :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock))))
 createGLTFMeshes buffers bufferViews accessors materials =
     BV.mapM (createMeshes buffers bufferViews accessors materials)
 
-createMeshes :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> Mesh -> IO (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterial) (Hree.Mesh Hree.StandardMaterial)))
+createMeshes :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> Mesh -> IO (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock)))
 createMeshes buffers bufferViews accessors materials =
     BV.mapM (createMeshFromPrimitive buffers bufferViews accessors materials) . meshPrimitives
 
-createMeshFromPrimitive :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> Primitive -> IO (Either (Hree.Mesh Hree.FlatColorMaterial) (Hree.Mesh Hree.StandardMaterial))
+createMeshFromPrimitive :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> Primitive -> IO (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock))
 createMeshFromPrimitive buffers bufferViews accessors materials primitive = do
     attributes <- either (throwIO . userError) return . mapM f . Map.toList . primitiveAttributes $ primitive
     let (_, geometry) = foldl addAttribBinding (1, Hree.newGeometry) attributes
@@ -951,7 +944,7 @@ setNodeChildren scene nodeIds i a =
     children = BV.map (nodeIds BV.!) (nodeChildren a)
     f node = node { Hree.nodeChildren = children }
 
-createMeshNodes :: Hree.Scene -> BV.Vector Hree.NodeId -> BV.Vector (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterial) (Hree.Mesh Hree.StandardMaterial))) -> BV.Vector Hree.SkinId -> Int -> Node -> IO ()
+createMeshNodes :: Hree.Scene -> BV.Vector Hree.NodeId -> BV.Vector (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock))) -> BV.Vector Hree.SkinId -> Int -> Node -> IO ()
 createMeshNodes scene nodeIds meshsets skinIds i a =
     whenJust (nodeMesh a) $ \j -> do
         let nodeId = nodeIds BV.! i
@@ -1262,23 +1255,23 @@ createMaterial textures m =
     setWhenJust _ Nothing a  = a
     setWhenJust f (Just b) a = a `f` b
     setPbrMetallicRoughness a pbr = a
-        { Hree.uniformBlock = (Hree.uniformBlock a)
-            { Hree.baseColorFactor = pbrBaseColorFactor pbr
-            , Hree.metallicFactor = pbrMetallicFactor pbr
-            , Hree.roughnessFactor = pbrRoughnessFactor pbr
+        { Hree.materialUniformBlock = (Hree.materialUniformBlock a)
+            { StandardMaterial.baseColorFactor = pbrBaseColorFactor pbr
+            , StandardMaterial.metallicFactor = pbrMetallicFactor pbr
+            , StandardMaterial.roughnessFactor = pbrRoughnessFactor pbr
             }
         }
         & setWhenJust setBaseColorTexture (pbrBaseColorTexture pbr)
         & setWhenJust setMetallicRoughnessTexture (pbrMetallicRoughnessTexture pbr)
     setBaseColorTexture a info = fromMaybe a $ do
         texture <- textures BV.!? textureInfoIndex info
-        return $ a { Hree.baseColorTexture = Just texture }
+        return $ a { Hree.materialTextures = Hree.materialTextures a `mappend` pure (Hree.BaseColorMapping, texture) }
     setNormalTexture a info = fromMaybe a $ do
         texture <- textures BV.!? normalTextureInfoIndex info
-        return $ a { Hree.normalTexture = Just texture }
+        return $ a { Hree.materialTextures = Hree.materialTextures a `mappend` pure (Hree.NormalMapping, texture) }
     setMetallicRoughnessTexture a info = fromMaybe a $ do
         texture <- textures BV.!? textureInfoIndex info
-        return $ a { Hree.metallicRoughnessTexture = Just texture }
+        return $ a { Hree.materialTextures = Hree.materialTextures a `mappend` pure (Hree.MetallicRoughnessMapping, texture) }
 
 createMaterials :: BV.Vector Hree.Texture -> BV.Vector Material -> BV.Vector Hree.StandardMaterial
 createMaterials textures = BV.map (createMaterial textures)

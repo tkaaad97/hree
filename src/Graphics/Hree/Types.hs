@@ -6,6 +6,7 @@ module Graphics.Hree.Types
     , Geometry(..)
     , LightId(..)
     , LightStore
+    , Material(..)
     , MaterialInfo(..)
     , MatricesBlockBinder(..)
     , Mesh(..)
@@ -21,6 +22,7 @@ module Graphics.Hree.Types
     , SceneState(..)
     , Skin(..)
     , SkinId(..)
+    , TextureMappingType(..)
     , TransformInfo(..)
     ) where
 
@@ -56,10 +58,26 @@ data Geometry = Geometry
     , geometryVerticesCount  :: !Int
     } deriving (Show)
 
+data TextureMappingType =
+    BaseColorMapping |
+    NormalMapping |
+    MetallicRoughnessMapping
+    deriving (Show, Eq, Enum)
+
+data Material a = Material
+    { materialUniformBlock  :: !a
+    , materialTextures      :: !(BV.Vector (TextureMappingType, Texture))
+    , materialRenderOption  :: !PartialRenderOption
+    , materialProgramOption :: !PartialProgramOption
+    , materialProgramSpec   :: !ProgramSpec
+    } deriving (Show, Eq)
+
 data MaterialInfo = MaterialInfo
-    { materialInfoUniformBlock :: !GLW.Buffer
-    , materialInfoTextures     :: !(BV.Vector (ByteString, Texture))
-    , materialInfoRenderOption :: !RenderOption
+    { materialInfoUniformBlock  :: !GLW.Buffer
+    , materialInfoTextures      :: !(BV.Vector (ByteString, Texture))
+    , materialInfoRenderOption  :: !RenderOption
+    , materialInfoProgramOption :: !ProgramOption
+    , materialInfoProgramSpec   :: !ProgramSpec
     } deriving (Show, Eq)
 
 newtype LightId = LightId
@@ -72,7 +90,7 @@ newtype MeshId = MeshId
 
 data Mesh b = Mesh
     { meshGeometry      :: !Geometry
-    , meshMaterial      :: !b
+    , meshMaterial      :: !(Material b)
     , meshInstanceCount :: !(Maybe Int)
     } deriving (Show)
 
@@ -83,7 +101,7 @@ data MeshInfo = MeshInfo
     , meshInfoInstanceCount :: !(Maybe Int)
     , meshInfoSkin          :: !(Maybe SkinId)
     , meshInfoBuffers       :: !(SV.Vector GLW.Buffer)
-    , meshInfoProgram       :: !(ProgramSpec, ProgramName)
+    , meshInfoProgram       :: !ProgramName
     , meshInfoVertexArray   :: !(Maybe GLW.VertexArray)
     } deriving (Show)
 

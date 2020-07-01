@@ -1,19 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Graphics.Hree.Mesh
     ( Mesh(..)
-    , resolveProgramSpec
+    , resolveProgramOption
     ) where
 
 import Data.ByteString (ByteString)
 import Data.Function ((&))
 import qualified Data.Map.Strict as Map
-import Graphics.Hree.Material (Material(..), TextureMappingType(..))
+import Graphics.Hree.Material (materialHasTextureMapping)
 import Graphics.Hree.Program
 import Graphics.Hree.Skin (maxJointCount)
 import Graphics.Hree.Types
 
-resolveProgramSpec :: Material b => Mesh b -> Maybe Skin -> ProgramSpec
-resolveProgramSpec mesh maybeSkin =
+resolveProgramOption :: Mesh b -> Maybe Skin -> ProgramOption
+resolveProgramOption mesh maybeSkin =
     let geo = meshGeometry mesh
         material = meshMaterial mesh
         options = defaultProgramOption
@@ -25,7 +25,8 @@ resolveProgramSpec mesh maybeSkin =
             & applyWhen (materialHasTextureMapping material NormalMapping) (`setHasNormalMap` True)
             & applyWhen (materialHasTextureMapping material MetallicRoughnessMapping) (`setHasMetallicRoughnessMap` True)
             & applySkinOptions maybeSkin
-    in (materialProgramSpec . meshMaterial $ mesh) options
+            & flip applyPartialProgramOption (materialProgramOption material)
+    in options
     where
     applyWhen True f a  = f a
     applyWhen False _ a = a

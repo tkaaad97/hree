@@ -74,6 +74,12 @@ module Graphics.Hree.GL.Types
     , partialRenderOptionBlending
     , partialRenderOptionStencil
     , partialRenderOptionColorMask
+    , setPartialRenderOptionCullFace
+    , setPartialRenderOptionFlipSided
+    , setPartialRenderOptionDepth
+    , setPartialRenderOptionBlending
+    , setPartialRenderOptionStencil
+    , setPartialRenderOptionColorMask
     ) where
 
 import Data.ByteString (ByteString)
@@ -251,6 +257,24 @@ partialRenderOptionStencil = coerce . renderOptionStencil
 
 partialRenderOptionColorMask :: PartialRenderOption -> Maybe BVec4
 partialRenderOptionColorMask = coerce . renderOptionColorMask
+
+setPartialRenderOptionCullFace :: PartialRenderOption -> Maybe (Maybe GLW.CullFaceMode) -> PartialRenderOption
+setPartialRenderOptionCullFace option a = option { renderOptionCullFace = coerce a }
+
+setPartialRenderOptionFlipSided :: PartialRenderOption -> Maybe Bool -> PartialRenderOption
+setPartialRenderOptionFlipSided option a = option { renderOptionFlipSided = coerce a }
+
+setPartialRenderOptionDepth :: PartialRenderOption -> Maybe DepthOption -> PartialRenderOption
+setPartialRenderOptionDepth option a = option { renderOptionDepth = coerce a }
+
+setPartialRenderOptionBlending :: PartialRenderOption -> Maybe BlendingOption -> PartialRenderOption
+setPartialRenderOptionBlending option a = option { renderOptionBlending = coerce a }
+
+setPartialRenderOptionStencil :: PartialRenderOption -> Maybe StencilOption -> PartialRenderOption
+setPartialRenderOptionStencil option a = option { renderOptionStencil = coerce a }
+
+setPartialRenderOptionColorMask :: PartialRenderOption -> Maybe BVec4 -> PartialRenderOption
+setPartialRenderOptionColorMask option a = option { renderOptionColorMask = coerce a }
 
 data RenderInfo = RenderInfo
     { riProgram       :: !ProgramInfo

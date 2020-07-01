@@ -1,26 +1,19 @@
 {-# LANGUAGE TypeFamilies #-}
 module Graphics.Hree.Material.UserMaterial
-    ( UserMaterial(..)
+    ( userMaterial
     ) where
 
 import Data.ByteString (ByteString)
 import qualified Data.Vector as BV (Vector)
-import Graphics.Hree.GL.Block (Block(..))
-import Graphics.Hree.GL.Types (BufferBindingIndex, Texture)
-import Graphics.Hree.Material (Material(..))
+import Graphics.Hree.GL.Types (BufferBindingIndex)
 import Graphics.Hree.Program (ProgramSpec(..), ShaderSource(..))
+import Graphics.Hree.Types (Material(..))
 
-data UserMaterial a = UserMaterial
-    { userMaterialBlock :: !a
-    , userMaterialTextures :: !(BV.Vector (ByteString, Texture))
-    , userMaterialVertexShaderSource :: !ShaderSource
-    , userMaterialFragmentShaderSource :: !ShaderSource
-    , userMaterialBindingPoints :: !(BV.Vector (ByteString, BufferBindingIndex))
-    } deriving (Show, Eq)
-
-instance Block a => Material (UserMaterial a) where
-    type MaterialUniformBlock (UserMaterial a) = a
-    materialUniformBlock = userMaterialBlock
-    materialTextures = userMaterialTextures
-    materialHasTextureMapping _ _ = False
-    materialProgramSpec a _ = UserProgram (userMaterialVertexShaderSource a) (userMaterialFragmentShaderSource a) (userMaterialBindingPoints a)
+userMaterial :: a -> ShaderSource -> ShaderSource -> BV.Vector (ByteString, BufferBindingIndex) -> Material a
+userMaterial block vshader fshader bindingPoints = Material
+    { materialUniformBlock = block
+    , materialTextures = mempty
+    , materialRenderOption = mempty
+    , materialProgramOption = mempty
+    , materialProgramSpec = UserProgram vshader fshader bindingPoints
+    }

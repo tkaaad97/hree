@@ -76,7 +76,7 @@ import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..))
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
-import Graphics.Hree.Material
+import Graphics.Hree.Material (defaultRenderOption, textureMappingUniformName)
 import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
@@ -219,10 +219,13 @@ nodeToRenderInfos renderer scene state =
             inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
         meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
         meshInfo <- MaybeT $ Component.readComponent meshStore meshId
-        let (pspec, pname) = meshInfoProgram meshInfo
+        let pname = meshInfoProgram meshInfo
+            material = meshInfoMaterial meshInfo
+            pspec = materialInfoProgramSpec material
+            poption = materialInfoProgramOption material
             maybeVao = meshInfoVertexArray meshInfo
             maybeSkinId = meshInfoSkin meshInfo
-        (program, _) <- lift $ mkProgramIfNotExists renderer pspec pname
+        (program, _) <- lift $ mkProgramIfNotExists renderer pspec poption pname
         vao <- maybe (lift $ mkMeshVertexArray scene meshInfo program) return maybeVao
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent globalMatrixStore nodeId
         defaultTexture <- lift $ mkDefaultTextureIfNotExists scene
@@ -274,24 +277,27 @@ resolveDrawMethod mesh =
     resolve _ (Just (IndexBuffer _ dt indicesCount offset)) (Just instanceCount) =
         DrawElementsInstanced PrimitiveType.glTriangles indicesCount dt (Foreign.nullPtr `Foreign.plusPtr` offset) instanceCount
 
-addMesh :: Material b => Scene -> Mesh b -> IO (AddedMesh (MaterialUniformBlock b))
+addMesh :: Block b => Scene -> Mesh b -> IO (AddedMesh b)
 addMesh scene mesh = addMesh_ scene mesh Nothing
 
-addSkinnedMesh :: Material b => Scene -> Mesh b -> SkinId -> IO (AddedMesh (MaterialUniformBlock b))
+addSkinnedMesh :: Block b => Scene -> Mesh b -> SkinId -> IO (AddedMesh b)
 addSkinnedMesh scene mesh skin = addMesh_ scene mesh (Just skin)
 
-addMesh_ :: Material b => Scene -> Mesh b -> Maybe SkinId -> IO (AddedMesh (MaterialUniformBlock b))
+addMesh_ :: Block b => Scene -> Mesh b -> Maybe SkinId -> IO (AddedMesh b)
 addMesh_ scene mesh maybeSkinId = do
     maybeSkin <- maybe (return Nothing) (Component.readComponent (sceneSkinStore scene)) maybeSkinId
-    let pspec = resolveProgramSpec mesh maybeSkin
-        pname = getProgramName pspec
-    (materialInfo, ubb) <- mkMaterialInfo
-    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc materialInfo (pspec, pname))
+    let pspec = materialProgramSpec material
+        poption = resolveProgramOption mesh maybeSkin
+        pname = getProgramName pspec poption
+    (materialInfo, ubb) <- mkMaterialInfo poption
+    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc materialInfo pname)
     let meshId = meshInfoId minfo
     Component.addComponent (sceneMeshStore scene) meshId minfo
     return $ AddedMesh meshId ubb
 
     where
+    material = meshMaterial mesh
+
     addMeshFunc materialInfo p state =
         let meshId = ssMeshCounter state
             meshIdNext = meshId + 1
@@ -303,14 +309,14 @@ addMesh_ scene mesh maybeSkinId = do
                 }
         in (newState, minfo)
 
-    mkMaterialInfo = do
-        let material = meshMaterial mesh
-            textures = materialTextures material
+    mkMaterialInfo poption = do
+        let textures = BV.map (\(ttype, texture) -> (textureMappingUniformName ttype, texture)) $ materialTextures material
             block = materialUniformBlock material
-            roption = materialRenderOption material
+            roption = applyPartialRenderOption defaultRenderOption $ materialRenderOption material
+            pspec = materialProgramSpec material
         buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
         ubb <- newUniformBlockBinder buffer block
-        return (MaterialInfo buffer textures roption, ubb)
+        return (MaterialInfo buffer textures roption poption pspec, ubb)
 
     geo = meshGeometry mesh
     instanceCount = meshInstanceCount mesh
@@ -658,15 +664,15 @@ getLightBlock :: LightStore -> IO LightBlock
 getLightBlock store =
     LightBlock . LimitedVector <$> (SV.unsafeFreeze =<< Component.getComponentSlice store)
 
-mkProgramIfNotExists :: Renderer -> ProgramSpec -> ProgramName -> IO (ProgramInfo, Bool)
-mkProgramIfNotExists renderer pspec pname = do
+mkProgramIfNotExists :: Renderer -> ProgramSpec -> ProgramOption -> ProgramName -> IO (ProgramInfo, Bool)
+mkProgramIfNotExists renderer pspec poption pname = do
     programs <- fmap rendererStatePrograms . readIORef . rendererState $ renderer
     let maybeProgram = Map.lookup pname programs
-    maybe (flip (,) True <$> mkProgramAndInsert renderer pspec pname) (return . flip (,) False) maybeProgram
+    maybe (flip (,) True <$> mkProgramAndInsert renderer pspec poption pname) (return . flip (,) False) maybeProgram
 
-mkProgramAndInsert :: Renderer -> ProgramSpec -> ProgramName -> IO ProgramInfo
-mkProgramAndInsert renderer pspec pname = do
-    program <- mkProgram pspec
+mkProgramAndInsert :: Renderer -> ProgramSpec -> ProgramOption -> ProgramName -> IO ProgramInfo
+mkProgramAndInsert renderer pspec poption pname = do
+    program <- mkProgram pspec poption
     atomicModifyIORef' (rendererState renderer) (insertProgram program)
     return program
     where

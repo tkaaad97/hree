@@ -12,10 +12,8 @@ import Example
 import qualified Foreign (castPtr)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
-import Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.SpriteMaterial as Material (SpriteMaterial(..),
-                                                                    SpriteMaterialBlock(..),
-                                                                    spriteMaterial)
+import qualified Graphics.Hree as Hree
+import qualified Graphics.Hree.Material.SpriteMaterial as Material (SpriteMaterialBlock(..))
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V2(..), V3(..), (!*))
 import Prelude hiding (init)
@@ -129,11 +127,11 @@ main =
         (_, sampler) <- Hree.addSampler scene "material1"
         Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
         Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
-        let material = Material.spriteMaterial
-                { Material.uniformBlock = (Material.uniformBlock Material.spriteMaterial)
+        let material = Hree.spriteMaterial
+                { Hree.materialUniformBlock = (Hree.materialUniformBlock Hree.spriteMaterial)
                     { Material.uvOffset = off
                     }
-                , Material.baseColorTexture = Just $ Hree.Texture (texture, sampler)
+                , Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler))
                 }
         return material
 
@@ -141,7 +139,7 @@ main =
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 0 0) (V2 (w / twidth') (h / theight')) GL.GL_FALSE 0
         (geo, _) <- Hree.newSpriteGeometry scene
         geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
-        Hree.addMesh scene $ Mesh geo' material (Just 1)
+        Hree.addMesh scene $ Hree.Mesh geo' material (Just 1)
 
     createUvAnimation ubb uvs =
         let uvs' = UV.map uvOffset uvs
