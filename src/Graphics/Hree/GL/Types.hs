@@ -1,9 +1,11 @@
-{-# LANGUAGE DataKinds                 #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE KindSignatures            #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
-{-# LANGUAGE StandaloneDeriving        #-}
-{-# LANGUAGE TypeOperators             #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE ExistentialQuantification  #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TypeOperators              #-}
 module Graphics.Hree.GL.Types
     ( AttribBinding(..)
     , AttributeFormat(..)
@@ -18,7 +20,9 @@ module Graphics.Hree.GL.Types
     , IndexBuffer(..)
     , ProgramInfo(..)
     , RenderInfo(..)
-    , RenderOption(..)
+    , RenderOption_(..)
+    , RenderOption
+    , PartialRenderOption
     , DepthOption(..)
     , BlendingOption(..)
     , BlendingSeparateOption(..)
@@ -64,10 +68,20 @@ module Graphics.Hree.GL.Types
     , Vec3
     , Vec4
     , LimitedVector(..)
+    , partialRenderOptionCullFace
+    , partialRenderOptionFlipSided
+    , partialRenderOptionDepth
+    , partialRenderOptionBlending
+    , partialRenderOptionStencil
+    , partialRenderOptionColorMask
     ) where
 
 import Data.ByteString (ByteString)
+import Data.Coerce (coerce)
+import Data.Functor.Identity (Identity)
 import Data.Map.Strict (Map)
+import Data.Monoid (Monoid(..))
+import Data.Semigroup (Last(..))
 import qualified Data.Vector as BV (Vector)
 import qualified Data.Vector.Storable as SV (Vector)
 import Foreign (Ptr, Storable)
@@ -176,14 +190,67 @@ data StencilOption = StencilOption
     , stencilOptionBack        :: !FaceStencilOption
     } deriving (Show, Eq)
 
-data RenderOption = RenderOption
-    { renderOptionCullFace  :: !(Maybe GLW.CullFaceMode)
-    , renderOptionFlipSided :: !Bool
-    , renderOptionDepth     :: !DepthOption
-    , renderOptionBlending  :: !BlendingOption
-    , renderOptionStencil   :: !StencilOption
-    , renderOptionColorMask :: !BVec4
-    } deriving (Show, Eq)
+data RenderOption_ f = RenderOption
+    { renderOptionCullFace  :: !(f (Maybe GLW.CullFaceMode))
+    , renderOptionFlipSided :: !(f Bool)
+    , renderOptionDepth     :: !(f DepthOption)
+    , renderOptionBlending  :: !(f BlendingOption)
+    , renderOptionStencil   :: !(f StencilOption)
+    , renderOptionColorMask :: !(f BVec4)
+    }
+
+newtype LastMaybe a = LastMaybe
+    { unLastMaybe :: Last (Maybe a)
+    } deriving (Show, Eq, Semigroup)
+
+type RenderOption = RenderOption_ Identity
+type PartialRenderOption = RenderOption_ LastMaybe
+
+deriving instance Eq RenderOption
+deriving instance Eq PartialRenderOption
+deriving instance Show RenderOption
+deriving instance Show PartialRenderOption
+
+instance Monoid (LastMaybe a) where
+    mempty = LastMaybe (Last Nothing)
+
+instance Semigroup PartialRenderOption where
+    a <> b = RenderOption
+        { renderOptionCullFace  = renderOptionCullFace a <> renderOptionCullFace b
+        , renderOptionFlipSided = renderOptionFlipSided a <> renderOptionFlipSided b
+        , renderOptionDepth     = renderOptionDepth a <> renderOptionDepth b
+        , renderOptionBlending  = renderOptionBlending a <> renderOptionBlending b
+        , renderOptionStencil   = renderOptionStencil a <> renderOptionStencil b
+        , renderOptionColorMask = renderOptionColorMask a <> renderOptionColorMask b
+        }
+
+instance Monoid PartialRenderOption where
+    mempty = RenderOption
+        { renderOptionCullFace  = mempty
+        , renderOptionFlipSided = mempty
+        , renderOptionDepth     = mempty
+        , renderOptionBlending  = mempty
+        , renderOptionStencil   = mempty
+        , renderOptionColorMask = mempty
+        }
+
+partialRenderOptionCullFace :: PartialRenderOption -> Maybe (Maybe GLW.CullFaceMode)
+partialRenderOptionCullFace = coerce . renderOptionCullFace
+
+partialRenderOptionFlipSided :: PartialRenderOption -> Maybe Bool
+partialRenderOptionFlipSided = coerce . renderOptionFlipSided
+
+partialRenderOptionDepth :: PartialRenderOption -> Maybe DepthOption
+partialRenderOptionDepth = coerce . renderOptionDepth
+
+partialRenderOptionBlending :: PartialRenderOption -> Maybe BlendingOption
+partialRenderOptionBlending = coerce . renderOptionBlending
+
+partialRenderOptionStencil :: PartialRenderOption -> Maybe StencilOption
+partialRenderOptionStencil = coerce . renderOptionStencil
+
+partialRenderOptionColorMask :: PartialRenderOption -> Maybe BVec4
+partialRenderOptionColorMask = coerce . renderOptionColorMask
 
 data RenderInfo = RenderInfo
     { riProgram       :: !ProgramInfo

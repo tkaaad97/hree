@@ -175,6 +175,6 @@ instance Arbitrary RenderOptionGen where
                 then Just cullFaceMode
                 else Nothing
             cmask = V4 cmaskRed cmaskGreen cmaskBlue cmaskAlpha
-        return . RenderOptionGen $ RenderOption cullFaceModeOption flipSided depthOption blendingOption stencilOption cmask
+        return . RenderOptionGen $ RenderOption (pure cullFaceModeOption) (pure flipSided) (pure depthOption) (pure blendingOption) (pure stencilOption) (pure cmask)
         where
             boolean = QuickCheck.elements [GL.GL_FALSE, GL.GL_TRUE]

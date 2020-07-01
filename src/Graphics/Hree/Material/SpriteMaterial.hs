@@ -19,7 +19,7 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..))
 import Graphics.Hree.GL.Types (BlendingOption(..), BlendingSeparateOption(..),
                                DepthOption(..), LimitedVector(..),
-                               RenderOption(..), Texture)
+                               RenderOption_(..), Texture)
 import Graphics.Hree.Material (Material(..), TextureMappingType(..),
                                defaultRenderOption)
 import Graphics.Hree.Program (EmbeddedProgramType(..), ProgramSpec(..),
@@ -108,13 +108,13 @@ instance Material SpriteMaterial where
     materialProgramSpec _ programOption =
         EmbeddedProgram SpriteProgram programOption { programOptionMaxSpriteTileCount = pure maxSpriteTileCount }
     materialRenderOption _ = defaultRenderOption
-        { renderOptionCullFace = Nothing
-        , renderOptionDepth = DepthOption
+        { renderOptionCullFace = pure Nothing
+        , renderOptionDepth = pure DepthOption
             { depthOptionDepthTest = False
             , depthOptionDepthMask = True
             , depthOptionDepthFunction = DepthFunction.glLequal
             }
-        , renderOptionBlending = BlendingOption
+        , renderOptionBlending = pure BlendingOption
             { blendingOptionEnabled = True
             , blendingOptionRGB = BlendingSeparateOption GL.GL_FUNC_ADD (GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
             , blendingOptionAlpha = BlendingSeparateOption GL.GL_FUNC_ADD (GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)

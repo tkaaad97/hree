@@ -16,8 +16,9 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Block (Block(..))
 import Graphics.Hree.GL.Types (BlendingOption(..), BlendingSeparateOption(..),
                                DepthOption(..), FaceStencilOption(..),
-                               RenderOption(..), StencilFuncArgs(..),
-                               StencilOpArgs(..), StencilOption(..), Texture)
+                               RenderOption, RenderOption_(..),
+                               StencilFuncArgs(..), StencilOpArgs(..),
+                               StencilOption(..), Texture)
 import Graphics.Hree.Program (ProgramOption, ProgramSpec)
 import Linear (V4(..))
 
@@ -39,12 +40,12 @@ class Block (MaterialUniformBlock a) => Material a where
 
 defaultRenderOption :: RenderOption
 defaultRenderOption = RenderOption
-    { renderOptionCullFace = Just CullFaceMode.glBack
-    , renderOptionFlipSided = False
-    , renderOptionDepth = defaultDepthOption
-    , renderOptionBlending = defaultBlendingOption
-    , renderOptionStencil = defaultStencilOption
-    , renderOptionColorMask = V4 GL.GL_TRUE GL.GL_TRUE GL.GL_TRUE GL.GL_TRUE
+    { renderOptionCullFace = pure $ Just CullFaceMode.glBack
+    , renderOptionFlipSided = pure $ False
+    , renderOptionDepth = pure $ defaultDepthOption
+    , renderOptionBlending = pure $ defaultBlendingOption
+    , renderOptionStencil = pure $ defaultStencilOption
+    , renderOptionColorMask = pure $ V4 GL.GL_TRUE GL.GL_TRUE GL.GL_TRUE GL.GL_TRUE
     }
 
 defaultDepthOption :: DepthOption

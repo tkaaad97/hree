@@ -4,6 +4,7 @@ module GLSpec
     ) where
 
 import Data.Bits (complement)
+import Data.Functor.Identity (Identity(..))
 import Foreign (alloca, peek)
 import GLContext
 import GLTypesGen
@@ -215,8 +216,8 @@ spec = do
 
     describe "setRenderOption" $ do
         let assertRenderOption expected actual = do
-                let Hree.RenderOption cullFace0 flipSided0 depth0 blending0 stencil0 cmask0 = expected
-                    Hree.RenderOption cullFace1 flipSided1 depth1 blending1 stencil1 cmask1 = actual
+                let Hree.RenderOption (Identity cullFace0) (Identity flipSided0) (Identity depth0) (Identity blending0) (Identity stencil0) (Identity cmask0) = expected
+                    Hree.RenderOption (Identity cullFace1) (Identity flipSided1) (Identity depth1) (Identity blending1) (Identity stencil1) (Identity cmask1) = actual
                 cullFace1 `shouldBe` cullFace0
                 flipSided1 `shouldBe` flipSided0
                 depth1 `shouldBe` depth0

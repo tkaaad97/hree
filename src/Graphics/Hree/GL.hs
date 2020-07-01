@@ -1,5 +1,6 @@
 module Graphics.Hree.GL
-    ( attribFormat
+    ( applyPartialRenderOption
+    , attribFormat
     , attribIFormat
     , attribLFormat
     , createBuffer
@@ -29,6 +30,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString (length)
 import qualified Data.ByteString.Unsafe as ByteString (unsafeUseAsCString)
 import Data.Foldable (foldrM)
+import Data.Functor.Identity (Identity(..))
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
@@ -121,16 +123,16 @@ getRenderOption = do
     blendingOption <- getBlendingOption
     stencilOption <- getStencilOption
     colorMask <- getColorMask
-    return $ RenderOption cullFaceOption flipSided depthOption blendingOption stencilOption colorMask
+    return $ RenderOption (pure cullFaceOption) (pure flipSided) (pure depthOption) (pure blendingOption) (pure stencilOption) (pure colorMask)
 
 setRenderOption :: Maybe RenderOption -> RenderOption -> IO ()
 setRenderOption beforeOption option = do
-    setCullFace (renderOptionCullFace <$> beforeOption) (renderOptionCullFace option)
-    setFlipSided (renderOptionFlipSided <$> beforeOption) (renderOptionFlipSided option)
-    setDepthOption (renderOptionDepth <$> beforeOption) (renderOptionDepth option)
-    setBlendingOption (renderOptionBlending <$> beforeOption) (renderOptionBlending option)
-    setStencilOption (renderOptionStencil <$> beforeOption) (renderOptionStencil option)
-    setColorMask (renderOptionColorMask <$> beforeOption) (renderOptionColorMask option)
+    setCullFace (runIdentity . renderOptionCullFace <$> beforeOption) (runIdentity . renderOptionCullFace $ option)
+    setFlipSided (runIdentity . renderOptionFlipSided <$> beforeOption) (runIdentity . renderOptionFlipSided $ option)
+    setDepthOption (runIdentity . renderOptionDepth <$> beforeOption) (runIdentity . renderOptionDepth $ option)
+    setBlendingOption (runIdentity . renderOptionBlending <$> beforeOption) (runIdentity . renderOptionBlending $ option)
+    setStencilOption (runIdentity . renderOptionStencil <$> beforeOption) (runIdentity . renderOptionStencil $ option)
+    setColorMask (runIdentity . renderOptionColorMask <$> beforeOption) (runIdentity . renderOptionColorMask $ option)
 
 setCullFace :: Maybe (Maybe GLW.CullFaceMode) -> Maybe GLW.CullFaceMode -> IO ()
 setCullFace Nothing Nothing = GLW.glDisable EnableCap.glCullFace
@@ -464,3 +466,13 @@ getInteger64v :: GL.GLenum -> IO GL.GLint64
 getInteger64v param = Foreign.alloca $ \p -> do
     GL.glGetInteger64v param p
     Foreign.peek p
+
+applyPartialRenderOption :: RenderOption -> PartialRenderOption -> RenderOption
+applyPartialRenderOption a b = RenderOption
+    { renderOptionCullFace  = maybe (renderOptionCullFace a) pure $ partialRenderOptionCullFace b
+    , renderOptionFlipSided = maybe (renderOptionFlipSided a) pure $ partialRenderOptionFlipSided b
+    , renderOptionDepth     = maybe (renderOptionDepth a) pure $ partialRenderOptionDepth b
+    , renderOptionBlending  = maybe (renderOptionBlending a) pure $ partialRenderOptionBlending b
+    , renderOptionStencil   = maybe (renderOptionStencil a) pure $ partialRenderOptionStencil b
+    , renderOptionColorMask = maybe (renderOptionColorMask a) pure $ partialRenderOptionColorMask b
+    }
