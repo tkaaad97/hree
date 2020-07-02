@@ -163,7 +163,7 @@ tilesetGidRanges = BV.postscanl' go (V2 0 1)
     where
     go (V2 _ a) tileset =
         let fgid = maybe a (max a) (tilesetFirstGid tileset)
-            next = fgid + fromIntegral (tilesetTileCount tileset)
+            next = fgid + fromIntegral (tilesetTileCount tileset) + 1
         in V2 fgid next
 
 resolveTileset :: BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Gid -> Maybe TileMaterial
