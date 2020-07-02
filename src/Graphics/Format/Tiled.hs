@@ -26,11 +26,10 @@ import Data.Bits (complement, (.&.))
 import Data.Function ((&))
 import qualified Data.IntMap.Strict as IntMap (findMax)
 import Data.Maybe (fromMaybe, isJust)
-import Data.Ord (comparing)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
-import qualified Data.Vector as BV (Vector, concatMap, findIndex, foldM',
-                                    freeze, fromList, generate, imapM,
+import qualified Data.Vector as BV (Vector, concatMap, findIndex, freeze,
+                                    fromList, generate, ifoldM', imapM,
                                     imapMaybe, length, map, mapM, mapMaybe,
                                     postscanl', reverse, zip, (!), (!?))
 import Data.Vector.Algorithms.Merge (sortBy)
@@ -39,8 +38,9 @@ import qualified Data.Vector.Storable as SV (generate, replicate, singleton,
                                              unsafeWith, (//))
 import qualified Data.Vector.Storable.Mutable as MSV (unsafeWith)
 import qualified Data.Vector.Unboxed as UV (Vector, findIndex, findIndices,
-                                            generate, ifoldl', length, map,
-                                            mapM_, scanl, (!))
+                                            freeze, generate, ifoldl', length,
+                                            map, mapM_, scanl, (!))
+import qualified Data.Vector.Unboxed.Mutable as MUV (new, slice, write)
 import Data.Word (Word32)
 import qualified Foreign (Ptr, castPtr, copyArray, peekElemOff, plusPtr,
                           pokeElemOff, sizeOf)
@@ -515,21 +515,48 @@ createTilesetInfos scene cd tilesets =
     in BV.imapM (createTilesetInfo scene cd) (BV.zip tilesets gidRanges)
 
 loadObjectGroup :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> ObjectGroup -> IO (BV.Vector RegionLoadInfo)
-loadObjectGroup scene config map tilesetInfos gidRanges layerIndex (ObjectGroup layerCommon objects) = do
+loadObjectGroup scene config map tilesetInfos gidRanges layerIndex (ObjectGroup layerCommon drawOrder objects) = do
+    objectIndices <- MUV.new (BV.length objects)
+    regionIndices <- MUV.new (BV.length objects)
     regions <- MBV.new (BV.length objects)
-    len <- BV.foldM' (go regions) 0 objects
-    let sliced = MBV.slice 0 len regions
-    sortBy (comparing snd) sliced
-    BV.map fst <$> BV.freeze sliced
+    len <- BV.ifoldM' (go objectIndices regionIndices regions) 0 objects
+    let regionIndices' = MUV.slice 0 len regionIndices
+    objectIndices' <- UV.freeze $ MUV.slice 0 len objectIndices
+    regions' <- BV.freeze $ MBV.slice 0 len regions
+    sortResult drawOrder len objectIndices' regionIndices' regions'
     where
-    go regions i object = do
+    go objectIndices regionIndices regions i j object = do
         r <- loadObject scene config map tilesetInfos gidRanges layerIndex opacity object
         case r of
-            Just v  -> MBV.write regions i v >> return (i + 1)
+            Just v  -> do
+                MUV.write objectIndices i j
+                MUV.write regionIndices i i
+                MBV.write regions i v
+                return (i + 1)
             Nothing -> return i
     opacity = realToFrac $ layerCommonOpacity layerCommon
 
-loadObject :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Float -> Object -> IO (Maybe (RegionLoadInfo, Double))
+    sortResult DrawOrderTopDown len objectIndices regionIndices results = do
+        sortBy (compareObjectPositionY objectIndices) regionIndices
+        regionIndices' <- UV.freeze regionIndices
+        return $ BV.generate len ((results BV.!) . (regionIndices' UV.!))
+
+    sortResult DrawOrderIndex len objectIndices regionIndices results = do
+        sortBy (compareObjectId objectIndices) regionIndices
+        regionIndices' <- UV.freeze regionIndices
+        return $ BV.generate len ((results BV.!) . (regionIndices' UV.!))
+
+    compareObjectPositionY objectIndices i0 i1 =
+        let y0 = objectCommonY . getObjectCommon $ objects BV.! (objectIndices UV.! i0)
+            y1 = objectCommonY . getObjectCommon $ objects BV.! (objectIndices UV.! i1)
+        in compare y0 y1
+
+    compareObjectId objectIndices i0 i1 =
+        let id0 = objectCommonId . getObjectCommon $ objects BV.! (objectIndices UV.! i0)
+            id1 = objectCommonId . getObjectCommon $ objects BV.! (objectIndices UV.! i1)
+        in compare id0 id1
+
+loadObject :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Float -> Object -> IO (Maybe RegionLoadInfo)
 loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTile (TileObject object gidWithFlags))
     | objectCommonVisible object = go (resolveObjectMaterial opacity tilesetInfos gidRanges gid)
     | otherwise = return Nothing
@@ -554,7 +581,7 @@ loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTil
                 & applyWhen vflip flipRectVertically
             vertex = Hree.SpriteVertex (V3 x y z) (V3 w h 0) (V3 0 0 0) rotation uv uvSize 0 0
         region <- loadRegion vertex material
-        return (Just (region, objectCommonY object))
+        return (Just region)
 
     go (Just (ObjectMaterialTileImage (Image _ iwidth iheight) (material, V2 twidth theight))) = do
         let uvw = fromIntegral (iwidth - 1) / (fromIntegral twidth)
@@ -566,7 +593,7 @@ loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTil
                 & applyWhen vflip flipRectVertically
             vertex = Hree.SpriteVertex (V3 x y z) (V3 w h 0) (V3 0 0 0) rotation uv uvSize 0 0
         region <- loadRegion vertex material
-        return (Just (region, objectCommonY object))
+        return (Just region)
 
     go Nothing = return Nothing
 
@@ -664,3 +691,11 @@ resizeImage width height source =
 applyWhen :: Bool -> (a -> a) -> a -> a
 applyWhen True f = f
 applyWhen _ _    = id
+
+getObjectCommon :: Object -> ObjectCommon
+getObjectCommon (ObjectRectangle (Rectangle a)) = a
+getObjectCommon (ObjectEllipse (Ellipse a))     = a
+getObjectCommon (ObjectPoint (Point a))         = a
+getObjectCommon (ObjectPolygon (Polygon a _))   = a
+getObjectCommon (ObjectPolyline (Polyline a _)) = a
+getObjectCommon (ObjectTile (TileObject a _))   = a

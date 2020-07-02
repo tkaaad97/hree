@@ -4,6 +4,7 @@ module Graphics.Format.Tiled.Types
     ( Color
     , CompressionType(..)
     , Coord(..)
+    , DrawOrder(..)
     , Ellipse(..)
     , EncodingType(..)
     , Frame(..)
@@ -101,6 +102,12 @@ data StaggerIndex
     | StaggerIndexOdd
     deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = constructorTagModifier 12 }) ''StaggerIndex)
+
+data DrawOrder
+    = DrawOrderTopDown
+    | DrawOrderIndex
+    deriving (Show, Eq)
+$(DA.deriveJSON (DA.defaultOptions { DA.constructorTagModifier = constructorTagModifier 9 }) ''DrawOrder)
 
 data PropertyValue =
     PropertyString !Text |
@@ -300,8 +307,9 @@ data Image = Image
     } deriving (Show, Eq)
 
 data ObjectGroup = ObjectGroup
-    { objectGroupCommon  :: !LayerCommon
-    , objectGroupObjects :: !(BV.Vector Object)
+    { objectGroupCommon    :: !LayerCommon
+    , objectGroupDrawOrder :: !DrawOrder
+    , objectGroupObjects   :: !(BV.Vector Object)
     } deriving (Show, Eq)
 
 data Frame = Frame
@@ -542,8 +550,10 @@ parseLayer "tilelayer" common v = do
     compression <- v .:? "compression" .!= NoCompression
     data_ <- maybe (fail "tilelayer needs data field.") (parseTileLayerData encoding compression) $ HML.lookup "data" v
     return (LayerMidTileLayer (TileLayerMid common width height data_))
-parseLayer "objectgroup" common v = LayerMidObjectGroup . ObjectGroup common
-    <$> v .: "objects"
+parseLayer "objectgroup" common v = do
+    drawOrder <- v .:? "draworder" .!= DrawOrderTopDown
+    objects <- v .: "objects"
+    return (LayerMidObjectGroup (ObjectGroup common drawOrder objects))
 parseLayer "imagelayer" common v = LayerMidImageLayer . ImageLayer common
     <$> v .: "image"
 parseLayer _ _ _ = mzero
@@ -572,9 +582,9 @@ instance DA.ToJSON LayerMid where
 
         in DA.object $ fields ++ compressionFields ++ otherFields
 
-    toJSON (LayerMidObjectGroup (ObjectGroup common objects)) =
+    toJSON (LayerMidObjectGroup (ObjectGroup common drawOrder objects)) =
         let fields = layerCommonFields common
-        in DA.object $ fields ++ ["objects" .= objects, "type" .= ("objectgroup" :: Text)]
+        in DA.object $ fields ++ ["objects" .= objects, "draworder" .= drawOrder, "type" .= ("objectgroup" :: Text)]
 
     toJSON (LayerMidImageLayer (ImageLayer common image)) =
         let fields = layerCommonFields common
@@ -589,7 +599,9 @@ layerCommonFields = fields . DA.toJSON
 instance DA.FromJSON ObjectGroup where
     parseJSON (DA.Object v) = do
         common <- parseLayerCommon v
-        ObjectGroup common <$> v .: "objects"
+        ObjectGroup common
+            <$> v .:? "draworder" .!= DrawOrderTopDown
+            <*> v .: "objects"
     parseJSON invalid = DA.typeMismatch "ObjectGroup" invalid
 
 instance DA.ToJSON ObjectGroup where
