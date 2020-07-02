@@ -68,7 +68,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
 import Data.Monoid (Monoid(..))
 import Data.Proxy (Proxy(..))
-import Data.Semigroup (Last(..), Semigroup)
+import Data.Semigroup (Last(..), Semigroup(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (replace)
 import qualified Data.Text.Lazy as Text (toStrict)
