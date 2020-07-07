@@ -67,9 +67,9 @@ spec = do
         (DA.object ["type" .= ("tilelayer" :: Text), "width" .= (4 :: Int), "height" .= (8 :: Int), "name" .= ("ground" :: Text), "opacity" .= (1 :: Double), "visible" .= True, "x" .= (0 :: Int), "y" .= (0 :: Int), "properties" .= [DA.object ["name" .= ("tileLayerProp" :: Text), "type" .= ("string" :: Text), "value" .= ("1" :: Text)]], "data" .= ([1,2,1,2,3,1,3,1,2,2,3,3,4,4,4,1] :: [Int])])
 
     testJSON "LayerMid ImageLayer"
-        "{\"image\":\"buch-outdoor.png\",\"name\":\"image01\",\"opacity\":1,\"type\":\"imagelayer\",\"visible\":true,\"x\":295,\"y\":249}"
+        "{\"image\":\"buch-outdoor.png\",\"name\":\"image01\",\"opacity\":1,\"type\":\"imagelayer\",\"visible\":true,\"x\":295,\"y\":249,\"offsetx\":0,\"offsety\":0}"
         (LayerMidImageLayer (ImageLayer (LayerCommon "image01" 1 True 295 249 (Properties Map.empty)) (Image "buch-outdoor.png" Nothing Nothing) 0 0))
-        (DA.object ["type" .= ("imagelayer" :: Text), "name" .= ("image01" :: Text), "opacity" .= (1 :: Double), "visible" .= True, "x" .= (295 :: Int), "y" .= (249 :: Int), "properties" .= ([] :: [DA.Value]), "image" .= ("buch-outdoor.png" :: Text)])
+        (DA.object ["type" .= ("imagelayer" :: Text), "name" .= ("image01" :: Text), "opacity" .= (1 :: Double), "visible" .= True, "x" .= (295 :: Int), "y" .= (249 :: Int), "properties" .= ([] :: [DA.Value]), "image" .= ("buch-outdoor.png" :: Text), "offsetx" .= (0 :: Double), "offsety" .= (0 :: Double)])
 
     testJSON "Layer ObjectGroup"
         "{\"draworder\":\"topdown\",\"name\":\"objects\",\"objects\":[{\"height\":161,\"id\":1,\"name\":\"rect1\",\"properties\":[],\"rotation\":0,\"type\":\"shape\",\"visible\":true,\"width\":136,\"x\":38,\"y\":39},{\"ellipse\":true,\"height\":212,\"id\":2,\"name\":\"ellipse1\",\"properties\":[],\"rotation\":0,\"type\":\"\",\"visible\":true,\"width\":384,\"x\":81,\"y\":100}],\"opacity\":1,\"type\":\"objectgroup\",\"visible\":true,\"x\":0,\"y\":0}"
