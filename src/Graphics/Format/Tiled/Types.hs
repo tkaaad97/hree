@@ -483,8 +483,10 @@ data EncodingType =
     deriving (Show, Eq)
 
 data ImageLayer = ImageLayer
-    { imageLayerCommon :: !LayerCommon
-    , imageLayerImage  :: !Text
+    { imageLayerCommon  :: !LayerCommon
+    , imageLayerImage   :: !Image
+    , imageLayerOffsetX :: !Double
+    , imageLayerOffsetY :: !Double
     } deriving (Show, Eq)
 
 data MapMid = MapMid
@@ -556,8 +558,12 @@ parseLayer "objectgroup" common v = do
     drawOrder <- v .:? "draworder" .!= DrawOrderTopDown
     objects <- v .: "objects"
     return (LayerMidObjectGroup (ObjectGroup common drawOrder objects))
-parseLayer "imagelayer" common v = LayerMidImageLayer . ImageLayer common
-    <$> v .: "image"
+parseLayer "imagelayer" common v = do
+    path <- v .: "image"
+    let image = Image path Nothing Nothing
+    offx <- v .:? "offsetx" .!= 0
+    offy <- v .:? "offsety" .!= 0
+    return (LayerMidImageLayer (ImageLayer common image offx offy))
 parseLayer _ _ _ = mzero
 
 parseTileLayerData :: EncodingType -> CompressionType -> DA.Value -> DA.Parser TileLayerData
@@ -588,9 +594,9 @@ instance DA.ToJSON LayerMid where
         let fields = layerCommonFields common
         in DA.object $ fields ++ ["objects" .= objects, "draworder" .= drawOrder, "type" .= ("objectgroup" :: Text)]
 
-    toJSON (LayerMidImageLayer (ImageLayer common image)) =
+    toJSON (LayerMidImageLayer (ImageLayer common image offx offy)) =
         let fields = layerCommonFields common
-        in DA.object $ fields ++ ["type" .= ("imagelayer" :: Text), "image" .= image]
+        in DA.object $ fields ++ ["type" .= ("imagelayer" :: Text), "image" .= imageSource image, "offsetx" .= offx, "offsety" .= offy]
 
 layerCommonFields :: LayerCommon -> [(Text, DA.Value)]
 layerCommonFields = fields . DA.toJSON

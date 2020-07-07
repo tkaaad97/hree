@@ -251,7 +251,7 @@ loadTiledMap scene cd = loadTiledMapWithConfig scene cd defaultTiledConfig
 loadTiledMapWithConfig :: Hree.Scene -> FilePath -> TiledConfig -> Map -> IO LoadInfo
 loadTiledMapWithConfig scene cd config map = do
     tilesetInfos <- createTilesetInfos scene cd tilesets
-    layers <- BV.mapMaybe id <$> BV.imapM (loadLayer scene config map tilesetInfos gidRanges) (mapLayers map)
+    layers <- BV.mapMaybe id <$> BV.imapM (loadLayer scene cd config map tilesetInfos gidRanges) (mapLayers map)
     let nodeIds = BV.map layerLoadInfoNodeId layers
         animations = BV.concatMap (BV.concatMap regionLoadInfoAnimations . layerLoadInfoRegions) $ layers
     return (LoadInfo map nodeIds animations layers)
@@ -259,18 +259,35 @@ loadTiledMapWithConfig scene cd config map = do
     tilesets = mapTilesets map
     gidRanges = tilesetGidRanges tilesets
 
-loadLayer :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Layer -> IO (Maybe LayerLoadInfo)
-loadLayer scene config map tilesetInfos gidRanges layerIndex (LayerTileLayer layer) = do
+loadLayer :: Hree.Scene -> FilePath -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> Layer -> IO (Maybe LayerLoadInfo)
+loadLayer scene _ config map tilesetInfos gidRanges layerIndex (LayerTileLayer layer) = do
     regions <- loadRegions scene config map tilesetInfos gidRanges layerIndex layer
     let regionNodeIds = BV.map regionLoadInfoNodeId regions
     nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = regionNodeIds } False
     return . Just $ (LayerLoadInfo nodeId regions)
-loadLayer scene config map tilesetInfos gidRanges layerIndex (LayerObjectGroup layer) = do
+loadLayer scene _ config map tilesetInfos gidRanges layerIndex (LayerObjectGroup layer) = do
     regions <- loadObjectGroup scene config map tilesetInfos gidRanges layerIndex layer
     let objectNodeIds = BV.map regionLoadInfoNodeId regions
     nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = objectNodeIds } False
     return . Just $ (LayerLoadInfo nodeId regions)
-loadLayer _ _ _ _ _ _ _ = return Nothing
+loadLayer scene cd config map _ _ layerIndex (LayerImageLayer (ImageLayer _ image offx offy)) = do
+    (material, (V2 iwidth iheight), (V2 twidth theight)) <- createMaterialFromImage scene cd image
+    let mapH = fromIntegral $ mapHeight map * mapTileHeight map
+        unit = tiledConfigUnitLength config
+        x = realToFrac offx / fromIntegral unit
+        y = realToFrac (mapH - fromIntegral iheight - offy) / fromIntegral unit
+        z = tiledConfigStartZ config + tiledConfigLayerDeltaZ config * fromIntegral layerIndex
+        width = fromIntegral iwidth / fromIntegral unit
+        height = fromIntegral iheight / fromIntegral unit
+        uv = V2 (0.5 / fromIntegral twidth) ((fromIntegral iheight - 0.5) / fromIntegral theight)
+        uvSize = V2 ((fromIntegral iwidth - 1) / fromIntegral twidth) (- (fromIntegral iheight - 1) / fromIntegral theight)
+        vertex = Hree.SpriteVertex (V3 x y z) (V3 width height 0) (V3 0 0 0) 0 uv uvSize 0 0
+    (geo, _) <- Hree.newSpriteGeometry scene
+    geometry <- Hree.addVerticesToGeometry geo (SV.singleton vertex) GL.GL_STATIC_READ scene
+    let mesh = Hree.Mesh geometry material (Just 1)
+    Hree.AddedMesh meshId _ <- Hree.addMesh scene mesh
+    nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
+    return . Just $ (LayerLoadInfo nodeId mempty)
 
 loadRegions :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> TileLayer -> IO (BV.Vector RegionLoadInfo)
 loadRegions scene config map tilesetInfos gidRanges layerIndex tileLayer = BV.mapM (uncurry $ loadRegionFromTiles scene config map layerData origin z) groups

@@ -68,7 +68,7 @@ spec = do
 
     testJSON "LayerMid ImageLayer"
         "{\"image\":\"buch-outdoor.png\",\"name\":\"image01\",\"opacity\":1,\"type\":\"imagelayer\",\"visible\":true,\"x\":295,\"y\":249}"
-        (LayerMidImageLayer (ImageLayer (LayerCommon "image01" 1 True 295 249 (Properties Map.empty)) "buch-outdoor.png"))
+        (LayerMidImageLayer (ImageLayer (LayerCommon "image01" 1 True 295 249 (Properties Map.empty)) (Image "buch-outdoor.png" Nothing Nothing) 0 0))
         (DA.object ["type" .= ("imagelayer" :: Text), "name" .= ("image01" :: Text), "opacity" .= (1 :: Double), "visible" .= True, "x" .= (295 :: Int), "y" .= (249 :: Int), "properties" .= ([] :: [DA.Value]), "image" .= ("buch-outdoor.png" :: Text)])
 
     testJSON "Layer ObjectGroup"
