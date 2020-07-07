@@ -33,7 +33,7 @@ spec = do
 
     testJSON "Tileset"
         "{\"columns\":19,\"firstgid\":1,\"image\":\"../image/fishbaddie_parts.png\",\"imageheight\":480,\"imagewidth\":640,\"margin\":3,\"name\":\"tileset1\",\"properties\":[{\"name\":\"myProperty1\",\"type\":\"string\",\"value\":\"myProperty1_value\"}],\"spacing\":1,\"tilecount\":266,\"tileheight\":32,\"tilewidth\":32,\"tileoffset\":{\"x\":-12,\"y\":-12}}"
-        (Tileset (Just 1) "tileset1" 32 32 1 266 3 19 (Just $ Image "../image/fishbaddie_parts.png" 640 480) (Coord (-12) (-12)) mempty mempty mempty (Properties $ Map.singleton "myProperty1" (PropertyString "myProperty1_value")))
+        (Tileset (Just 1) "tileset1" 32 32 1 266 3 19 (Just $ Image "../image/fishbaddie_parts.png" (Just 640) (Just 480)) (Coord (-12) (-12)) mempty mempty mempty (Properties $ Map.singleton "myProperty1" (PropertyString "myProperty1_value")))
         (DA.object ["firstgid" .= (Just 1 :: Maybe Int), "image" .= ("../image/fishbaddie_parts.png" :: Text), "name" .= ("tileset1" :: Text), "tilewidth" .= (32 :: Int), "tileheight" .= (32 :: Int), "imagewidth" .= (640 :: Int), "imageheight" .= (480 :: Int), "tileoffset" .= Coord (-12) (-12), "properties" .= [DA.object ["name" .= ("myProperty1" :: Text), "type" .= ("string" :: Text), "value" .= ("myProperty1_value" :: Text)]], "margin" .= (3 :: Int), "spacing" .= (1 :: Int), "columns" .= (19 :: Int), "tilecount" .= (266 :: Int), ("terrains", DA.Null), ("tiles", DA.Null), ("wangsets", DA.Null)])
 
     testJSON "Object Rectangle"

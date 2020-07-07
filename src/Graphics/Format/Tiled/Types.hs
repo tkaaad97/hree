@@ -302,8 +302,8 @@ $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = constructorTagModif
 
 data Image = Image
     { imageSource :: !Text
-    , imageWidth  :: !Int
-    , imageHeight :: !Int
+    , imageWidth  :: !(Maybe Int)
+    , imageHeight :: !(Maybe Int)
     } deriving (Show, Eq)
 
 data ObjectGroup = ObjectGroup
@@ -383,7 +383,9 @@ instance DA.FromJSON Tileset where
         imgSource <- v .:? "image"
         imgWidth <- v .:? "imagewidth"
         imgHeight <- v .:? "imageheight"
-        let image = Image <$> imgSource <*> imgWidth <*> imgHeight
+        let image = do
+                path <- imgSource
+                return (Image path imgWidth imgHeight)
         Tileset
             <$> v .:? "firstgid"
             <*> v .: "name"

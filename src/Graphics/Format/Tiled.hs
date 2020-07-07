@@ -89,7 +89,7 @@ data TilesetInfo = TilesetInfo
     , tilesetInfoAnimationFrames :: !(BV.Vector (BV.Vector Frame))
     , tilesetInfoImageGids       :: !(UV.Vector Gid)
     , tilesetInfoImageSources    :: !(BV.Vector Image)
-    , tilesetInfoImageMaterials  :: !(BV.Vector (Hree.SpriteMaterial, V2 Int))
+    , tilesetInfoImageMaterials  :: !(BV.Vector (Hree.SpriteMaterial, V2 Int, V2 Int))
     } deriving (Show)
 
 data TiledConfig = TiledConfig
@@ -121,7 +121,7 @@ data TileMaterial = TileMaterial !TilesetInfo !Hree.SpriteMaterial
 
 data ObjectMaterial =
     ObjectMaterialTileset !TilesetInfo !Hree.SpriteMaterial |
-    ObjectMaterialTileImage !Image !(Hree.SpriteMaterial, V2 Int)
+    ObjectMaterialTileImage !(Hree.SpriteMaterial, V2 Int, V2 Int)
     deriving (Show)
 
 instance Eq TileMaterial where
@@ -583,7 +583,7 @@ loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTil
         region <- loadRegion vertex material
         return (Just region)
 
-    go (Just (ObjectMaterialTileImage (Image _ iwidth iheight) (material, V2 twidth theight))) = do
+    go (Just (ObjectMaterialTileImage (material, V2 iwidth iheight, V2 twidth theight))) = do
         let uvw = fromIntegral (iwidth - 1) / (fromIntegral twidth)
             uvh = fromIntegral (iheight - 1) / (fromIntegral theight)
             uv = V2 (0.5 / fromIntegral twidth) (uvh + 0.5 / fromIntegral theight)
@@ -611,14 +611,13 @@ resolveObjectMaterial opacityFactor tilesets gidRanges gid = do
     tilesetIndex <- BV.findIndex (\(V2 firstGid nextGid) -> firstGid <= gid && gid < nextGid) $ gidRanges
     tileset <- tilesets BV.!? tilesetIndex
     let imageGids = tilesetInfoImageGids tileset
-        imageSources = tilesetInfoImageSources tileset
         imageMaterials = tilesetInfoImageMaterials tileset
     case (UV.findIndex (== gid) imageGids, tilesetInfoMaterial tileset) of
         (Just imageIndex, _) ->
-            let (material, textureSize) = imageMaterials BV.! imageIndex
+            let (material, imageSize, textureSize) = imageMaterials BV.! imageIndex
                 block = Hree.materialUniformBlock material
                 material' = material { Hree.materialUniformBlock = block { Hree.opacityFactor = opacityFactor } }
-            in Just $ ObjectMaterialTileImage (imageSources BV.! imageIndex) (material', textureSize)
+            in Just $ ObjectMaterialTileImage (material', imageSize, textureSize)
         (Nothing, Just material) ->
             let block = Hree.materialUniformBlock material
                 material' = material { Hree.materialUniformBlock = block { Hree.opacityFactor = opacityFactor } }
@@ -629,7 +628,7 @@ createTilesetInfo :: Hree.Scene -> FilePath -> Int -> (Tileset, V2 Gid) -> IO Ti
 createTilesetInfo scene cd index (tileset, gidRange) = go (tilesetImage tileset)
     where
     go (Just image) = do
-        (material, textureSize) <- createMaterialFromImage scene cd image
+        (material, _, textureSize) <- createMaterialFromImage scene cd image
         imageMaterials <- BV.mapM (createMaterialFromImage scene cd) imageSources
         return $ TilesetInfo index tileset (Just material) textureSize gidRange animationGids animationFrames imageGids imageSources imageMaterials
     go Nothing = do
@@ -647,15 +646,18 @@ createTilesetInfo scene cd index (tileset, gidRange) = go (tilesetImage tileset)
     imageGids = UV.generate (BV.length imageTiles) (fst . (imageTiles BV.! ))
     imageSources = BV.map snd imageTiles
 
-createMaterialFromImage :: Hree.Scene -> FilePath -> Image -> IO (Hree.SpriteMaterial, V2 Int)
-createMaterialFromImage scene cd (Image sourcePath width height) = do
+createMaterialFromImage :: Hree.Scene -> FilePath -> Image -> IO (Hree.SpriteMaterial, V2 Int, V2 Int)
+createMaterialFromImage scene cd (Image sourcePath maybeWidth maybeHeight) = do
     path <- canonicalizePath $ cd </> Text.unpack sourcePath
-    image <- either (throwIO . userError) (resizeImage width height . Picture.convertRGBA8) =<< Picture.readImage path
+    image <- either (throwIO . userError) (return . Picture.convertRGBA8) =<< Picture.readImage path
+    let width = fromMaybe (Picture.imageWidth image) maybeWidth
+        height = fromMaybe (Picture.imageHeight image) maybeHeight
+    resizedImage <- resizeImage width height image
     let name = Text.encodeUtf8 sourcePath
         twidth = nextPow2 width
         theight = nextPow2 height
         settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
-    (_, texture) <- SV.unsafeWith (Picture.imageData image) $ \ptr -> do
+    (_, texture) <- SV.unsafeWith (Picture.imageData resizedImage) $ \ptr -> do
         let sourceData = Hree.TextureSourceData (fromIntegral width) (fromIntegral height) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr ptr)
         Hree.addTexture scene name settings sourceData
     let sname = Text.encodeUtf8 sourcePath
@@ -663,7 +665,7 @@ createMaterialFromImage scene cd (Image sourcePath width height) = do
     Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
     Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
     let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
-    return (material, V2 twidth theight)
+    return (material, V2 width height, V2 twidth theight)
     where
     nextPow2 = nextPow2_ 1
     nextPow2_ a x | a >= x = a
