@@ -37,5 +37,5 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ghc-${{ matrix.ghc }}-stack-
 
-    - name: build
-      run: stack build --no-test
+      - name: build
+        run: stack build --no-test
