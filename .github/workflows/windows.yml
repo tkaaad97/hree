@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: build on ${{ runner.os }} with ghc-${{ matrix.ghc }}
+    name: build with ghc-${{ matrix.ghc }}
 
     env:
       STACK_YAML: stack-ghc-${{ matrix.ghc }}.yaml
@@ -33,9 +33,9 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.stack
-          key: ${{ runner.os }}-ghc-${{ matrix.ghc }}-stack-${{ hashFiles('**/package.yaml') }}
+          key: windows-ghc-${{ matrix.ghc }}-stack-${{ hashFiles('**/package.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-ghc-${{ matrix.ghc }}-stack-
+            windows-ghc-${{ matrix.ghc }}-stack-
 
       - name: build
         run: stack build --no-test
