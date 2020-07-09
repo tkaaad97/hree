@@ -29,10 +29,10 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: cache ~/.stack
+      - name: cache ./.stack
         uses: actions/cache@v2
         with:
-          path: ~/.stack
+          path: ./.stack
           key: windows-ghc-${{ matrix.ghc }}-stack-${{ hashFiles('**/package.yaml') }}
           restore-keys: |
             windows-ghc-${{ matrix.ghc }}-stack-
@@ -40,4 +40,4 @@ jobs:
       - name: build
         run: stack build --no-test
         env:
-          STACK_ROOT: "${{ env.HOME }}\\.stack"
+          STACK_ROOT: ".stack"
