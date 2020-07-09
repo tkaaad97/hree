@@ -13,6 +13,7 @@ jobs:
 
     env:
       STACK_YAML: stack-ghc-${{ matrix.ghc }}.yaml
+      STACK_ROOT: "${{ github.workspace }}\\.stack"
 
     strategy:
       matrix:
@@ -29,15 +30,13 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: cache "${{ github.workspace }}\\.stack"
+      - name: cache ${{ env.STACK_ROOT }}
         uses: actions/cache@v2
         with:
-          path: "${{ github.workspace }}\\.stack"
+          path: ${{ env.STACK_ROOT }}
           key: windows-ghc-${{ matrix.ghc }}-stack-${{ hashFiles('**/package.yaml') }}
           restore-keys: |
             windows-ghc-${{ matrix.ghc }}-stack-
 
       - name: build
         run: stack build --no-test
-        env:
-          STACK_ROOT: "${{ github.workspace }}\\.stack"
