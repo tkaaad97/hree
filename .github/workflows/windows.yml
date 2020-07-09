@@ -12,6 +12,7 @@ jobs:
     name: build with ghc-${{ matrix.ghc }}
 
     env:
+      STACK_ROOT: ~/.stack
       STACK_YAML: stack-ghc-${{ matrix.ghc }}.yaml
 
     strategy:
