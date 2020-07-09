@@ -1,0 +1,41 @@
+name: build on windows
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v*
+
+jobs:
+  build:
+    name: build on ${{ runner.os }} with ghc-${{ matrix.ghc }}
+
+    env:
+      STACK_YAML: stack-ghc-${{ matrix.ghc }}.yaml
+
+    strategy:
+      matrix:
+        ghc:
+          - "8.2.2"
+          - "8.4.4"
+          - "8.6.5"
+          - "8.8.3"
+
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: cache ~/.stack
+        uses: actions/cache@v2
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-ghc-${{ matrix.ghc }}-stack-${{ hashFiles('**/package.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-ghc-${{ matrix.ghc }}-stack-
+
+    - name: build
+      run: stack build --no-test
