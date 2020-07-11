@@ -36,9 +36,9 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy(..), asProxyTypeOf)
-import qualified Data.Vector as BV (Vector, mapMaybe)
+import qualified Data.Vector as BV (Vector, length, map, mapMaybe, toList)
 import qualified Data.Vector.Storable as SV
-import qualified Foreign (Storable(..), alloca, allocaArray, castPtr)
+import qualified Foreign (Storable(..), alloca, allocaArray, castPtr, withArray)
 import qualified GLW
 import qualified GLW.Groups.Boolean as Boolean
 import qualified GLW.Groups.EnableCap as EnableCap
@@ -95,12 +95,14 @@ bindUniformBlockBuffers = mapM_ bindUniformBlockBuffer
     bindUniformBlockBuffer (BufferBindingIndex bindingIndex, buffer) =
         GLW.glBindBufferBase GL.GL_UNIFORM_BUFFER bindingIndex buffer
 
-bindTextures :: BV.Vector (GL.GLuint, Texture) -> IO ()
-bindTextures textures = mapM_ bindTexture textures
+bindTextures :: BV.Vector Texture -> IO ()
+bindTextures xs = do
+    Foreign.withArray textures $ GLW.glBindTextures 0 (fromIntegral len)
+    Foreign.withArray samplers $ GLW.glBindSamplers 0 (fromIntegral len)
     where
-    bindTexture (index, Texture (texture, sampler)) = do
-        GLW.glBindTextureUnit index texture
-        GLW.glBindSampler index sampler
+    len = BV.length xs
+    textures = BV.toList . BV.map (\(Texture (texture, _)) -> texture) $ xs
+    samplers = BV.toList . BV.map (\(Texture (_, sampler)) -> sampler) $ xs
 
 renderMany :: Foldable t => BV.Vector (ByteString, BufferBindingIndex) -> t RenderInfo -> IO ()
 renderMany common = void . foldrM (render common) Nothing

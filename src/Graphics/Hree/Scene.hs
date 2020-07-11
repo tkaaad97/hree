@@ -249,10 +249,10 @@ toRenderInfo program defaultTexture meshInfo vao skin matrix =
         uniformLocation <- Map.lookup uniformName uniformLocations
         return (uniformLocation, uniform)
     mtextures = materialInfoTextures material
-    mtextureUnits = BV.imap (\i (_, t) -> (fromIntegral i, t)) mtextures :: BV.Vector (GL.GLuint, Texture)
-    textureUniforms = BV.imap (\i (a, _) -> (a, Uniform (fromIntegral i :: GL.GLuint))) mtextures
+    mtextureUnits = BV.map snd mtextures
+    textureUniforms = BV.imap (\i (a, _) -> (a, Uniform (fromIntegral i :: GL.GLint))) mtextures
     textures = if BV.null mtextures
-        then BV.singleton (0, defaultTexture)
+        then BV.singleton defaultTexture
         else mtextureUnits
     getSkinUbs x =
         let joint = (skinJointMatricesBlockBindingIndex, getMatricesBlockBinderBuffer . skinJointMatricesBinder $ x)
