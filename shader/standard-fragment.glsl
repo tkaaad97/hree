@@ -34,15 +34,18 @@ struct MaterialInfo {
 
 layout(std140) uniform MaterialBlock {
     vec4 baseColorFactor;
-    vec3 emissiveness;
+    vec3 emissiveFactor;
     float metallicFactor;
     float roughnessFactor;
     float normalScale;
+    float occlusionStrength;
 } materialBlock;
 
 uniform sampler2D baseColorTexture;
 uniform sampler2D normalTexture;
 uniform sampler2D metallicRoughnessTexture;
+uniform sampler2D emissiveTexture;
+uniform sampler2D occlusionTexture;
 
 const float pi = 3.141592653589793;
 const float epsilon = 1.19209e-07;
@@ -180,5 +183,16 @@ void main() {
 
     vec3 acc = vec3(0.0, 0.0, 0.0);
     acc += applyLights(normal, view, color.rgb, metallic, roughness);
+
+#ifdef HAS_EMISSIVE_MAP
+    vec3 emissive = sRGBToLinear(texture(emissiveTexture, fragmentUv)).rgb * materialBlock.emissiveFactor;
+    acc += emissive;
+#endif
+
+#ifdef HAS_OCCLUSION_MAP
+    float ao = texture(occlusionTexture, fragmentUv).r;
+    acc = mix(acc, acc * ao, materialBlock.occlusionStrength);
+#endif
+
     outColor = vec4(toneMapping(acc), 1.0);
 }

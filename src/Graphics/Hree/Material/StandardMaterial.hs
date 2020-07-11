@@ -16,11 +16,12 @@ import Linear (V3(..), V4(..))
 type StandardMaterial = Material StandardMaterialBlock
 
 data StandardMaterialBlock = StandardMaterialBlock
-    { baseColorFactor    :: !(V4 GL.GLfloat)
-    , emissivenessFactor :: !(V3 GL.GLfloat)
-    , metallicFactor     :: !GL.GLfloat
-    , roughnessFactor    :: !GL.GLfloat
-    , normalScale        :: !GL.GLfloat
+    { baseColorFactor   :: !(V4 GL.GLfloat)
+    , emissiveFactor    :: !(V3 GL.GLfloat)
+    , metallicFactor    :: !GL.GLfloat
+    , roughnessFactor   :: !GL.GLfloat
+    , normalScale       :: !GL.GLfloat
+    , occlusionStrength :: !GL.GLfloat
     } deriving (Show, Eq)
 
 instance Block StandardMaterialBlock where
@@ -33,14 +34,16 @@ instance Block StandardMaterialBlock where
         metallic <- peekByteOffStd140 ptr (off + 28)
         roughness <- peekByteOffStd140 ptr (off + 32)
         nscale <- peekByteOffStd140 ptr (off + 36)
-        return $ StandardMaterialBlock baseColor emissive metallic roughness nscale
+        occlusion <- peekByteOffStd140 ptr (off + 40)
+        return $ StandardMaterialBlock baseColor emissive metallic roughness nscale occlusion
 
-    pokeByteOffStd140 ptr off (StandardMaterialBlock baseColor emissive metallic roughness nscale) = do
+    pokeByteOffStd140 ptr off (StandardMaterialBlock baseColor emissive metallic roughness nscale occlusion) = do
         pokeByteOffStd140 ptr off baseColor
         pokeByteOffStd140 ptr (off + 16) emissive
         pokeByteOffStd140 ptr (off + 28) metallic
         pokeByteOffStd140 ptr (off + 32) roughness
         pokeByteOffStd140 ptr (off + 36) nscale
+        pokeByteOffStd140 ptr (off + 40) occlusion
 
 standardMaterial :: StandardMaterialBlock -> Material StandardMaterialBlock
 standardMaterial block = Material
@@ -54,8 +57,9 @@ standardMaterial block = Material
 standardMaterialBlock :: StandardMaterialBlock
 standardMaterialBlock = StandardMaterialBlock
     { baseColorFactor = V4 1 1 1 1
-    , emissivenessFactor = V3 0 0 0
+    , emissiveFactor = V3 0 0 0
     , metallicFactor = 1
     , roughnessFactor = 1
     , normalScale = 1
+    , occlusionStrength = 1
     }

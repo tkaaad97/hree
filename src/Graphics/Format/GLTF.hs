@@ -1250,7 +1250,10 @@ createMaterial :: BV.Vector Hree.Texture -> Material -> Hree.StandardMaterial
 createMaterial textures m =
     Hree.standardMaterial Hree.standardMaterialBlock
         & setWhenJust setPbrMetallicRoughness (materialPbrMetallicRoughness m)
+        & flip setEmissiveFactor (materialEmissiveFactor m)
         & setWhenJust setNormalTexture (materialNormalTexture m)
+        & setWhenJust setEmissiveTexture (materialEmissiveTexture m)
+        & setWhenJust setOcclusionTexture (materialOcclusionTexture m)
     where
     setWhenJust _ Nothing a  = a
     setWhenJust f (Just b) a = a `f` b
@@ -1263,15 +1266,32 @@ createMaterial textures m =
         }
         & setWhenJust setBaseColorTexture (pbrBaseColorTexture pbr)
         & setWhenJust setMetallicRoughnessTexture (pbrMetallicRoughnessTexture pbr)
-    setBaseColorTexture a info = fromMaybe a $ do
-        texture <- textures BV.!? textureInfoIndex info
-        return $ a { Hree.materialTextures = Hree.materialTextures a `mappend` pure (Hree.BaseColorMapping, texture) }
-    setNormalTexture a info = fromMaybe a $ do
-        texture <- textures BV.!? normalTextureInfoIndex info
-        return $ a { Hree.materialTextures = Hree.materialTextures a `mappend` pure (Hree.NormalMapping, texture) }
-    setMetallicRoughnessTexture a info = fromMaybe a $ do
-        texture <- textures BV.!? textureInfoIndex info
-        return $ a { Hree.materialTextures = Hree.materialTextures a `mappend` pure (Hree.MetallicRoughnessMapping, texture) }
+    setBaseColorTexture a info = appendTexture a Hree.BaseColorMapping (textureInfoIndex info)
+    setNormalTexture a info = appendTexture a Hree.NormalMapping (normalTextureInfoIndex info)
+        & flip setNormalScale (normalTextureInfoScale info)
+    setMetallicRoughnessTexture a info = appendTexture a Hree.MetallicRoughnessMapping (textureInfoIndex info)
+    setEmissiveTexture a info = appendTexture a Hree.EmissiveMapping (textureInfoIndex info)
+    setOcclusionTexture a info = appendTexture a Hree.OcclusionMapping (occlusionTextureInfoIndex info)
+        & flip setOcclusionStrength (occlusionTextureInfoStrength info)
+
+    appendTexture a mappingType textureIndex = fromMaybe a $ do
+        texture <- textures BV.!? textureIndex
+        return $ a { Hree.materialTextures = Hree.materialTextures a `mappend` pure (mappingType, texture) }
+
+    setEmissiveFactor a emissiveFactor =
+        let block = Hree.materialUniformBlock a
+            block' = block { StandardMaterial.emissiveFactor = emissiveFactor }
+        in a { Hree.materialUniformBlock = block' }
+
+    setNormalScale a normalScale =
+        let block = Hree.materialUniformBlock a
+            block' = block { StandardMaterial.normalScale = normalScale }
+        in a { Hree.materialUniformBlock = block' }
+
+    setOcclusionStrength a occlusionStrength =
+        let block = Hree.materialUniformBlock a
+            block' = block { StandardMaterial.occlusionStrength = occlusionStrength }
+        in a { Hree.materialUniformBlock = block' }
 
 createMaterials :: BV.Vector Hree.Texture -> BV.Vector Material -> BV.Vector Hree.StandardMaterial
 createMaterials textures = BV.map (createMaterial textures)

@@ -61,7 +61,9 @@ data Geometry = Geometry
 data TextureMappingType =
     BaseColorMapping |
     NormalMapping |
-    MetallicRoughnessMapping
+    EmissiveMapping |
+    MetallicRoughnessMapping |
+    OcclusionMapping
     deriving (Show, Eq, Enum)
 
 data Material a = Material

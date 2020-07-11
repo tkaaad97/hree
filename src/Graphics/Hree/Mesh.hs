@@ -24,6 +24,8 @@ resolveProgramOption mesh maybeSkin =
             & applyWhen (hasAttribute geo "color") (`setHasVertexColor` True)
             & applyWhen (materialHasTextureMapping material NormalMapping) (`setHasNormalMap` True)
             & applyWhen (materialHasTextureMapping material MetallicRoughnessMapping) (`setHasMetallicRoughnessMap` True)
+            & applyWhen (materialHasTextureMapping material EmissiveMapping) (`setHasEmissiveMap` True)
+            & applyWhen (materialHasTextureMapping material OcclusionMapping) (`setHasOcclusionMap` True)
             & applySkinOptions maybeSkin
             & flip applyPartialProgramOption (materialProgramOption material)
     in options

@@ -86,4 +86,6 @@ materialHasTextureMapping material textureMappingType = isJust . BV.find ((== te
 textureMappingUniformName :: TextureMappingType -> ByteString
 textureMappingUniformName BaseColorMapping         = "baseColorTexture"
 textureMappingUniformName NormalMapping            = "normalTexture"
+textureMappingUniformName EmissiveMapping          = "emissiveTexture"
 textureMappingUniformName MetallicRoughnessMapping = "metallicRoughnessTexture"
+textureMappingUniformName OcclusionMapping         = "occlusionTexture"

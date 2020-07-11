@@ -24,10 +24,12 @@ module Graphics.Hree.Program
     , getProgramName
     , mkProgram
     , setGlslVersion
+    , setHasEmissiveMap
     , setHasJointIndices
     , setHasJointWeights
     , setHasMetallicRoughnessMap
     , setHasNormalMap
+    , setHasOcclusionMap
     , setHasVertexNormal
     , setHasVertexTangent
     , setHasVertexColor
@@ -36,10 +38,12 @@ module Graphics.Hree.Program
     , setMaxSpriteTileCount
     , setUseVertexSkinning
     , setPartialGlslVersion
+    , setPartialHasEmissiveMap
     , setPartialHasJointIndices
     , setPartialHasJointWeights
     , setPartialHasMetallicRoughnessMap
     , setPartialHasNormalMap
+    , setPartialHasOcclusionMap
     , setPartialHasVertexNormal
     , setPartialHasVertexTangent
     , setPartialHasVertexColor
@@ -90,10 +94,12 @@ import Graphics.Hree.Light (maxLightCount)
 
 data ProgramOption_ f = ProgramOption
     { programOptionGlslVersion             :: !(f (Maybe Int))
+    , programOptionHasEmissiveMap          :: !(f Bool)
     , programOptionHasJointIndices         :: !(f Bool)
     , programOptionHasJointWeights         :: !(f Bool)
     , programOptionHasMetallicRoughnessMap :: !(f Bool)
     , programOptionHasNormalMap            :: !(f Bool)
+    , programOptionHasOcclusionMap         :: !(f Bool)
     , programOptionHasVertexColor          :: !(f Bool)
     , programOptionHasVertexNormal         :: !(f Bool)
     , programOptionHasVertexTangent        :: !(f Bool)
@@ -122,10 +128,12 @@ instance Hashable ProgramOption where
 instance Semigroup PartialProgramOption where
     a <> b = ProgramOption
         { programOptionGlslVersion = programOptionGlslVersion a <> programOptionGlslVersion b
+        , programOptionHasEmissiveMap = programOptionHasEmissiveMap a <> programOptionHasEmissiveMap b
         , programOptionHasJointIndices = programOptionHasJointIndices a <> programOptionHasJointIndices b
         , programOptionHasJointWeights = programOptionHasJointWeights a <> programOptionHasJointWeights b
         , programOptionHasMetallicRoughnessMap = programOptionHasMetallicRoughnessMap a <> programOptionHasMetallicRoughnessMap b
         , programOptionHasNormalMap = programOptionHasNormalMap a <> programOptionHasNormalMap b
+        , programOptionHasOcclusionMap = programOptionHasOcclusionMap a <> programOptionHasOcclusionMap b
         , programOptionHasVertexColor = programOptionHasVertexColor a <> programOptionHasVertexColor b
         , programOptionHasVertexNormal = programOptionHasVertexNormal a <> programOptionHasVertexNormal b
         , programOptionHasVertexTangent = programOptionHasVertexTangent a <> programOptionHasVertexTangent b
@@ -138,10 +146,12 @@ instance Semigroup PartialProgramOption where
 instance Monoid PartialProgramOption where
     mempty =ProgramOption
         { programOptionGlslVersion = mempty
+        , programOptionHasEmissiveMap = mempty
         , programOptionHasJointIndices = mempty
         , programOptionHasJointWeights = mempty
         , programOptionHasMetallicRoughnessMap = mempty
         , programOptionHasNormalMap = mempty
+        , programOptionHasOcclusionMap = mempty
         , programOptionHasVertexColor = mempty
         , programOptionHasVertexNormal = mempty
         , programOptionHasVertexTangent = mempty
@@ -154,10 +164,12 @@ instance Monoid PartialProgramOption where
 applyPartialProgramOption :: ProgramOption -> PartialProgramOption -> ProgramOption
 applyPartialProgramOption a b = ProgramOption
     { programOptionGlslVersion = maybe (programOptionGlslVersion a) pure . getLast . coerce $ programOptionGlslVersion b
+    , programOptionHasEmissiveMap = maybe (programOptionHasEmissiveMap a) pure . coerce $ programOptionHasEmissiveMap b
     , programOptionHasJointIndices = maybe (programOptionHasJointIndices a) pure . coerce $ programOptionHasJointIndices b
     , programOptionHasJointWeights = maybe (programOptionHasJointWeights a) pure . coerce $ programOptionHasJointWeights b
     , programOptionHasMetallicRoughnessMap = maybe (programOptionHasMetallicRoughnessMap a) pure . coerce $ programOptionHasMetallicRoughnessMap b
     , programOptionHasNormalMap = maybe (programOptionHasNormalMap a) pure . coerce $ programOptionHasNormalMap b
+    , programOptionHasOcclusionMap = maybe (programOptionHasOcclusionMap a) pure . coerce $ programOptionHasOcclusionMap b
     , programOptionHasVertexColor = maybe (programOptionHasVertexColor a) pure . coerce $ programOptionHasVertexColor b
     , programOptionHasVertexNormal = maybe (programOptionHasVertexNormal a) pure . coerce $ programOptionHasVertexNormal b
     , programOptionHasVertexTangent = maybe (programOptionHasVertexTangent a) pure . coerce $ programOptionHasVertexTangent b
@@ -195,10 +207,12 @@ newtype ProgramName = ProgramName
 defaultProgramOption :: ProgramOption
 defaultProgramOption = ProgramOption
     { programOptionGlslVersion = pure $ Just 450
+    , programOptionHasEmissiveMap = pure False
     , programOptionHasJointIndices = pure False
     , programOptionHasJointWeights = pure False
-    , programOptionHasNormalMap = pure False
     , programOptionHasMetallicRoughnessMap = pure False
+    , programOptionHasNormalMap = pure False
+    , programOptionHasOcclusionMap = pure False
     , programOptionHasVertexNormal = pure False
     , programOptionHasVertexTangent = pure False
     , programOptionHasVertexColor = pure False
@@ -211,17 +225,23 @@ defaultProgramOption = ProgramOption
 setGlslVersion :: ProgramOption -> Maybe Int -> ProgramOption
 setGlslVersion programOption a = programOption { programOptionGlslVersion = pure a }
 
+setHasEmissiveMap :: ProgramOption -> Bool -> ProgramOption
+setHasEmissiveMap programOption a = programOption { programOptionHasEmissiveMap = pure a }
+
 setHasJointIndices :: ProgramOption -> Bool -> ProgramOption
 setHasJointIndices programOption a = programOption { programOptionHasJointIndices = pure a }
 
 setHasJointWeights :: ProgramOption -> Bool -> ProgramOption
 setHasJointWeights programOption a = programOption { programOptionHasJointWeights = pure a }
 
+setHasMetallicRoughnessMap :: ProgramOption -> Bool -> ProgramOption
+setHasMetallicRoughnessMap programOption a = programOption { programOptionHasMetallicRoughnessMap = pure a }
+
 setHasNormalMap :: ProgramOption -> Bool -> ProgramOption
 setHasNormalMap programOption a = programOption { programOptionHasNormalMap = pure a }
 
-setHasMetallicRoughnessMap :: ProgramOption -> Bool -> ProgramOption
-setHasMetallicRoughnessMap programOption a = programOption { programOptionHasMetallicRoughnessMap = pure a }
+setHasOcclusionMap :: ProgramOption -> Bool -> ProgramOption
+setHasOcclusionMap programOption a = programOption { programOptionHasOcclusionMap = pure a }
 
 setHasVertexNormal :: ProgramOption -> Bool -> ProgramOption
 setHasVertexNormal programOption a = programOption { programOptionHasVertexNormal = pure a }
@@ -247,17 +267,23 @@ setUseVertexSkinning programOption a = programOption { programOptionUseVertexSki
 setPartialGlslVersion :: PartialProgramOption -> Maybe (Maybe Int) -> PartialProgramOption
 setPartialGlslVersion programOption a = programOption { programOptionGlslVersion = coerce a }
 
+setPartialHasEmissiveMap :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasEmissiveMap programOption a = programOption { programOptionHasEmissiveMap = coerce a }
+
 setPartialHasJointIndices :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
 setPartialHasJointIndices programOption a = programOption { programOptionHasJointIndices = coerce a }
 
 setPartialHasJointWeights :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
 setPartialHasJointWeights programOption a = programOption { programOptionHasJointWeights = coerce a }
 
+setPartialHasMetallicRoughnessMap :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasMetallicRoughnessMap programOption a = programOption { programOptionHasMetallicRoughnessMap = coerce a }
+
 setPartialHasNormalMap :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
 setPartialHasNormalMap programOption a = programOption { programOptionHasNormalMap = coerce a }
 
-setPartialHasMetallicRoughnessMap :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
-setPartialHasMetallicRoughnessMap programOption a = programOption { programOptionHasMetallicRoughnessMap = coerce a }
+setPartialHasOcclusionMap :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
+setPartialHasOcclusionMap programOption a = programOption { programOptionHasOcclusionMap = coerce a }
 
 setPartialHasVertexNormal :: PartialProgramOption -> Maybe Bool -> PartialProgramOption
 setPartialHasVertexNormal programOption a = programOption { programOptionHasVertexNormal = coerce a }
@@ -374,17 +400,23 @@ getEmbeddedFragmentShaderSource TestProgram = $(preprocessFile "shader/test-frag
 renderProgramOption :: ProgramOption -> ByteString
 renderProgramOption programOption = ByteString.intercalate "\n" . catMaybes $
     [ mappend "#version " . ByteString.pack . show <$> runIdentity (programOptionGlslVersion programOption)
+    , if runIdentity $ programOptionHasEmissiveMap programOption
+        then Just "#define HAS_EMISSIVE_MAP"
+        else Nothing
     , if runIdentity $ programOptionHasJointIndices programOption
         then Just "#define HAS_JOINT_INDICES"
         else Nothing
     , if runIdentity $ programOptionHasJointWeights programOption
         then Just "#define HAS_JOINT_WEIGHTS"
         else Nothing
+    , if runIdentity $ programOptionHasMetallicRoughnessMap programOption
+        then Just "#define HAS_METALLIC_ROUGHNESS_MAP"
+        else Nothing
     , if runIdentity $ programOptionHasNormalMap programOption
         then Just "#define HAS_NORMAL_MAP"
         else Nothing
-    , if runIdentity $ programOptionHasMetallicRoughnessMap programOption
-        then Just "#define HAS_METALLIC_ROUGHNESS_MAP"
+    , if runIdentity $ programOptionHasOcclusionMap programOption
+        then Just "#define HAS_OCCLUSION_MAP"
         else Nothing
     , if runIdentity $ programOptionHasVertexNormal programOption
         then Just "#define HAS_VERTEX_NORMAL"
