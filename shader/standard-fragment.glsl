@@ -25,11 +25,11 @@ struct AngularInfo {
 
 struct MaterialInfo {
     vec3 color;
-    float roughness;
+    vec3 albedoColor;
     float metallic;
+    float roughness;
     float alpha;
     float alpha2;
-    float padding;
 };
 
 layout(std140) uniform MaterialBlock {
@@ -113,7 +113,7 @@ vec3 calcPointShade(AngularInfo angular, MaterialInfo material) {
         float V = calcVisibilityOcclusion(material.alpha2, angular.dotNL, angular.dotNV);
         float D = calcMicrofacetDistribution(material.alpha2, angular.dotNH);
 
-        vec3 diffuseOut = (1.0 - F) * diffuse(material.color);
+        vec3 diffuseOut = (1.0 - F) * diffuse(material.albedoColor);
         vec3 specularOut = F * V * D;
         return angular.dotNL * (diffuseOut + specularOut);
     }
@@ -131,7 +131,8 @@ vec3 applyLights(vec3 normal, vec3 view, vec3 color, float metallic, float rough
     vec3 n = normalize(normal);
     vec3 v = normalize(view);
     float dotNV = clamp(dot(n, v), 0.0, 1.0);
-    MaterialInfo material = MaterialInfo(color, metallic, roughness, alpha, alpha2, 0.0);
+    vec3 albedoColor = mix(color * (1.0 - dielectricSpecular.r), black, metallic);
+    MaterialInfo material = MaterialInfo(color, albedoColor, metallic, roughness, alpha, alpha2);
 
     for (int i = 0; i < MAX_LIGHT_COUNT; i++) {
         if (i < lightBlock.count) {
@@ -177,9 +178,7 @@ void main() {
     roughness = mrSample.g * materialBlock.roughnessFactor;
 #endif
 
-    vec3 diffuseColor = mix(color.rgb * (1.0 - dielectricSpecular.r), black, metallic);
-
     vec3 acc = vec3(0.0, 0.0, 0.0);
-    acc += applyLights(normal, view, diffuseColor, metallic, roughness);
+    acc += applyLights(normal, view, color.rgb, metallic, roughness);
     outColor = vec4(toneMapping(acc), 1.0);
 }
