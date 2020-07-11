@@ -64,10 +64,10 @@ vec3 getNormal() {
 #ifdef HAS_VERTEX_NORMAL
     vec3 ng = normalize(fragmentNormal);
 #else
-    vec3 ng = cross(pdx, pdy);
+    vec3 ng = normalize(cross(pdx, pdy));
 #endif
 
-    vec3 t = (tdy.t * pdx - tdx.t * pdy) / (tdx.s * tdy.t - tdy.s * tdx.t);
+    vec3 t = normalize((tdy.t * pdx - tdx.t * pdy) / (tdx.s * tdy.t - tdy.s * tdx.t));
     t = normalize(t - ng * dot(ng, t));
     vec3 b = normalize(cross(ng, t));
     mat3 tbn = mat3(t, b, ng);
