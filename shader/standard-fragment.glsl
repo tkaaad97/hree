@@ -69,7 +69,7 @@ vec3 getNormal() {
     vec3 b = normalize(cross(ng, t));
     mat3 tbn = mat3(t, b, ng);
 #else
-    mat3 tbn = fragmentTBN;
+    mat3 tbn = mat3(normalize(fragmentTBN[0]), normalize(fragmentTBN[1]), normalize(fragmentTBN[2]));
 #endif
 
 #ifdef HAS_NORMAL_MAP
@@ -96,18 +96,18 @@ float calcVisibilityOcclusion(float alpha2, float dotNL, float dotNV) {
     float GGXL = dotNV * sqrt(dotNL * dotNL * (1.0 - alpha2) + alpha2);
     float GGX = GGXV + GGXL;
     if (GGX > 0.0) {
-        return 0.5 / (GGXV + GGXL);
+        return 0.5 / GGX;
     }
     return 0.0;
 }
 
 float calcMicrofacetDistribution(float alpha2, float dotNH) {
-    float f = dotNH * (dotNH * alpha2 - dotNH) + 1.0;
+    float f = dotNH * dotNH * (alpha2 - 1.0) + 1.0;
     float D = alpha2 / max(pi * f * f, epsilon);
     return D;
 }
 
-vec3 calcPointShade(vec3 pointToLight, AngularInfo angular, MaterialInfo material) {
+vec3 calcPointShade(AngularInfo angular, MaterialInfo material) {
     if (angular.dotNL > 0.0 || angular.dotNV > 0.0) {
         vec3 F = calcFresnelSchlick(material.color, material.metallic, angular.dotVH);
         float V = calcVisibilityOcclusion(material.alpha2, angular.dotNL, angular.dotNV);
@@ -121,8 +121,7 @@ vec3 calcPointShade(vec3 pointToLight, AngularInfo angular, MaterialInfo materia
 }
 
 vec3 applyDirectionalLight(Light light, AngularInfo angular, MaterialInfo material) {
-    vec3 pointToLight = -light.direction;
-    return light.intensity * light.color * calcPointShade(pointToLight, angular, material);
+    return light.intensity * light.color * calcPointShade(angular, material);
 }
 
 vec3 applyLights(vec3 normal, vec3 view, vec3 color, float metallic, float roughness) {
