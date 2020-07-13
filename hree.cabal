@@ -1,10 +1,10 @@
-cabal-version: 1.12
+cabal-version: 2.0
 
 -- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: eaa79ba2a34882f196ae0709da02e0dcbee44786a8e99018e40e8722bec532a6
+-- hash: 8fc7315ed2a34fb7141e75f135e31fca54eb5b921b9ce1e875e2c50d2bf45c11
 
 name:           hree
 version:        0.3.0
@@ -13,7 +13,7 @@ bug-reports:    https://github.com/tkaaad97/hree/issues
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-extra-source-files:
+data-files:
     shader/basic-fragment.glsl
     shader/basic-vertex.glsl
     shader/flat-color-fragment.glsl
@@ -31,6 +31,10 @@ extra-source-files:
 source-repository head
   type: git
   location: https://github.com/tkaaad97/hree
+
+flag embed_shaders
+  manual: False
+  default: True
 
 library
   exposed-modules:
@@ -71,8 +75,6 @@ library
       Graphics.Hree.Skin
       Graphics.Hree.Texture
       Graphics.Hree.Types
-  other-modules:
-      Paths_hree
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -O2
@@ -103,13 +105,19 @@ library
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(embed_shaders)
+    cpp-options: -DEMBED_SHADERS
+  else
+    other-modules:
+        Paths_hree
+    autogen-modules:
+        Paths_hree
   default-language: Haskell2010
 
 executable child-node-1
   main-is: ChildNode1.hs
   other-modules:
       Example
-      ChildNode1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is ChildNode1
@@ -148,7 +156,6 @@ executable flat-color-1
   main-is: FlatColor1.hs
   other-modules:
       Example
-      FlatColor1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is FlatColor1
@@ -187,7 +194,6 @@ executable format-loader-1
   main-is: FormatLoader1.hs
   other-modules:
       Example
-      FormatLoader1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is FormatLoader1
@@ -226,7 +232,6 @@ executable geometry-box-1
   main-is: GeometryBox1.hs
   other-modules:
       Example
-      GeometryBox1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is GeometryBox1
@@ -265,7 +270,6 @@ executable gltf-minimal-1
   main-is: GLTFMinimal1.hs
   other-modules:
       Example
-      GLTFMinimal1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is GLTFMinimal1
@@ -304,7 +308,6 @@ executable node-mesh-animation-1
   main-is: NodeMeshAnimation1.hs
   other-modules:
       Example
-      NodeMeshAnimation1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is NodeMeshAnimation1
@@ -343,7 +346,6 @@ executable skinning-1
   main-is: Skinning1.hs
   other-modules:
       Example
-      Skinning1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Skinning1
@@ -382,7 +384,6 @@ executable sprite-instanced-1
   main-is: SpriteInstanced1.hs
   other-modules:
       Example
-      SpriteInstanced1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is SpriteInstanced1
@@ -421,7 +422,6 @@ executable standard-material-1
   main-is: StandardMaterial1.hs
   other-modules:
       Example
-      StandardMaterial1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is StandardMaterial1
@@ -460,7 +460,6 @@ executable texture-1
   main-is: Texture1.hs
   other-modules:
       Example
-      Texture1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Texture1
@@ -499,7 +498,6 @@ executable tiled-1
   main-is: Tiled1.hs
   other-modules:
       Example
-      Tiled1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Tiled1
@@ -538,7 +536,6 @@ executable transform-rotate-1
   main-is: TransformRotate1.hs
   other-modules:
       Example
-      TransformRotate1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is TransformRotate1
@@ -577,7 +574,6 @@ executable uv-animation-1
   main-is: UvAnimation1.hs
   other-modules:
       Example
-      UvAnimation1
   hs-source-dirs:
       examples
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is UvAnimation1

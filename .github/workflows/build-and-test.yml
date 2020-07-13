@@ -55,3 +55,6 @@ jobs:
 
       - name: run test
         run: LD_PRELOAD=./libglxoverride.so stack test hree:hree-test
+
+      - name: build with no embed_shaders flag
+        run: stack build --flag hree:-embed_shaders --test --no-run-tests

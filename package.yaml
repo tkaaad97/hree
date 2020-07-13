@@ -3,7 +3,12 @@ version:             0.3.0
 github:              "tkaaad97/hree"
 license:             BSD3
 
-extra-source-files:
+flags:
+  embed_shaders:
+    manual: false
+    default: true
+
+data-files:
   - shader/**/*.glsl
 
 ghc-options:
@@ -48,13 +53,18 @@ library:
   ghc-options:
     - -O2
   source-dirs: src
+  when:
+    - condition: flag(embed_shaders)
+      then:
+        cpp-options: -DEMBED_SHADERS
+      else:
+        generated-other-modules: Paths_hree
 
 _exe-common: &exe-common
   source-dirs:
     - examples
   other-modules:
     - Example
-    - FlatColor1
   dependencies:
     - hree
     - GLFW-b
@@ -63,9 +73,6 @@ executables:
   child-node-1:
     <<: *exe-common
     main:                ChildNode1.hs
-    other-modules:
-      - Example
-      - ChildNode1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -76,9 +83,6 @@ executables:
   flat-color-1:
     <<: *exe-common
     main:                FlatColor1.hs
-    other-modules:
-      - Example
-      - FlatColor1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -89,9 +93,6 @@ executables:
   format-loader-1:
     <<: *exe-common
     main:                FormatLoader1.hs
-    other-modules:
-      - Example
-      - FormatLoader1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -102,9 +103,6 @@ executables:
   geometry-box-1:
     <<: *exe-common
     main:                GeometryBox1.hs
-    other-modules:
-      - Example
-      - GeometryBox1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -115,9 +113,6 @@ executables:
   gltf-minimal-1:
     <<: *exe-common
     main:                GLTFMinimal1.hs
-    other-modules:
-      - Example
-      - GLTFMinimal1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -128,9 +123,6 @@ executables:
   node-mesh-animation-1:
     <<: *exe-common
     main:                NodeMeshAnimation1.hs
-    other-modules:
-      - Example
-      - NodeMeshAnimation1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -141,9 +133,6 @@ executables:
   skinning-1:
     <<: *exe-common
     main:                Skinning1.hs
-    other-modules:
-      - Example
-      - Skinning1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -154,9 +143,6 @@ executables:
   sprite-instanced-1:
     <<: *exe-common
     main:                SpriteInstanced1.hs
-    other-modules:
-      - Example
-      - SpriteInstanced1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -167,9 +153,6 @@ executables:
   standard-material-1:
     <<: *exe-common
     main:                StandardMaterial1.hs
-    other-modules:
-      - Example
-      - StandardMaterial1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -180,9 +163,6 @@ executables:
   texture-1:
     <<: *exe-common
     main:                Texture1.hs
-    other-modules:
-      - Example
-      - Texture1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -193,9 +173,6 @@ executables:
   tiled-1:
     <<: *exe-common
     main:                Tiled1.hs
-    other-modules:
-      - Example
-      - Tiled1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -206,9 +183,6 @@ executables:
   transform-rotate-1:
     <<: *exe-common
     main:                TransformRotate1.hs
-    other-modules:
-      - Example
-      - TransformRotate1
     ghc-options:
       - -threaded
       - -rtsopts
@@ -219,9 +193,6 @@ executables:
   uv-animation-1:
     <<: *exe-common
     main:                UvAnimation1.hs
-    other-modules:
-      - Example
-      - UvAnimation1
     ghc-options:
       - -threaded
       - -rtsopts

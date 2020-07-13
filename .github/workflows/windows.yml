@@ -40,3 +40,6 @@ jobs:
 
       - name: build
         run: stack build --no-test
+
+      - name: build with no embed_shaders flag
+        run: stack build --flag hree:-embed_shaders --no-test

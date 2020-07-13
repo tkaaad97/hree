@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Data.FilePreprocess
     ( preprocessFile
+    , preprocessFileIO
     ) where
 
 import Control.Monad (filterM)
@@ -16,14 +17,17 @@ import System.FilePath ((</>))
 
 preprocessFile :: FilePath -> FilePath -> Q Exp
 preprocessFile filepath includeDir = do
-    bs <- runIO $ do
-        content <- ByteString.readFile filepath
-        let xs = ByteString.lines content
-        xs' <- mapM (`preprocessLine` includeDir) xs
-        return $ ByteString.unlines xs'
+    bs <- runIO $ preprocessFileIO filepath includeDir
     qAddDependentFile filepath
     mapM_ qAddDependentFile =<< runIO (filterM doesFileExist =<< listDirectory includeDir)
     Data.FileEmbed.bsToExp bs
+
+preprocessFileIO :: FilePath -> FilePath -> IO ByteString
+preprocessFileIO filepath includeDir = do
+    content <- ByteString.readFile filepath
+    let xs = ByteString.lines content
+    xs' <- mapM (`preprocessLine` includeDir) xs
+    return $ ByteString.unlines xs'
 
 preprocessLine :: ByteString -> FilePath -> IO ByteString
 preprocessLine line includeDir =

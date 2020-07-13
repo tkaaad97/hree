@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
@@ -65,7 +66,11 @@ import qualified Data.ByteString.Char8 as ByteString (pack, packCStringLen,
                                                       useAsCString,
                                                       useAsCStringLen)
 import Data.Coerce (coerce)
+#ifdef EMBED_SHADERS
 import Data.FilePreprocess (preprocessFile)
+#else
+import Data.FilePreprocess (preprocessFileIO)
+#endif
 import Data.Functor.Identity (Identity(..))
 import Data.Hashable (Hashable(..))
 import qualified Data.Map.Strict as Map
@@ -91,6 +96,10 @@ import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.Light (maxLightCount)
+#ifndef EMBED_SHADERS
+import qualified Paths_hree as Paths
+#endif
+import System.FilePath ((</>))
 
 data ProgramOption_ f = ProgramOption
     { programOptionGlslVersion             :: !(f (Maybe Int))
@@ -349,9 +358,9 @@ embeddedProgramBindingPoints _ = mempty
 mkProgram :: ProgramSpec -> ProgramOption -> IO ProgramInfo
 mkProgram (EmbeddedProgram progType) programOption = do
     let header = renderProgramOption programOption
-        vsource = header `mappend` getEmbeddedVertexShaderSource progType
-        fsource = header `mappend` getEmbeddedFragmentShaderSource progType
         bindingPoints = embeddedProgramBindingPoints progType
+    vsource <- mappend header <$> loadEmbeddedVertexShaderSource progType
+    fsource <- mappend header <$> loadEmbeddedFragmentShaderSource progType
     mkProgram' vsource fsource bindingPoints
 mkProgram (UserProgram (ShaderSource _ vsource) (ShaderSource _ fsource) bindingPoints) _ =
     mkProgram' vsource fsource bindingPoints
@@ -383,19 +392,37 @@ mkProgram' vsource fsource bindingPoints = do
 
     return $ ProgramInfo program attribMap uniformMap uniformLocationMap uniformBlockMap bindingPoints
 
-getEmbeddedVertexShaderSource :: EmbeddedProgramType -> ByteString
-getEmbeddedVertexShaderSource BasicProgram = $(preprocessFile "shader/basic-vertex.glsl" "shader/lib")
-getEmbeddedVertexShaderSource FlatColorProgram = $(preprocessFile "shader/flat-color-vertex.glsl" "shader/lib")
-getEmbeddedVertexShaderSource SpriteProgram = $(preprocessFile "shader/sprite-vertex.glsl" "shader/lib")
-getEmbeddedVertexShaderSource StandardProgram = $(preprocessFile "shader/standard-vertex.glsl" "shader/lib")
-getEmbeddedVertexShaderSource TestProgram = $(preprocessFile "shader/test-vertex.glsl" "shader/lib")
+loadEmbeddedVertexShaderSource, loadEmbeddedFragmentShaderSource :: EmbeddedProgramType -> IO ByteString
+#ifdef EMBED_SHADERS
+loadEmbeddedVertexShaderSource BasicProgram = return $(preprocessFile "shader/basic-vertex.glsl" "shader/lib")
+loadEmbeddedVertexShaderSource FlatColorProgram = return $(preprocessFile "shader/flat-color-vertex.glsl" "shader/lib")
+loadEmbeddedVertexShaderSource SpriteProgram = return $(preprocessFile "shader/sprite-vertex.glsl" "shader/lib")
+loadEmbeddedVertexShaderSource StandardProgram = return $(preprocessFile "shader/standard-vertex.glsl" "shader/lib")
+loadEmbeddedVertexShaderSource TestProgram = return $(preprocessFile "shader/test-vertex.glsl" "shader/lib")
 
-getEmbeddedFragmentShaderSource :: EmbeddedProgramType -> ByteString
-getEmbeddedFragmentShaderSource BasicProgram = $(preprocessFile "shader/basic-fragment.glsl" "shader/lib")
-getEmbeddedFragmentShaderSource FlatColorProgram = $(preprocessFile "shader/flat-color-fragment.glsl" "shader/lib")
-getEmbeddedFragmentShaderSource SpriteProgram = $(preprocessFile "shader/sprite-fragment.glsl" "shader/lib")
-getEmbeddedFragmentShaderSource StandardProgram = $(preprocessFile "shader/standard-fragment.glsl" "shader/lib")
-getEmbeddedFragmentShaderSource TestProgram = $(preprocessFile "shader/test-fragment.glsl" "shader/lib")
+loadEmbeddedFragmentShaderSource BasicProgram = return $(preprocessFile "shader/basic-fragment.glsl" "shader/lib")
+loadEmbeddedFragmentShaderSource FlatColorProgram = return $(preprocessFile "shader/flat-color-fragment.glsl" "shader/lib")
+loadEmbeddedFragmentShaderSource SpriteProgram = return $(preprocessFile "shader/sprite-fragment.glsl" "shader/lib")
+loadEmbeddedFragmentShaderSource StandardProgram = return $(preprocessFile "shader/standard-fragment.glsl" "shader/lib")
+loadEmbeddedFragmentShaderSource TestProgram = return $(preprocessFile "shader/test-fragment.glsl" "shader/lib")
+#else
+loadEmbeddedVertexShaderSource programType = loadEmbeddedShaderSource programType "vertex"
+loadEmbeddedFragmentShaderSource programType = loadEmbeddedShaderSource programType "fragment"
+
+loadEmbeddedShaderSource :: EmbeddedProgramType -> String -> IO ByteString
+loadEmbeddedShaderSource programType shaderType = do
+    filepath <- getShaderFileName programType shaderType
+    dataDir <- Paths.getDataDir
+    let includeDir = dataDir </> "shader" </> "lib"
+    preprocessFileIO filepath includeDir
+
+getShaderFileName :: EmbeddedProgramType -> String -> IO FilePath
+getShaderFileName BasicProgram shaderType     = Paths.getDataFileName $ "shader/basic-" ++ shaderType ++ ".glsl"
+getShaderFileName FlatColorProgram shaderType = Paths.getDataFileName $ "shader/flat-color-" ++ shaderType ++ ".glsl"
+getShaderFileName SpriteProgram shaderType    = Paths.getDataFileName $ "shader/sprite-" ++ shaderType ++ ".glsl"
+getShaderFileName StandardProgram shaderType  = Paths.getDataFileName $ "shader/standard-" ++ shaderType ++ ".glsl"
+getShaderFileName TestProgram shaderType      = Paths.getDataFileName $ "shader/test-" ++ shaderType ++ ".glsl"
+#endif
 
 renderProgramOption :: ProgramOption -> ByteString
 renderProgramOption programOption = ByteString.intercalate "\n" . catMaybes $
