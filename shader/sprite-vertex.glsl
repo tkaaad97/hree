@@ -36,6 +36,7 @@ layout(std140) uniform MaterialBlock {
     vec3 sizeFactor;
     bool uvFlippedVertically;
     vec2 uvOffset;
+    vec2 uvSizeFactor;
     TileArray spriteTileArray;
 } materialBlock;
 
@@ -71,6 +72,6 @@ void main()
     vec2 uvoff = vec2(
         flipH ? (1.0 - uvOffset.x) : uvOffset.x,
         flipV ? (1.0 - uvOffset.y) : uvOffset.y);
-    fragmentUv = materialBlock.uvOffset + uv1 + uvoff * uvSize1;
+    fragmentUv = materialBlock.uvOffset + uv1 + uvoff * uvSize1 * materialBlock.uvSizeFactor;
     opacityFactor = materialBlock.opacityFactor;
 }

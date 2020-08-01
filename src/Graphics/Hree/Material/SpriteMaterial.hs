@@ -49,6 +49,7 @@ data SpriteMaterialBlock = SpriteMaterialBlock
     , sizeFactor            :: !(V3 Float)
     , uvFlippedVertically   :: !GL.GLboolean
     , uvOffset              :: !(V2 Float)
+    , uvSizeFactor          :: !(V2 Float)
     , spriteTiles           :: !(LimitedVector MaxSpriteTileCount (Elem SpriteTile))
     } deriving (Show, Eq)
 
@@ -84,18 +85,20 @@ instance Block SpriteMaterialBlock where
         flipH <- peekByteOffStd140 ptr (off + 28)
         size <- peekByteOffStd140 ptr (off + 32)
         flipV <- peekByteOffStd140 ptr (off + 44)
-        uvo <- peekByteOffStd140 ptr (off + 48)
+        uvoff <- peekByteOffStd140 ptr (off + 48)
+        uvsize <- peekByteOffStd140 ptr (off + 56)
         tiles <- peekByteOffStd140 ptr (off + 64)
-        return $ SpriteMaterialBlock axis opacity poff flipH size flipV uvo tiles
+        return $ SpriteMaterialBlock axis opacity poff flipH size flipV uvoff uvsize tiles
 
-    pokeByteOffStd140 ptr off (SpriteMaterialBlock axis opacity poff flipH size flipV uvo tiles) = do
+    pokeByteOffStd140 ptr off (SpriteMaterialBlock axis opacity poff flipH size flipV uvoff uvsize tiles) = do
         pokeByteOffStd140 ptr off axis
         pokeByteOffStd140 ptr (off + 12) opacity
         pokeByteOffStd140 ptr (off + 16) poff
         pokeByteOffStd140 ptr (off + 28) flipH
         pokeByteOffStd140 ptr (off + 32) size
         pokeByteOffStd140 ptr (off + 44) flipV
-        pokeByteOffStd140 ptr (off + 48) uvo
+        pokeByteOffStd140 ptr (off + 48) uvoff
+        pokeByteOffStd140 ptr (off + 56) uvsize
         pokeByteOffStd140 ptr (off + 64) tiles
 
 spriteMaterialBlockByteSize :: Int
@@ -111,7 +114,7 @@ spriteMaterial = Material
     }
     where
     tiles = LimitedVector . SV.singleton . Elem $ SpriteTile GL.GL_FALSE GL.GL_FALSE (V2 0 0) (V2 0 0)
-    block = SpriteMaterialBlock (V3 0 0 1) 1 (V3 0 0 0) GL.GL_FALSE (V3 1 1 1) GL.GL_FALSE (V2 0 0) tiles
+    block = SpriteMaterialBlock (V3 0 0 1) 1 (V3 0 0 0) GL.GL_FALSE (V3 1 1 1) GL.GL_FALSE (V2 0 0) (V2 1 1) tiles
     renderOption = mempty
         & flip setPartialRenderOptionCullFace (Just Nothing)
         & flip setPartialRenderOptionDepth (Just DepthOption
