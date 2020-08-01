@@ -51,6 +51,7 @@ const float pi = 3.141592653589793;
 const float epsilon = 1.19209e-07;
 const vec3 dielectricSpecular = vec3(0.04, 0.04, 0.04);
 const vec3 black = vec3(0.0, 0.0, 0.0);
+const minRoughness = 0.05;
 
 vec3 getNormal() {
     vec2 uv = fragmentUv;
@@ -166,7 +167,7 @@ vec3 toneMapping(vec3 color) {
 
 void main() {
     float metallic = clamp(materialBlock.metallicFactor, 0.0, 1.0);
-    float roughness = clamp(materialBlock.roughnessFactor, 0.0, 1.0);
+    float roughness = clamp(materialBlock.roughnessFactor, minRoughness, 1.0);
     vec3 view = cameraBlock.viewPosition - fragmentPosition;
     vec3 normal = getNormal();
     vec4 color = sRGBToLinear(texture2D(baseColorTexture, fragmentUv)) * materialBlock.baseColorFactor;
@@ -178,7 +179,7 @@ void main() {
 #ifdef HAS_METALLIC_ROUGHNESS_MAP
     vec4 mrSample = texture2D(metallicRoughnessTexture, fragmentUv);
     metallic = mrSample.b * materialBlock.metallicFactor;
-    roughness = mrSample.g * materialBlock.roughnessFactor;
+    roughness = clamp(mrSample.g * materialBlock.roughnessFactor, minRoughness, 1.0);
 #endif
 
     vec3 acc = vec3(0.0, 0.0, 0.0);
