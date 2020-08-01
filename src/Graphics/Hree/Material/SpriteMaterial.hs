@@ -44,9 +44,11 @@ data SpriteTile = SpriteTile
 data SpriteMaterialBlock = SpriteMaterialBlock
     { rotateAxis            :: !(V3 Float)
     , opacityFactor         :: !Float
-    , uvOffset              :: !(V2 Float)
+    , positionOffset        :: !(V3 Float)
     , uvFlippedHorizontally :: !GL.GLboolean
+    , sizeFactor            :: !(V3 Float)
     , uvFlippedVertically   :: !GL.GLboolean
+    , uvOffset              :: !(V2 Float)
     , spriteTiles           :: !(LimitedVector MaxSpriteTileCount (Elem SpriteTile))
     } deriving (Show, Eq)
 
@@ -78,22 +80,26 @@ instance Block SpriteMaterialBlock where
     peekByteOffStd140 ptr off = do
         axis <- peekByteOffStd140 ptr off
         opacity <- peekByteOffStd140 ptr (off + 12)
-        uvo <- peekByteOffStd140 ptr (off + 16)
-        flipH <- peekByteOffStd140 ptr (off + 24)
-        flipV <- peekByteOffStd140 ptr (off + 28)
-        tiles <- peekByteOffStd140 ptr (off + 32)
-        return $ SpriteMaterialBlock axis opacity uvo flipH flipV tiles
+        poff <- peekByteOffStd140 ptr (off + 16)
+        flipH <- peekByteOffStd140 ptr (off + 28)
+        size <- peekByteOffStd140 ptr (off + 32)
+        flipV <- peekByteOffStd140 ptr (off + 44)
+        uvo <- peekByteOffStd140 ptr (off + 48)
+        tiles <- peekByteOffStd140 ptr (off + 64)
+        return $ SpriteMaterialBlock axis opacity poff flipH size flipV uvo tiles
 
-    pokeByteOffStd140 ptr off (SpriteMaterialBlock axis opacity uvo flipH flipV tiles) = do
+    pokeByteOffStd140 ptr off (SpriteMaterialBlock axis opacity poff flipH size flipV uvo tiles) = do
         pokeByteOffStd140 ptr off axis
         pokeByteOffStd140 ptr (off + 12) opacity
-        pokeByteOffStd140 ptr (off + 16) uvo
-        pokeByteOffStd140 ptr (off + 24) flipH
-        pokeByteOffStd140 ptr (off + 28) flipV
-        pokeByteOffStd140 ptr (off + 32) tiles
+        pokeByteOffStd140 ptr (off + 16) poff
+        pokeByteOffStd140 ptr (off + 28) flipH
+        pokeByteOffStd140 ptr (off + 32) size
+        pokeByteOffStd140 ptr (off + 44) flipV
+        pokeByteOffStd140 ptr (off + 48) uvo
+        pokeByteOffStd140 ptr (off + 64) tiles
 
 spriteMaterialBlockByteSize :: Int
-spriteMaterialBlockByteSize = 32 + sizeOfStd140 (Proxy :: Proxy (LimitedVector MaxSpriteTileCount (Elem SpriteTile)))
+spriteMaterialBlockByteSize = 64 + sizeOfStd140 (Proxy :: Proxy (LimitedVector MaxSpriteTileCount (Elem SpriteTile)))
 
 spriteMaterial :: Material SpriteMaterialBlock
 spriteMaterial = Material
@@ -105,7 +111,7 @@ spriteMaterial = Material
     }
     where
     tiles = LimitedVector . SV.singleton . Elem $ SpriteTile GL.GL_FALSE GL.GL_FALSE (V2 0 0) (V2 0 0)
-    block = SpriteMaterialBlock (V3 0 0 1) 1 (V2 0 0) GL.GL_FALSE GL.GL_FALSE tiles
+    block = SpriteMaterialBlock (V3 0 0 1) 1 (V3 0 0 0) GL.GL_FALSE (V3 1 1 1) GL.GL_FALSE (V2 0 0) tiles
     renderOption = mempty
         & flip setPartialRenderOptionCullFace (Just Nothing)
         & flip setPartialRenderOptionDepth (Just DepthOption

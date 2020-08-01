@@ -31,9 +31,11 @@ struct TileArray {
 layout(std140) uniform MaterialBlock {
     vec3 rotateAxis;
     float opacityFactor;
-    vec2 uvOffset;
+    vec3 positionOffset;
     bool uvFlippedHorizontally;
+    vec3 sizeFactor;
     bool uvFlippedVertically;
+    vec2 uvOffset;
     TileArray spriteTileArray;
 } materialBlock;
 
@@ -57,7 +59,9 @@ mat3 rotateMatrix(vec3 axis, float angle)
 
 void main()
 {
-    vec3 offset = position + center + rotateMatrix(materialBlock.rotateAxis, angle) * vec3(size.x * positionOffset.x - center.x, size.y * positionOffset.y - center.y, size.z * positionOffset.z - center.z);
+    vec3 offset = position + materialBlock.positionOffset
+        + center
+        + rotateMatrix(materialBlock.rotateAxis, angle) * (size * positionOffset * materialBlock.sizeFactor - center);
     gl_Position = cameraBlock.projectionMatrix * cameraBlock.viewMatrix * modelMatrix * vec4(offset, 1.0);
 
     bool flipH = (useTile > 0) ? materialBlock.spriteTileArray.items[tileIndex].uvFlippedHorizontally : materialBlock.uvFlippedHorizontally;
