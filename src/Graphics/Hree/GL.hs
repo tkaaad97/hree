@@ -35,7 +35,7 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Proxy (Proxy(..), asProxyTypeOf)
+import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV (Vector, length, map, mapMaybe, toList)
 import qualified Data.Vector.Storable as SV
 import qualified Foreign (Storable(..), alloca, allocaArray, castPtr, withArray)

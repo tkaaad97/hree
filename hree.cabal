@@ -1,16 +1,16 @@
-cabal-version: 2.0
+cabal-version: 2.2
 
 -- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6dc2dcc960718b8b8902f3c68d804a23bf716d3b9409fc154d79611352539193
+-- hash: b8495468f76a93da24787df7d720e32af1c967071438a17acabaf43d83ddbd99
 
 name:           hree
 version:        0.6.0
 homepage:       https://github.com/tkaaad97/hree#readme
 bug-reports:    https://github.com/tkaaad97/hree/issues
-license:        BSD3
+license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
 data-files:
@@ -36,6 +36,10 @@ flag embed_shaders
   manual: False
   default: True
 
+flag enable_draco
+  manual: False
+  default: False
+
 flag examples
   manual: True
   default: False
@@ -45,6 +49,7 @@ library
       Data.Component
       Data.FilePreprocess
       Graphics.Format.GLTF
+      Graphics.Format.GLTF.Draco
       Graphics.Format.PLY
       Graphics.Format.STL
       Graphics.Format.Tiled
@@ -116,6 +121,14 @@ library
         Paths_hree
     autogen-modules:
         Paths_hree
+  if flag(enable_draco)
+    cpp-options: -DENABLE_DRACO
+    cxx-options: -std=c++11
+    cxx-sources:
+        cbits/draco.cc
+    extra-libraries:
+        draco
+        stdc++
   default-language: Haskell2010
 
 executable child-node-1

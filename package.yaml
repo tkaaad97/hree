@@ -10,6 +10,9 @@ flags:
   embed_shaders:
     manual: false
     default: true
+  enable_draco:
+    manual: false
+    default: false
 
 data-files:
   - shader/**/*.glsl
@@ -62,6 +65,15 @@ library:
         cpp-options: -DEMBED_SHADERS
       else:
         generated-other-modules: Paths_hree
+    - condition: flag(enable_draco)
+      cxx-sources:
+        - cbits/draco.cc
+      cxx-options:
+        - -std=c++11
+      extra-libraries:
+        - draco
+        - stdc++
+      cpp-options: -DENABLE_DRACO
 
 _exe-common: &exe-common
   when:
