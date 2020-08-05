@@ -51,7 +51,7 @@ const float pi = 3.141592653589793;
 const float epsilon = 1.19209e-07;
 const vec3 dielectricSpecular = vec3(0.04, 0.04, 0.04);
 const vec3 black = vec3(0.0, 0.0, 0.0);
-const minRoughness = 0.05;
+const float minRoughness = 0.05;
 
 vec3 getNormal() {
     vec2 uv = fragmentUv;
