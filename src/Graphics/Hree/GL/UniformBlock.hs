@@ -28,7 +28,7 @@ newUniformBlockBinder :: (Block a) => GLW.Buffer -> a -> IO (UniformBlockBinder 
 newUniformBlockBinder buffer a = do
     ptr <- Foreign.mallocForeignPtr
     Foreign.withForeignPtr ptr (`Foreign.poke` Std140 a)
-    Foreign.withForeignPtr ptr $ \p -> updateBuffer buffer (BufferSourcePtr p GL.GL_DYNAMIC_DRAW)
+    Foreign.withForeignPtr ptr $ \p -> updateBuffer buffer (BufferSourcePtr (Foreign.castPtr p) (Foreign.sizeOf (Std140 a)) GL.GL_DYNAMIC_DRAW)
     return $ UniformBlockBinder buffer ptr
 
 updateUniformBlock :: (Eq a, Block a) => UniformBlockBinder a -> a -> IO ()

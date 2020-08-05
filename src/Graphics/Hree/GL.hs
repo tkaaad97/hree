@@ -348,10 +348,9 @@ setColorMask (Just beforeOption) option @ (V4 red green blue alpha)
     | otherwise = GL.glColorMask red green blue alpha
 
 createBuffer :: BufferSource -> IO GLW.Buffer
-createBuffer (BufferSourcePtr ptr usage) = do
-    let size = fromIntegral $ Foreign.sizeOf (asProxyTypeOf undefined ptr)
+createBuffer (BufferSourcePtr ptr len usage) = do
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
-    GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
+    GLW.glNamedBufferData buffer (fromIntegral len) ptr usage
     return buffer
 createBuffer (BufferSourceVector vec usage) = do
     let n = SV.length vec
@@ -366,9 +365,8 @@ createBuffer (BufferSourceByteString bs usage) = do
     return buffer
 
 updateBuffer :: GLW.Buffer -> BufferSource -> IO ()
-updateBuffer buffer (BufferSourcePtr ptr usage) = do
-    let size = fromIntegral . Foreign.sizeOf $ asProxyTypeOf undefined ptr
-    GLW.glNamedBufferData buffer size (Foreign.castPtr ptr) usage
+updateBuffer buffer (BufferSourcePtr ptr len usage) = do
+    GLW.glNamedBufferData buffer (fromIntegral len) ptr usage
 updateBuffer buffer (BufferSourceVector vec usage) = do
     let n = SV.length vec
         size = fromIntegral $ n * Foreign.sizeOf (SV.head vec)

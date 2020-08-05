@@ -294,7 +294,7 @@ data DrawMethod =
     deriving (Show, Eq)
 
 data BufferSource =
-    forall a. Storable a => BufferSourcePtr !(Ptr a) !GL.GLenum |
+    BufferSourcePtr !(Ptr ()) !Int !GL.GLenum |
     forall a. Storable a => BufferSourceVector !(SV.Vector a) !GL.GLenum |
     BufferSourceByteString !ByteString !GL.GLenum
 
