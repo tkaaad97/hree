@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3db3a3ff78fb9a762e510b8f09fd41d2c7c607983975145a637c3882d0259041
+-- hash: 19556924814a73a77742efe0a29e45beea9698db98bb6c786af39a8b4584c142
 
 name:           hree
 version:        0.5.0
@@ -35,6 +35,10 @@ source-repository head
 flag embed_shaders
   manual: False
   default: True
+
+flag examples
+  manual: True
+  default: False
 
 library
   exposed-modules:
@@ -117,13 +121,10 @@ library
 executable child-node-1
   main-is: ChildNode1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is ChildNode1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -140,7 +141,6 @@ executable child-node-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -150,18 +150,25 @@ executable child-node-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable flat-color-1
   main-is: FlatColor1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is FlatColor1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -178,7 +185,6 @@ executable flat-color-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -188,18 +194,25 @@ executable flat-color-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable format-loader-1
   main-is: FormatLoader1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is FormatLoader1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -216,7 +229,6 @@ executable format-loader-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -226,18 +238,25 @@ executable format-loader-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable geometry-box-1
   main-is: GeometryBox1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is GeometryBox1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -254,7 +273,6 @@ executable geometry-box-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -264,18 +282,25 @@ executable geometry-box-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable gltf-minimal-1
   main-is: GLTFMinimal1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is GLTFMinimal1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -292,7 +317,6 @@ executable gltf-minimal-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -302,18 +326,25 @@ executable gltf-minimal-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable node-mesh-animation-1
   main-is: NodeMeshAnimation1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is NodeMeshAnimation1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -330,7 +361,6 @@ executable node-mesh-animation-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -340,18 +370,25 @@ executable node-mesh-animation-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable skinning-1
   main-is: Skinning1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Skinning1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -368,7 +405,6 @@ executable skinning-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -378,18 +414,25 @@ executable skinning-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable sprite-instanced-1
   main-is: SpriteInstanced1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is SpriteInstanced1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -406,7 +449,6 @@ executable sprite-instanced-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -416,18 +458,25 @@ executable sprite-instanced-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable standard-material-1
   main-is: StandardMaterial1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is StandardMaterial1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -444,7 +493,6 @@ executable standard-material-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -454,18 +502,25 @@ executable standard-material-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable texture-1
   main-is: Texture1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Texture1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -482,7 +537,6 @@ executable texture-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -492,18 +546,25 @@ executable texture-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable tiled-1
   main-is: Tiled1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Tiled1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -520,7 +581,6 @@ executable tiled-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -530,18 +590,25 @@ executable tiled-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable transform-rotate-1
   main-is: TransformRotate1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is TransformRotate1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -558,7 +625,6 @@ executable transform-rotate-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -568,18 +634,25 @@ executable transform-rotate-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable uv-animation-1
   main-is: UvAnimation1.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is UvAnimation1
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -596,7 +669,6 @@ executable uv-animation-1
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -606,18 +678,25 @@ executable uv-animation-1
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable uv-animation-2
   main-is: UvAnimation2.hs
   other-modules:
-      Example
-  hs-source-dirs:
-      examples
+      Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is UvAnimation2
   build-depends:
-      GLFW-b
-    , JuicyPixels >=3.2.9.5 && <3.4
+      JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
     , atomic-primops >=0.8 && <0.9
     , attoparsec >=0.13.2.2 && <0.14
@@ -634,7 +713,6 @@ executable uv-animation-2
     , gl-wrapper >=0.9 && <0.10
     , hashable >=1.2.7.0 && <1.4
     , hashtables >=1.2.2.0 && <1.3
-    , hree
     , linear >=1.10.1.2 && <1.22
     , mwc-random >=0.11 && <0.15
     , template-haskell >=2.7 && <3.0
@@ -644,6 +722,16 @@ executable uv-animation-2
     , vector >=0.12.0.1 && <0.13
     , vector-algorithms >=0.7.0.1 && <0.9
     , zlib >=0.5.3.1 && <0.7
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
   default-language: Haskell2010
 
 test-suite hree-test

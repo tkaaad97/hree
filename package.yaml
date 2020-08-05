@@ -4,6 +4,9 @@ github:              "tkaaad97/hree"
 license:             BSD3
 
 flags:
+  examples:
+    manual: true
+    default: false
   embed_shaders:
     manual: false
     default: true
@@ -61,13 +64,18 @@ library:
         generated-other-modules: Paths_hree
 
 _exe-common: &exe-common
-  source-dirs:
-    - examples
-  other-modules:
-    - Example
-  dependencies:
-    - hree
-    - GLFW-b
+  when:
+    - condition: flag(examples)
+      then:
+        source-dirs:
+          - examples
+        other-modules:
+          - Example
+        dependencies:
+          - hree
+          - GLFW-b
+      else:
+        buildable: false
 
 executables:
   child-node-1:

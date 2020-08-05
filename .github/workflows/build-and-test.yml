@@ -48,7 +48,7 @@ jobs:
           echo 'allow-different-user: true' >> ~/.stack/config.yaml
 
       - name: build
-        run: stack build --test --no-run-tests
+        run: stack build --flag hree:examples --test --no-run-tests
 
       - name: build libglxoverride.so
         run: gcc -shared -fPIC cbits/glxoverride.c -o libglxoverride.so
@@ -57,4 +57,4 @@ jobs:
         run: LD_PRELOAD=./libglxoverride.so stack test hree:hree-test
 
       - name: build with no embed_shaders flag
-        run: stack build --flag hree:-embed_shaders --test --no-run-tests
+        run: stack build --flag hree:examples --flag hree:-embed_shaders --test --no-run-tests
