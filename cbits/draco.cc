@@ -54,14 +54,6 @@ const draco::Status* draco_decodeBufferToMesh(Decoder* decoder, draco::DecoderBu
     return decoder->DecodeBufferToMesh(in_buffer, out_mesh);
 }
 
-long draco_getAttributeIdByName(const draco::PointCloud* pc, const char* attribute_name) {
-    return Decoder::GetAttributeIdByName(*pc, attribute_name);
-}
-
-const draco::PointAttribute* draco_getAttribute(const draco::PointCloud* pc, long att_id) {
-    return Decoder::GetAttribute(*pc, att_id);
-}
-
 const draco::PointAttribute* draco_getAttributeByUniqueId(const draco::PointCloud* pc, long unique_id) {
     return Decoder::GetAttributeByUniqueId(*pc, unique_id);
 }

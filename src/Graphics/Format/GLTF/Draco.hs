@@ -36,8 +36,6 @@ module Graphics.Format.GLTF.Draco
     , errorMsg
     ) where
 
-import Data.Int (Int8, Int16, Int32)
-import Data.Word (Word8, Word16, Word32)
 import Foreign (Ptr)
 import Foreign.C (CChar(..), CInt(..), CLong(..), CSize(..), CString)
 
@@ -89,9 +87,6 @@ foreign import ccall "draco_decodeBufferToPointCloud" decodeBufferToPointCloud
 
 foreign import ccall "draco_decodeBufferToMesh" decodeBufferToMesh
     :: Ptr Decoder -> Ptr DecoderBuffer -> Ptr Mesh -> IO (Ptr Status)
-
-foreign import ccall "draco_getAttribute" getAttribute
-    :: Ptr PointCloud -> CLong -> IO (Ptr PointAttribute)
 
 foreign import ccall "draco_getAttributeByUniqueId" getAttributeByUniqueId
     :: Ptr PointCloud -> CLong -> IO (Ptr PointAttribute)
