@@ -62,6 +62,10 @@ const draco::PointAttribute* draco_getAttribute(const draco::PointCloud* pc, lon
     return Decoder::GetAttribute(*pc, att_id);
 }
 
+const draco::PointAttribute* draco_getAttributeByUniqueId(const draco::PointCloud* pc, long unique_id) {
+    return Decoder::GetAttributeByUniqueId(*pc, unique_id);
+}
+
 bool draco_getAttributeFloatArrayForAllPoints(
     const draco::PointCloud* pc,
     const draco::PointAttribute* pa,

@@ -40,7 +40,7 @@ module Graphics.Format.GLTF
 
 import qualified Codec.Picture as Picture
 import Control.Exception (bracket, throwIO)
-import Control.Monad (unless, void, foldM)
+import Control.Monad (foldM, unless, void)
 import qualified Data.Aeson as Aeson (FromJSON(..), Object, Value,
                                       eitherDecodeStrict', withObject, withText,
                                       (.!=), (.:), (.:?))
@@ -50,14 +50,16 @@ import qualified Data.ByteString as ByteString (drop, isPrefixOf, readFile,
                                                 stripPrefix, take)
 import qualified Data.ByteString.Base64 as Base64 (decode)
 import qualified Data.ByteString.Char8 as ByteString (break, dropWhile, unpack,
-                                                      useAsCString)
+                                                      useAsCString,
+                                                      useAsCStringLen)
 import Data.Function ((&))
 import qualified Data.HashMap.Strict as HM (lookup)
 import Data.Int (Int16, Int8)
 import qualified Data.IntSet as IntSet (empty, fromList, isSubsetOf, member,
                                         union)
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map (elems, lookup, singleton, toList, traverseWithKey)
+import qualified Data.Map.Strict as Map (elems, lookup, singleton, toList,
+                                         traverseWithKey)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
@@ -72,7 +74,7 @@ import qualified Data.Vector.Unboxed as UV (Vector, generateM, length, map,
                                             unsafeFreeze, (!))
 import qualified Data.Vector.Unboxed.Mutable as MUV (read, replicate, write)
 import Data.Word (Word16, Word32, Word8)
-import qualified Foreign (Ptr, Storable(..), castPtr, peekByteOff, allocaBytes)
+import qualified Foreign (Ptr, Storable(..), allocaBytes, castPtr, peekByteOff)
 import qualified Foreign.C.String as Foreign (peekCString)
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
@@ -1354,9 +1356,9 @@ parseMaybeDracoExtension extensions =
 createGeometryDraco :: Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Map Text Int -> DracoExtension -> IO Hree.Geometry
 createGeometryDraco scene bufferSources bufferViews accessors attributes extension = do
     attrs <- getAttributeInfo
-    withDecoder $ \decoder ->
+    withDecoder $ \decoder -> do
         withDecoderBuffer $ \decoderBuffer -> do
-            gtype <- Draco.getEncodedGeometryType decoderBuffer
+            gtype <- Draco.getEncodedGeometryType decoder decoderBuffer
             case gtype of
                 n | n == Draco.encodedGeometryTypePointCloud ->
                     withPointCloud $ \pc -> do
@@ -1383,7 +1385,7 @@ createGeometryDraco scene bufferSources bufferViews accessors attributes extensi
         bracket Draco.newDecoder Draco.deleteDecoder
 
     withDecoderBuffer go = withInputBuffer $ \(p, len) ->
-        bracket (Draco.newDecoderBuffer (Foreign.castPtr p) (fromIntegral len)) Draco.deleteDecoderBuffer go
+        bracket (Draco.newDecoderBuffer p (fromIntegral len)) Draco.deleteDecoderBuffer go
 
     withPointCloud =
         bracket Draco.newPointCloud Draco.deletePointCloud
@@ -1397,7 +1399,7 @@ createGeometryDraco scene bufferSources bufferViews accessors attributes extensi
             byteOffset = bufferViewByteOffset view
             byteLen = bufferViewByteLength view
             slice = ByteString.take byteLen . ByteString.drop byteOffset $ buffer
-        ByteString.useAsCString slice $ \ptr -> f (ptr, byteLen)
+        ByteString.useAsCStringLen slice f
 
     getAttributeInfo :: IO [(Text, Accessor, Int)]
     getAttributeInfo =
@@ -1419,7 +1421,7 @@ createGeometryDraco scene bufferSources bufferViews accessors attributes extensi
     createAttributeDataBuffer pc accessor attrIndex = do
         let stride = accessorByteStride accessor
             byteSize = accessorCount accessor * stride
-        attr <- Draco.getAttribute pc (fromIntegral attrIndex)
+        attr <- Draco.getAttributeByUniqueId pc (fromIntegral attrIndex)
         Foreign.allocaBytes byteSize $ \ptr -> do
             getAttributeDataArray pc attr (accessorComponentType accessor) (fromIntegral byteSize) ptr
             Hree.addBuffer scene (Hree.BufferSourcePtr ptr byteSize GL.GL_STATIC_READ)

@@ -22,7 +22,7 @@ module Graphics.Format.GLTF.Draco
     , castMeshToPointCloud
     , decodeBufferToPointCloud
     , decodeBufferToMesh
-    , getAttribute
+    , getAttributeByUniqueId
     , getAttributeFloatArrayForAllPoints
     , getAttributeInt8ArrayForAllPoints
     , getAttributeUInt8ArrayForAllPoints
@@ -82,7 +82,7 @@ foreign import ccall "draco_castMeshToPointCloud" castMeshToPointCloud
     :: Ptr Mesh -> IO (Ptr PointCloud)
 
 foreign import ccall "draco_getEncodedGeometryType" getEncodedGeometryType
-    :: Ptr DecoderBuffer -> IO CInt
+    :: Ptr Decoder -> Ptr DecoderBuffer -> IO CInt
 
 foreign import ccall "draco_decodeBufferToPointCloud" decodeBufferToPointCloud
     :: Ptr Decoder -> Ptr DecoderBuffer -> Ptr PointCloud -> IO (Ptr Status)
@@ -91,6 +91,9 @@ foreign import ccall "draco_decodeBufferToMesh" decodeBufferToMesh
     :: Ptr Decoder -> Ptr DecoderBuffer -> Ptr Mesh -> IO (Ptr Status)
 
 foreign import ccall "draco_getAttribute" getAttribute
+    :: Ptr PointCloud -> CLong -> IO (Ptr PointAttribute)
+
+foreign import ccall "draco_getAttributeByUniqueId" getAttributeByUniqueId
     :: Ptr PointCloud -> CLong -> IO (Ptr PointAttribute)
 
 foreign import ccall "draco_getAttributeFloatArrayForAllPoints" getAttributeFloatArrayForAllPoints
