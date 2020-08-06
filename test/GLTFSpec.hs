@@ -45,6 +45,8 @@ spec = do
                                     , GLTF.primitiveIndices = Just 0
                                     , GLTF.primitiveMaterial = Nothing
                                     , GLTF.primitiveMode = Nothing
+                                    , GLTF.primitiveExtensions = Nothing
+                                    , GLTF.primitiveExtras = Nothing
                                     }
                                 ]
                             , GLTF.meshName = Nothing
@@ -76,7 +78,7 @@ spec = do
                         ]
                     , GLTF.gltfAccessors = BV.fromList
                         [ GLTF.Accessor
-                            { GLTF.accessorBufferView = 0
+                            { GLTF.accessorBufferView = Just 0
                             , GLTF.accessorByteOffset = 0
                             , GLTF.accessorComponentType = GLTF.UnsignedShort'
                             , GLTF.accessorCount = 3
@@ -85,7 +87,7 @@ spec = do
                             , GLTF.accessorName = Nothing
                             }
                         , GLTF.Accessor
-                            { GLTF.accessorBufferView = 1
+                            { GLTF.accessorBufferView = Just 1
                             , GLTF.accessorByteOffset = 0
                             , GLTF.accessorComponentType = GLTF.Float'
                             , GLTF.accessorCount = 3
