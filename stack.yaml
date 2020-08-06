@@ -1,7 +1,0 @@
-resolver: lts-14.27
-packages:
-  - .
-extra-deps:
-  - chronos-1.1.1
-  - git: https://github.com/tkaaad97/gl-wrapper
-    commit: 603cbd23e465e80e596890f1a450c1392171f18f
