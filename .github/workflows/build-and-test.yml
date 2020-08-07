@@ -47,8 +47,16 @@ jobs:
           echo 'install-ghc: false' >> ~/.stack/config.yaml
           echo 'allow-different-user: true' >> ~/.stack/config.yaml
 
+      - name: download and extract draco soruce
+        run: |
+          wget -O draco-1.3.6.zip https://github.com/google/draco/archive/1.3.6.zip
+          unzip draco-1.3.6.zip && mv draco-1.3.6 draco
+
+      - name: build draco
+        run: ./scripts/build-draco.sh draco
+
       - name: build
-        run: stack build --flag hree:examples --test --no-run-tests
+        run: stack build --extra-include-dirs=./draco/src:./draco/build --extra-lib-dirs=./draco/build --flag hree:enable_draco --flag hree:examples --test --no-run-tests
 
       - name: build libglxoverride.so
         run: gcc -shared -fPIC cbits/glxoverride.c -o libglxoverride.so
@@ -57,4 +65,4 @@ jobs:
         run: LD_PRELOAD=./libglxoverride.so stack test hree:hree-test
 
       - name: build with no embed_shaders flag
-        run: stack build --flag hree:examples --flag hree:-embed_shaders --test --no-run-tests
+        run: stack build --extra-include-dirs=./draco/src:./draco/build --extra-lib-dirs=./draco/build --flag hree:enable_draco --flag hree:examples --flag hree:-embed_shaders --test --no-run-tests
