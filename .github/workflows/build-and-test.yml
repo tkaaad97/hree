@@ -49,7 +49,7 @@ jobs:
           echo 'allow-different-user: true' >> ~/.stack/config.yaml
 
       - name: build draco
-        run: stack exec ./scripts/build-draco.sh -- third_party/draco
+        run: ./scripts/build-draco.sh third_party/draco
 
       - name: build
         run: stack build --extra-include-dirs=./third_party/draco/src:./third_party/draco/build --extra-lib-dirs=./third_party/draco/build --flag hree:enable_draco --flag hree:examples --test --no-run-tests
