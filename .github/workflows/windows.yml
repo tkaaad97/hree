@@ -29,7 +29,6 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          submodules: true
 
       - name: cache ${{ env.STACK_ROOT }}
         uses: actions/cache@v2
