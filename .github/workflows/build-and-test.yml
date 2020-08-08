@@ -62,7 +62,7 @@ jobs:
         run: gcc -shared -fPIC cbits/glxoverride.c -o libglxoverride.so
 
       - name: run test
-        run: LD_PRELOAD=./libglxoverride.so stack test hree:hree-test
+        run: LD_PRELOAD=./libglxoverride.so stack test --extra-include-dirs=./draco/src:./draco/build --extra-lib-dirs=./draco/build --flag hree:enable_draco --flag hree:examples hree:hree-test
 
       - name: build with no embed_shaders flag
         run: stack build --extra-include-dirs=./draco/src:./draco/build --extra-lib-dirs=./draco/build --flag hree:enable_draco --flag hree:examples --flag hree:-embed_shaders --test --no-run-tests
