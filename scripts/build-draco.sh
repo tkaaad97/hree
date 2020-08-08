@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eu
+set -eux
 
 draco_dir="$1"
 build_dir="${draco_dir}/build"
