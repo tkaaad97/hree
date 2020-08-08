@@ -29,7 +29,6 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          submodules: true
 
       - name: cache ${{ env.STACK_ROOT }}
         uses: actions/cache@v2
@@ -39,8 +38,10 @@ jobs:
           restore-keys: |
             windows-ghc-${{ matrix.ghc }}-stack-
 
-      - name: build draco
-        run: stack exec -- bash ./scripts/build-draco.sh third_party/draco
-
       - name: build
-        run: stack build --extra-include-dirs=./third_party/draco/src:./third_party/draco/build --extra-lib-dirs=./third_party/draco/build --flag hree:enable_draco --flag hree:examples --no-test
+        shell: bash
+        run: stack build --flag hree:examples --no-test
+
+      - name: build with no embed_shaders flag
+        shell: bash
+        run: stack build --flag hree:examples --flag hree:-embed_shaders --no-test
