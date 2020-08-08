@@ -40,10 +40,13 @@ jobs:
             windows-ghc-${{ matrix.ghc }}-stack-
 
       - name: build draco
+        shell: bash
         run: ./scripts/build-draco.sh third_party/draco
 
       - name: build
+        shell: bash
         run: stack build --extra-include-dirs=./third_party/draco/src:./third_party/draco/build --extra-lib-dirs=./third_party/draco/build --flag hree:enable_draco --flag hree:examples --no-test
 
       - name: build with no embed_shaders flag
+        shell: bash
         run: stack build --extra-include-dirs=./third_party/draco/src:./third_party/draco/build --extra-lib-dirs=./third_party/draco/build --flag hree:enable_draco --flag hree:examples --flag hree:-embed_shaders --no-test
