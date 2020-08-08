@@ -40,7 +40,7 @@ jobs:
 
       - name: build
         shell: bash
-        run: stack build --flag hree:enable_draco --flag hree:examples --no-test
+        run: stack build --flag hree:examples --no-test
 
       - name: build with no embed_shaders flag
         shell: bash
