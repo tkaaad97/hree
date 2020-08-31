@@ -25,12 +25,12 @@ import Prelude hiding (init)
 
 data Sprite = Sprite
     { spriteIndex :: !Int
-    , spriteX :: !Int
-    , spriteY :: !Int
-    , spriteW :: !Int
-    , spriteH :: !Int
-    , spriteOX :: !Int
-    , spriteOY :: !Int
+    , spriteX     :: !Int
+    , spriteY     :: !Int
+    , spriteW     :: !Int
+    , spriteH     :: !Int
+    , spriteOX    :: !Int
+    , spriteOY    :: !Int
     } deriving (Show, Eq)
 $(DA.deriveJSON (DA.defaultOptions { DA.fieldLabelModifier = map toLower . drop 6 }) ''Sprite)
 
@@ -126,14 +126,14 @@ main =
         in animation
 
     toFrameData sp =
-        let uvx = (fromIntegral (spriteX sp) + 0.5) / twidth'
-            uvy = (fromIntegral (spriteY sp + spriteH sp) - 0.5) / theight'
-            uvw = (fromIntegral (spriteW sp) - 1) / twidth'
-            uvh = - (fromIntegral (spriteH sp) - 1) / theight'
-            px = 10.0 * fromIntegral (spriteOX sp - 64) / twidth'
-            py = 10.0 * fromIntegral (spriteOY sp - 128) / theight'
-            sx = 10.0 * fromIntegral (spriteW sp) / twidth'
-            sy = 10.0 * fromIntegral (spriteH sp) / theight'
+        let uvx = fromIntegral (spriteX sp) / twidth'
+            uvy = fromIntegral (spriteY sp + spriteH sp) / theight'
+            uvw = fromIntegral (spriteW sp) / twidth'
+            uvh = - (fromIntegral (spriteH sp)) / theight'
+            px = 0.02 * fromIntegral (spriteOX sp - 64)
+            py = 0.02 * fromIntegral (spriteOY sp - 64)
+            sx = 0.02 * fromIntegral (spriteW sp)
+            sy = 0.02 * fromIntegral (spriteH sp)
         in FrameData
             { frameDataPositionOffset = V3 px py 0
             , frameDataSizeFactor = V3 sx sy 1
