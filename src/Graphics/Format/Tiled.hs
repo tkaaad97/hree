@@ -441,8 +441,8 @@ uvBoundingRect tilesetInfo gid =
         let (iy, ix) = divMod lid columns
             px = margin + ix * (tileWidth + spacing)
             py = margin + iy * (tileHeight + spacing) + tileHeight
-            x = (fromIntegral px) / fromIntegral uvWidth
-            y = (fromIntegral py) / fromIntegral uvHeight
+            x = fromIntegral px / fromIntegral uvWidth
+            y = fromIntegral py / fromIntegral uvHeight
             w = fromIntegral tileWidth / fromIntegral uvWidth
             h = - (fromIntegral tileHeight) / fromIntegral uvHeight
         in Rect (V2 x y) (V2 w h)

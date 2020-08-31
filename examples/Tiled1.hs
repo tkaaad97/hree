@@ -22,11 +22,11 @@ main = do
     withWindow width height "tiled-1" (init path) onDisplay
 
     where
-    width  = 640
-    height = 480
+    width  = 800
+    height = 600
     defaultAspect = fromIntegral width / fromIntegral height
 
-    proj = Hree.perspective 90 defaultAspect 0.1 10000.0
+    proj = Hree.perspective 90 defaultAspect 0.01 10000.0
 
     la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
