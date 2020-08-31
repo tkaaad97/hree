@@ -279,8 +279,8 @@ loadLayer scene cd config map _ _ layerIndex (LayerImageLayer (ImageLayer _ imag
         z = tiledConfigStartZ config + tiledConfigLayerDeltaZ config * fromIntegral layerIndex
         width = fromIntegral iwidth / fromIntegral unit
         height = fromIntegral iheight / fromIntegral unit
-        uv = V2 (0.5 / fromIntegral twidth) ((fromIntegral iheight - 0.5) / fromIntegral theight)
-        uvSize = V2 ((fromIntegral iwidth - 1) / fromIntegral twidth) (- (fromIntegral iheight - 1) / fromIntegral theight)
+        uv = V2 0 (fromIntegral iheight / fromIntegral theight)
+        uvSize = V2 (fromIntegral iwidth / fromIntegral twidth) (- (fromIntegral iheight) / fromIntegral theight)
         vertex = Hree.SpriteVertex (V3 x y z) (V3 width height 0) (V3 0 0 0) 0 uv uvSize 0 0
     (geo, _) <- Hree.newSpriteGeometry scene
     geometry <- Hree.addVerticesToGeometry geo (SV.singleton vertex) GL.GL_STATIC_READ scene
@@ -441,10 +441,10 @@ uvBoundingRect tilesetInfo gid =
         let (iy, ix) = divMod lid columns
             px = margin + ix * (tileWidth + spacing)
             py = margin + iy * (tileHeight + spacing) + tileHeight
-            x = (0.5 + fromIntegral px) / fromIntegral uvWidth
-            y = (- 0.5 + fromIntegral py) / fromIntegral uvHeight
-            w = (fromIntegral tileWidth - 1.0) / fromIntegral uvWidth
-            h = - (fromIntegral tileHeight - 1.0) / fromIntegral uvHeight
+            x = (fromIntegral px) / fromIntegral uvWidth
+            y = (fromIntegral py) / fromIntegral uvHeight
+            w = fromIntegral tileWidth / fromIntegral uvWidth
+            h = - (fromIntegral tileHeight) / fromIntegral uvHeight
         in Rect (V2 x y) (V2 w h)
 
 tileBoundingRect :: Orientation -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> V2 Int -> Int -> StaggerAxis -> StaggerIndex -> Int -> Rect
@@ -601,9 +601,9 @@ loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTil
         return (Just region)
 
     go (Just (ObjectMaterialTileImage (material, V2 iwidth iheight, V2 twidth theight))) = do
-        let uvw = fromIntegral (iwidth - 1) / (fromIntegral twidth)
-            uvh = fromIntegral (iheight - 1) / (fromIntegral theight)
-            uv = V2 (0.5 / fromIntegral twidth) (uvh + 0.5 / fromIntegral theight)
+        let uvw = fromIntegral iwidth / fromIntegral twidth
+            uvh = fromIntegral iheight / fromIntegral theight
+            uv = V2 0 uvh
             uvSize = V2 uvw (-uvh)
             Rect (V2 x y) (V2 w h) = Rect (V2 ox oy) (V2 ow oh)
                 & applyWhen hflip flipRectHorizontally
