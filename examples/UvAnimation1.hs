@@ -80,7 +80,12 @@ main =
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         material <- createMaterial scene (uvOffset $ UV.head walkFrontUVs)
-        Hree.AddedMesh meshId uniformBlockBinder <- createMesh scene material (V2 16 (-16))
+        Hree.AddedMesh meshId _ <- createMesh scene material (V2 16 (-16))
+
+        let node = Hree.newNode { Hree.nodeMesh = Just meshId }
+        nodeId <- Hree.addNode scene node True
+        uniformBlockBinder <- Hree.addNodeUniformBlock scene nodeId Hree.materialBlockBindingIndex (Hree.materialUniformBlock material)
+
         let walkFront = createUvAnimation uniformBlockBinder walkFrontUVs
             walkBack = createUvAnimation uniformBlockBinder walkBackUVs
             walkRight = createUvAnimation uniformBlockBinder walkRightUVs
@@ -89,8 +94,6 @@ main =
                 walkBack
                 walkRight
 
-        let node = Hree.newNode { Hree.nodeMesh = Just meshId }
-        _ <- Hree.addNode scene node True
         taskBoard <- Hree.newSceneTaskBoard scene
         taskId <- Hree.addSceneTask taskBoard Hree.Nop
 

@@ -128,7 +128,7 @@ data Node = Node
 data NodeInfo = NodeInfo
     { nodeInfoId            :: !NodeId
     , nodeInfoNode          :: !Node
-    , nodeInfoUniformBlocks :: !(BV.Vector (BufferBindingIndex, GLW.Buffer))
+    , nodeInfoUniformBlocks :: ![(BufferBindingIndex, GLW.Buffer)]
     } deriving (Show, Eq)
 
 data TransformInfo = TransformInfo

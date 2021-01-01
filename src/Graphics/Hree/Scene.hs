@@ -37,6 +37,11 @@ module Graphics.Hree.Scene
     , updateLight
     , updateMeshInstanceCount
     , updateNode
+    , materialBlockBindingIndex
+    , cameraBlockBindingIndex
+    , lightBlockBindingIndex
+    , skinJointMatricesBlockBindingIndex
+    , skinJointInverseMatricesBlockBindingIndex
     ) where
 
 import qualified Chronos as Time (Time, epoch, now)
@@ -53,6 +58,7 @@ import Data.Coerce (coerce)
 import qualified Data.Component as Component
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import Data.List (nubBy)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Data.Proxy (Proxy(..))
@@ -231,13 +237,12 @@ nodeToRenderInfos renderer scene state =
         defaultTexture <- lift $ mkDefaultTextureIfNotExists scene
         maybeSkin <- maybe (return Nothing) (lift . Component.readComponent skinStore) $ maybeSkinId
         let matrix = globalMatrix !*! inverseBindMatrix
-        let renderInfo = toRenderInfo program defaultTexture meshInfo vao maybeSkin matrix
+        let renderInfo = toRenderInfo program defaultTexture meshInfo vao maybeSkin matrix (nodeInfoUniformBlocks node)
         return renderInfo
 
-toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> GLW.VertexArray -> Maybe Skin -> Mat4 -> RenderInfo
-toRenderInfo program defaultTexture meshInfo vao skin matrix =
+toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> GLW.VertexArray -> Maybe Skin -> Mat4 -> [(BufferBindingIndex, GLW.Buffer)] -> RenderInfo
+toRenderInfo program defaultTexture meshInfo vao skin matrix nodeUbs =
     let uniforms = BV.mapMaybe toUniformEntry $ ("modelMatrix", Uniform matrix) `BV.cons` textureUniforms
-        ubs = BV.fromList $ (materialBlockBindingIndex, materialInfoUniformBlock material) : maybe mempty getSkinUbs skin
         renderInfo = RenderInfo program dm vao uniforms ubs textures roption
     in renderInfo
     where
@@ -254,10 +259,13 @@ toRenderInfo program defaultTexture meshInfo vao skin matrix =
     textures = if BV.null mtextures
         then BV.singleton defaultTexture
         else mtextureUnits
-    getSkinUbs x =
+    skinUbs Nothing = []
+    skinUbs (Just x) =
         let joint = (skinJointMatricesBlockBindingIndex, getMatricesBlockBinderBuffer . skinJointMatricesBinder $ x)
             inv = (skinJointInverseMatricesBlockBindingIndex, getMatricesBlockBinderBuffer . skinJointInverseMatricesBinder $ x)
         in [joint, inv]
+    ubs = BV.fromList . nubBy (\a b -> fst a == fst b)
+            $ nodeUbs ++ (materialBlockBindingIndex, materialInfoUniformBlock material) : skinUbs skin
     getMatricesBlockBinderBuffer (MatricesBlockBinder binder) = uniformBlockBinderBuffer binder
 
 resolveDrawMethod :: MeshInfo -> DrawMethod
@@ -378,7 +386,7 @@ addNodeUniformBlock scene nodeId bindingIndex a = do
     where
     nodeStore = sceneNodeStore scene
     f buffer nodeInfo =
-        let ubs = nodeInfoUniformBlocks nodeInfo `BV.snoc` (bindingIndex, buffer)
+        let ubs = nodeInfoUniformBlocks nodeInfo `mappend` [(bindingIndex, buffer)]
         in nodeInfo { nodeInfoUniformBlocks = ubs }
 
 readNode :: Scene -> NodeId -> IO (Maybe Node)
@@ -404,7 +412,7 @@ removeNode scene nodeId = do
             void $ Component.removeComponent (sceneNodeGlobalTransformMatrixStore scene) nodeId
 
             -- remove node uniform buffers
-            BV.mapM_ (removeBuffer scene . snd) (nodeInfoUniformBlocks nodeInfo)
+            mapM_ (removeBuffer scene . snd) (nodeInfoUniformBlocks nodeInfo)
 
             -- remove from root node list
             isRoot <- BV.elem nodeId . ssRootNodes <$> readIORef (sceneState scene)
