@@ -101,8 +101,8 @@ data AnimationChannel =
     deriving (Show)
 
 data AnimationClip = AnimationClip
-    { animationClipChannelds :: !(BV.Vector AnimationChannel)
-    , animationClipDuration  :: !Timespan
+    { animationClipChannels :: !(BV.Vector AnimationChannel)
+    , animationClipDuration :: !Timespan
     } deriving (Show)
 
 stepTranslation :: UV.Vector Int64 -> UV.Vector Vec3 -> KeyFrames TransformTrack
