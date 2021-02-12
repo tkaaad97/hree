@@ -823,7 +823,8 @@ newRendererWithOption option = do
     return $ Renderer option s
 
 initialRendererState :: RendererState
-initialRendererState = RendererState mempty
+initialRendererState =
+    RendererState mempty Foreign.nullPtr mempty
 
 deleteRenderer :: Renderer -> IO ()
 deleteRenderer renderer = do
