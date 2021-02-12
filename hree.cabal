@@ -4,7 +4,7 @@ cabal-version: 2.2
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2b06a3cfacce21accc8cc9220303d51215a3e3a8cd665046914c628fd98cc1e2
+-- hash: bea23196f91030af6dfdfe1a47fa4071cdc4a02799a1d541753c80e0f9dd211c
 
 name:           hree
 version:        0.9.0
@@ -82,6 +82,7 @@ library
       Graphics.Hree.Scene
       Graphics.Hree.SceneTask
       Graphics.Hree.Skin
+      Graphics.Hree.Text
       Graphics.Hree.Texture
       Graphics.Hree.Types
   hs-source-dirs:
@@ -178,6 +179,47 @@ executable flat-color-1
   other-modules:
       Paths_hree
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is FlatColor1
+  build-depends:
+      JuicyPixels >=3.2.9.5 && <3.4
+    , aeson >=1.2.4.0 && <1.6
+    , attoparsec >=0.13.2.2 && <0.14
+    , base >=4.10 && <5
+    , bytestring >=0.9.2.1 && <0.11
+    , cereal >=0.4.1.1 && <0.6
+    , chronos >=1.1 && <1.2
+    , containers >=0.4.2.1 && <0.7
+    , directory >=1.3.0 && <1.4
+    , file-embed >=0.0.10 && <0.1
+    , filepath >=1.3 && <1.5
+    , gl >=0.9 && <0.10
+    , gl-wrapper >=0.9 && <0.10
+    , hashable >=1.2.7.0 && <1.4
+    , hashtables >=1.2.2.0 && <1.3
+    , linear >=1.10.1.2 && <1.22
+    , mwc-random >=0.11 && <0.15
+    , template-haskell >=2.7 && <3.0
+    , text >=1.2.3.0 && <1.3
+    , transformers >=0.3.0.0 && <0.6
+    , unordered-containers >=0.2.8.0 && <0.3
+    , vector >=0.12.0.1 && <0.13
+    , vector-algorithms >=0.7.0.1 && <0.9
+  if flag(examples)
+    other-modules:
+        Example
+    hs-source-dirs:
+        examples
+    build-depends:
+        GLFW-b
+      , hree
+  else
+    buildable: False
+  default-language: Haskell2010
+
+executable font-1
+  main-is: Font1.hs
+  other-modules:
+      Paths_hree
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -threaded -rtsopts -with-rtsopts=-N -main-is Font1
   build-depends:
       JuicyPixels >=3.2.9.5 && <3.4
     , aeson >=1.2.4.0 && <1.6
