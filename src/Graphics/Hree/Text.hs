@@ -1,22 +1,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Graphics.Hree.Text
     ( FontFace
-    , createTextMesh
+    , GlyphInfo
+    , createText
     , deleteFontFace
     , newFontFace
     ) where
 
-import Control.Monad (foldM, forM_, mplus, when)
+import Control.Monad (forM_, when)
 import Data.Bits (shift, (.|.))
 import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
 import qualified Data.List as List (find, partition, sort)
-import qualified Data.Map.Strict as Map (fromList, (!))
+import qualified Data.Map.Strict as Map (fromList, lookup, (!))
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as Text (length, unpack)
-import qualified Data.Vector.Storable as SV (fromList)
-import qualified Data.Vector.Unboxed as UV (Vector, foldl', imap)
+import qualified Data.Text as Text (unpack)
+import qualified Data.Vector as BV (fromList, (!))
+import qualified Data.Vector.Storable as SV (generate, length)
+import qualified Data.Vector.Unboxed as UV (Vector, foldl', fromList, imap,
+                                            length, map, mapMaybe, scanl,
+                                            zipWith, (!))
 import qualified Foreign (allocaArray, castPtr, nullPtr, peek, peekElemOff,
                           pokeElemOff, with)
 import qualified FreeType
@@ -29,11 +33,11 @@ import System.Directory (canonicalizePath)
 
 data FontFace = FontFace !FreeType.FT_Library !FreeType.FT_Face
 
-data Character = Character
-    { characterCharcode :: !Char
-    , characterSize     :: !(V2 Int)
-    , characterBearing  :: !(V2 Int)
-    , characterAdvance  :: !Int
+data GlyphInfo = GlyphInfo
+    { glyphInfoCharcode :: !Char
+    , glyphInfoSize     :: !(V2 Int)
+    , glyphInfoBearing  :: !(V2 Int)
+    , glyphInfoAdvance  :: !Int
     } deriving (Show, Eq)
 
 data Packed = Packed
@@ -44,7 +48,6 @@ data Packed = Packed
 data Layout = Layout
     { layoutIndex    :: !Int
     , layoutPosition :: !(V2 Int)
-    , layoutRotated  :: !Bool
     } deriving (Show, Eq)
 
 data Rect = Rect
@@ -65,8 +68,8 @@ deleteFontFace (FontFace freeType face) = do
     FreeType.ft_Done_Face face
     FreeType.ft_Done_FreeType freeType
 
-createTextMesh :: Hree.Scene -> FontFace -> Text -> Int -> IO (Hree.AddedMesh Hree.SpriteMaterialBlock)
-createTextMesh scene (FontFace freeType face) text pixelSize = do
+createText :: Hree.Scene -> FontFace -> Text -> Int -> IO Hree.NodeId
+createText scene (FontFace freeType face) text pixelSize = do
     let str = Text.unpack text
         charcodes = nubOrd str
 
@@ -74,53 +77,72 @@ createTextMesh scene (FontFace freeType face) text pixelSize = do
     when isScalable
       $ FreeType.ft_Set_Pixel_Sizes face 0 (fromIntegral pixelSize)
 
-    characterMap <- Map.fromList <$> mapM loadMetrics charcodes
-    let characters = map (characterMap Map.!) str
-        V2 twidth theight = calcTextureSize
-        settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
-        sourceData = Hree.TextureSourceData (fromIntegral twidth) (fromIntegral theight) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE Foreign.nullPtr
+    glyphs <- mapM loadMetrics charcodes
+    let glyphMap = Map.fromList . map (\a -> (glyphInfoCharcode a, a)) $ glyphs
+        glyphVec = BV.fromList glyphs
+        glyphSizeVec = UV.fromList $ map glyphInfoSize glyphs
+        packResults = packGlyphs textureSize 1 glyphSizeVec
 
-    (tname, texture) <- Hree.addTexture scene "textmesh" settings sourceData
-    (_, sampler) <- Hree.addSampler scene tname
-    let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
+    materials <- mapM (createMaterial glyphVec) packResults
+    let uvMap = Map.fromList .
+            map (\(materialIndex, Layout index pos) ->
+                    let glyph = glyphVec BV.! index
+                    in (glyphInfoCharcode glyph, (index, materialIndex, toUv glyph pos))) .
+            concatMap (\(i, xs) -> zip (repeat i) xs) .
+            zip ([0..] :: [Int]) . map packedLayouts $ packResults
 
-    upMap <- Foreign.allocaArray (pixelSize * pixelSize * 4) $ \p ->
-        Map.fromList . snd <$> foldM (renderBitmap (V2 twidth theight) p texture) (V2 0 0, []) charcodes
-    let advanceSums = scanl (+) 0 . map characterAdvance $ characters
-        vertices = SV.fromList . map (toSpriteVertex (V2 twidth theight) upMap) $ (characters `zip` advanceSums)
-    (geo, _) <- Hree.newSpriteGeometry scene
-    geo' <- Hree.addVerticesToGeometry geo vertices GL.GL_STATIC_READ scene
+    let charVec = UV.fromList str
+        advanceSums = UV.scanl (+) 0 . UV.map (glyphInfoAdvance . (glyphMap Map.!)) $ charVec
+        charPosVec = UV.zipWith (\c advanceSum -> (c, V2 (fromIntegral advanceSum / fromIntegral unitLength) 0)) charVec advanceSums
 
-    let mesh = Hree.Mesh geo' material . Just . Text.length $ text
-    Hree.addMesh scene mesh
+    meshIds <- map Hree.addedMeshId <$> mapM (\(materialIndex, material) -> createMesh materialIndex material uvMap glyphVec charPosVec)
+                (zip [0..] materials)
+    childNodeIds <- mapM (\meshId -> Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False) meshIds
+    Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.fromList childNodeIds } False
 
     where
-    calcTextureSize = V2 1024 1024 :: V2 Int
-    padding = 2
+    textureSize = V2 1024 1024 :: V2 Int
+    V2 twidth theight = textureSize
     unitLength = 1024 :: Int
 
-    toSpriteVertex (V2 twidth theight) uvMap (Character charcode (V2 w h) (V2 bx by) _, advanceSum) =
-        let V2 uvx uvy = uvMap Map.! charcode
-            x = fromIntegral (advanceSum + bx) / fromIntegral unitLength
-            y = fromIntegral (by - h) / fromIntegral unitLength
-            position = V3 x y 0
+    toUv glyph (V2 x y) =
+        let V2 _ gh = glyphInfoSize glyph
+        in V2 (fromIntegral x / fromIntegral twidth) (fromIntegral (y + gh) / fromIntegral theight)
+
+    toSpriteVertex glyphVec (index, V2 sx sy, uv) =
+        let GlyphInfo _ (V2 w h) (V2 bx by) _ = glyphVec BV.! index
             size = V3 (fromIntegral w / fromIntegral unitLength) (fromIntegral h / fromIntegral unitLength) 0
-            uv = V2 (fromIntegral uvx / fromIntegral twidth) (fromIntegral (h - fromIntegral uvy) / fromIntegral theight)
             uvSize = V2 (fromIntegral w / fromIntegral twidth) (- fromIntegral h / fromIntegral theight)
+            x = sx + fromIntegral bx / fromIntegral unitLength
+            y = sy + fromIntegral (by - h) / fromIntegral unitLength
+            position = V3 x y 0
         in Hree.SpriteVertex position size (V3 0 0 0) 0 uv uvSize 0 0
 
     loadMetrics charcode = do
-        FreeType.ft_Load_Char face (fromIntegral (ord charcode :: Int)) (FreeType.FT_LOAD_DEFAULT .|. FreeType.FT_LOAD_NO_BITMAP)
+        FreeType.ft_Load_Char face (fromIntegral . ord $ charcode) (FreeType.FT_LOAD_DEFAULT .|. FreeType.FT_LOAD_NO_BITMAP)
         metrics <- FreeType.gsrMetrics <$> (Foreign.peek . FreeType.frGlyph =<< Foreign.peek face)
         let w = fromIntegral (FreeType.gmWidth metrics) `shift` (-6)
             h = fromIntegral (FreeType.gmHeight metrics) `shift` (-6)
             bx = fromIntegral (FreeType.gmHoriBearingX metrics) `shift` (-6)
             by = fromIntegral (FreeType.gmHoriBearingY metrics) `shift` (-6)
             advance = fromIntegral (FreeType.gmHoriAdvance metrics) `shift` (-6)
-        return (charcode, Character charcode (V2 w h) (V2 bx by) advance)
+        return (GlyphInfo charcode (V2 w h) (V2 bx by) advance)
 
-    renderBitmap (V2 twidth theight) p texture (V2 x y, results) charcode =
+    createMaterial glyphs (Packed layouts _) = do
+        let settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
+            sourceData = Hree.TextureSourceData (fromIntegral twidth) (fromIntegral theight) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE Foreign.nullPtr
+
+        (tname, texture) <- Hree.addTexture scene "textmesh" settings sourceData
+        (_, sampler) <- Hree.addSampler scene tname
+        let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
+        Foreign.allocaArray (pixelSize * pixelSize * 4) $ \p ->
+            mapM_ (renderBitmap p texture glyphs) layouts
+
+        return material
+
+    renderBitmap p texture glyphs (Layout index (V2 x y)) =
         FreeType.ft_Bitmap_With freeType $ \convertBitmap -> do
+            let charcode = glyphInfoCharcode $ glyphs BV.! index
             FreeType.ft_Load_Char face (fromIntegral $ ord charcode) FreeType.FT_LOAD_RENDER
             slot <- Foreign.peek . FreeType.frGlyph =<< Foreign.peek face
             let source = FreeType.gsrBitmap slot
@@ -135,20 +157,30 @@ createTextMesh scene (FontFace freeType face) text pixelSize = do
                 height = FreeType.bRows bitmap
                 buffer = FreeType.bBuffer bitmap
                 pitch = FreeType.bPitch bitmap
-                nextPos
-                    | x + fromIntegral width + padding + fromIntegral pixelSize <= fromIntegral twidth = V2 (x + fromIntegral width + padding) y
-                    | otherwise = V2 0 (y + fromIntegral pixelSize)
 
-            when (width > 0 && height > 0) $ forM_ [0..(fromIntegral $ width * height - 1)] $ \i -> do
-                let (py, px) = divMod i (fromIntegral width)
-                color <- Foreign.peekElemOff buffer (py * fromIntegral pitch + px)
-                Foreign.pokeElemOff p i (V4 (255 - color) (255 - color) (255 - color) color)
+            when (width > 0 && height > 0) $ do
+                forM_ [0..(fromIntegral $ width * height - 1)] $ \i -> do
+                    let (py, px) = divMod i (fromIntegral width)
+                    color <- Foreign.peekElemOff buffer (py * fromIntegral pitch + px)
+                    Foreign.pokeElemOff p i (V4 (255 - color) (255 - color) (255 - color) color)
+                GLW.glTextureSubImage2D texture 0 (fromIntegral x) (fromIntegral y) (fromIntegral width) (fromIntegral height) GL.GL_RGBA GL.GL_UNSIGNED_BYTE (Foreign.castPtr p)
 
-            GLW.glTextureSubImage2D texture 0 x y (fromIntegral width) (fromIntegral height) GL.GL_RGBA GL.GL_UNSIGNED_BYTE (Foreign.castPtr p)
-            return (nextPos, results ++ [(charcode, V2 x y)])
+    createMesh materialIndex material uvMap glyphVec charPosVec = do
+        let xs = flip UV.mapMaybe charPosVec $ \(char, pos) -> do
+                (i, m, uv) <- Map.lookup char uvMap
+                let glyph = glyphVec BV.! i
+                    V2 gw gh = glyphInfoSize glyph
+                if m == materialIndex && gw > 0 && gh > 0
+                    then return (i, pos, uv)
+                    else Nothing
+            vs = SV.generate (UV.length xs) (toSpriteVertex glyphVec . (xs UV.!))
+        (geo, _) <- Hree.newSpriteGeometry scene
+        geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
+        let mesh = Hree.Mesh geo' material . Just . SV.length $ vs
+        Hree.addMesh scene mesh
 
-packImages :: V2 Int -> Int -> UV.Vector (V2 Int) -> [Packed]
-packImages (V2 textureWidth textureHeight) spacing =
+packGlyphs :: V2 Int -> Int -> UV.Vector (V2 Int) -> [Packed]
+packGlyphs (V2 textureWidth textureHeight) spacing =
     reverse . UV.foldl' pack [] . UV.imap (,)
 
     where
@@ -157,7 +189,7 @@ packImages (V2 textureWidth textureHeight) spacing =
         fromMaybe (newRegion a : ps) (tryPack a ps)
 
     newRegion (index, V2 w h) =
-        let layouts = [Layout index (V2 spacing spacing) False]
+        let layouts = [Layout index (V2 spacing spacing)]
             spaces = relocateSpaces (V2 spacing spacing) (V2 (w + spacing) (h + spacing)) (newRect (V2 spacing spacing) (V2 (textureWidth - spacing) (textureHeight - spacing)))
         in Packed layouts spaces
 
@@ -170,17 +202,14 @@ packImages (V2 textureWidth textureHeight) spacing =
 
 tryPackOne :: (Int, V2 Int) -> Packed -> Maybe Packed
 tryPackOne (index, V2 w h) (Packed layouts spaces) = do
-    (Rect _ _ rp, rotated) <- s1 `mplus` s2
-    let layout = Layout index rp rotated
-        size = if rotated then V2 h w else V2 w h
+    Rect _ _ rp <- List.find locatable spaces
+    let layout = Layout index rp
+        size = V2 w h
         (intersectSpaces, restSpaces) = List.partition (hasIntersection rp size) spaces
         relocated = removeInclusion . concatMap (relocateSpaces rp size) $ intersectSpaces
     return $ Packed (layout : layouts) (restSpaces ++ relocated)
     where
-    s1 = List.find locatable $ zip spaces (repeat False)
-    s2 = List.find locatable $ zip spaces (repeat True)
-    locatable (Rect _ (V2 rw rh) _, False) = rw >= w && rh >= h
-    locatable (Rect _ (V2 rw rh) _, True)  = rh >= w && rw >= h
+    locatable (Rect _ (V2 rw rh) _) = rw >= w && rh >= h
 
 hasIntersection :: V2 Int -> V2 Int -> Rect -> Bool
 hasIntersection (V2 x y) (V2 w h) (Rect _ (V2 rw rh) (V2 rx ry)) = dx < w + rw && dy < h + rh
