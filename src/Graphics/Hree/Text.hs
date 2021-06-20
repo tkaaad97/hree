@@ -1,15 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Graphics.Hree.Text
-    ( createTextMesh
-    , loadFtFace
+    ( FontFace
+    , createTextMesh
+    , deleteFontFace
+    , newFontFace
     ) where
 
 import Control.Monad (foldM, forM_, when)
 import Data.Bits (shift, (.|.))
 import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
-import Data.IORef (readIORef, writeIORef)
-import qualified Data.Map.Strict as Map (fromList, insert, lookup, size, (!))
+import qualified Data.Map.Strict as Map (fromList, (!))
 import Data.Text (Text)
 import qualified Data.Text as Text (length, unpack)
 import qualified Data.Vector.Storable as SV (fromList)
@@ -20,9 +21,10 @@ import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
-import Graphics.Hree.Types (FtFaceName(..), Renderer(..), RendererState(..))
 import Linear (V2(..), V3(..), V4(..))
 import System.Directory (canonicalizePath)
+
+data FontFace = FontFace !FreeType.FT_Library !FreeType.FT_Face
 
 data Character = Character
     { characterCharcode :: !Char
@@ -31,47 +33,28 @@ data Character = Character
     , characterAdvance  :: !Int
     } deriving (Show, Eq)
 
-loadFtFace :: Renderer -> FilePath -> IO FtFaceName
-loadFtFace renderer fontPath = do
-    state <- readIORef ref
+newFontFace :: FilePath -> IO FontFace
+newFontFace fontPath = do
     path <- canonicalizePath fontPath
+    freeType <- FreeType.ft_Init_FreeType
+    face <- FreeType.ft_New_Face freeType path 0
+    return (FontFace freeType face)
 
-    let faces = rendererStateFreeTypeFaces state
-        faceName = FtFaceName path
+deleteFontFace :: FontFace -> IO ()
+deleteFontFace (FontFace freeType face) = do
+    FreeType.ft_Done_Face face
+    FreeType.ft_Done_FreeType freeType
 
-    freeType <- if rendererStateFreeType state /= Foreign.nullPtr
-        then return $ rendererStateFreeType state
-        else FreeType.ft_Init_FreeType
-
-    (face, faceLoaded) <- case Map.lookup (FtFaceName path) faces of
-        Just face -> return (face, False)
-        Nothing -> flip (,) True <$> FreeType.ft_New_Face freeType path (fromIntegral $ Map.size faces)
-
-    when faceLoaded $ do
-        let updatedFaces = Map.insert faceName face faces
-            updatedState = state { rendererStateFreeType = freeType, rendererStateFreeTypeFaces = updatedFaces }
-        writeIORef ref updatedState
-
-    return faceName
-
-    where
-    ref = rendererState renderer
-
-createTextMesh :: Hree.Renderer -> Hree.Scene -> FtFaceName -> Text -> Int -> IO (Hree.AddedMesh Hree.SpriteMaterialBlock)
-createTextMesh renderer scene faceName text pixelSize = do
-    state <- readIORef ref
-
-    let freeType = rendererStateFreeType state
-        faces = rendererStateFreeTypeFaces state
-        face = faces Map.! faceName
-        str = Text.unpack text
+createTextMesh :: Hree.Scene -> FontFace -> Text -> Int -> IO (Hree.AddedMesh Hree.SpriteMaterialBlock)
+createTextMesh scene (FontFace freeType face) text pixelSize = do
+    let str = Text.unpack text
         charcodes = nubOrd str
 
     isScalable <- FreeType.FT_IS_SCALABLE face
     when isScalable
       $ FreeType.ft_Set_Pixel_Sizes face 0 (fromIntegral pixelSize)
 
-    characterMap <- Map.fromList <$> mapM (loadMetrics face) charcodes
+    characterMap <- Map.fromList <$> mapM loadMetrics charcodes
     let characters = map (characterMap Map.!) str
         V2 twidth theight = calcTextureSize
         settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
@@ -82,7 +65,7 @@ createTextMesh renderer scene faceName text pixelSize = do
     let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
 
     upMap <- Foreign.allocaArray (pixelSize * pixelSize * 4) $ \p ->
-        Map.fromList . snd <$> foldM (renderBitmap freeType face (V2 twidth theight) p texture) (V2 0 0, []) charcodes
+        Map.fromList . snd <$> foldM (renderBitmap (V2 twidth theight) p texture) (V2 0 0, []) charcodes
     let advanceSums = scanl (+) 0 . map characterAdvance $ characters
         vertices = SV.fromList . map (toSpriteVertex (V2 twidth theight) upMap) $ (characters `zip` advanceSums)
     (geo, _) <- Hree.newSpriteGeometry scene
@@ -92,7 +75,6 @@ createTextMesh renderer scene faceName text pixelSize = do
     Hree.addMesh scene mesh
 
     where
-    ref = rendererState renderer
     calcTextureSize = V2 1024 1024 :: V2 Int
     padding = 2
     unitLength = 1024 :: Int
@@ -107,7 +89,7 @@ createTextMesh renderer scene faceName text pixelSize = do
             uvSize = V2 (fromIntegral w / fromIntegral twidth) (- fromIntegral h / fromIntegral theight)
         in Hree.SpriteVertex position size (V3 0 0 0) 0 uv uvSize 0 0
 
-    loadMetrics face charcode = do
+    loadMetrics charcode = do
         FreeType.ft_Load_Char face (fromIntegral (ord charcode :: Int)) (FreeType.FT_LOAD_DEFAULT .|. FreeType.FT_LOAD_NO_BITMAP)
         metrics <- FreeType.gsrMetrics <$> (Foreign.peek . FreeType.frGlyph =<< Foreign.peek face)
         let w = fromIntegral (FreeType.gmWidth metrics) `shift` (-6)
@@ -117,15 +99,15 @@ createTextMesh renderer scene faceName text pixelSize = do
             advance = fromIntegral (FreeType.gmHoriAdvance metrics) `shift` (-6)
         return (charcode, Character charcode (V2 w h) (V2 bx by) advance)
 
-    renderBitmap lib face (V2 twidth theight) p texture (V2 x y, results) charcode =
-        FreeType.ft_Bitmap_With lib $ \convertBitmap -> do
+    renderBitmap (V2 twidth theight) p texture (V2 x y, results) charcode =
+        FreeType.ft_Bitmap_With freeType $ \convertBitmap -> do
             FreeType.ft_Load_Char face (fromIntegral $ ord charcode) FreeType.FT_LOAD_RENDER
             slot <- Foreign.peek . FreeType.frGlyph =<< Foreign.peek face
             let source = FreeType.gsrBitmap slot
 
             bitmap <- if FreeType.bPixel_mode source /= FreeType.FT_PIXEL_MODE_GRAY
                 then Foreign.with source $ \sourceBitmap -> do
-                    FreeType.ft_Bitmap_Convert lib sourceBitmap convertBitmap 1
+                    FreeType.ft_Bitmap_Convert freeType sourceBitmap convertBitmap 1
                     Foreign.peek convertBitmap
                 else return source
 

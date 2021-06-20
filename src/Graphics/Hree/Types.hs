@@ -3,7 +3,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Graphics.Hree.Types
     ( ClearOption(..)
-    , FtFaceName(..)
     , Geometry(..)
     , LightId(..)
     , LightStore
@@ -31,8 +30,8 @@ import Chronos (Time)
 import Data.ByteString (ByteString)
 import qualified Data.Component as Component
 import Data.Hashable (Hashable(..))
-import Data.IORef (IORef)
 import Data.IntMap.Strict (IntMap)
+import Data.IORef (IORef)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Vector as BV
@@ -40,7 +39,6 @@ import qualified Data.Vector.Mutable as MBV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import Foreign (Storable(..), castPtr, plusPtr)
-import qualified FreeType (FT_Face, FT_Library)
 import GHC.TypeNats (KnownNat)
 import qualified GLW
 import qualified Graphics.GL as GL
@@ -181,12 +179,7 @@ data Renderer = Renderer
 
 data RendererState = RendererState
     { rendererStatePrograms      :: !(Map ProgramName ProgramInfo)
-    , rendererStateFreeType      :: !FreeType.FT_Library
-    , rendererStateFreeTypeFaces :: !(Map FtFaceName FreeType.FT_Face)
     } deriving (Show)
-
-newtype FtFaceName = FtFaceName FilePath
-    deriving (Show, Eq, Ord, Hashable)
 
 data MatricesBlockBinder = forall n. KnownNat n => MatricesBlockBinder
     { unMatricesBlockBinder :: !(UniformBlockBinder (LimitedVector n (Elem Mat4)))
