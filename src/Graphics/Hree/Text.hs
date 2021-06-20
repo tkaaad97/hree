@@ -6,14 +6,17 @@ module Graphics.Hree.Text
     , newFontFace
     ) where
 
-import Control.Monad (foldM, forM_, when)
+import Control.Monad (foldM, forM_, mplus, when)
 import Data.Bits (shift, (.|.))
 import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
+import qualified Data.List as List (find, partition, sort)
 import qualified Data.Map.Strict as Map (fromList, (!))
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (length, unpack)
 import qualified Data.Vector.Storable as SV (fromList)
+import qualified Data.Vector.Unboxed as UV (Vector, foldl', imap)
 import qualified Foreign (allocaArray, castPtr, nullPtr, peek, peekElemOff,
                           pokeElemOff, with)
 import qualified FreeType
@@ -32,6 +35,23 @@ data Character = Character
     , characterBearing  :: !(V2 Int)
     , characterAdvance  :: !Int
     } deriving (Show, Eq)
+
+data Packed = Packed
+    { packedLayouts :: ![Layout]
+    , packedSpaces  :: ![Rect]
+    } deriving (Show, Eq)
+
+data Layout = Layout
+    { layoutIndex    :: !Int
+    , layoutPosition :: !(V2 Int)
+    , layoutRotated  :: !Bool
+    } deriving (Show, Eq)
+
+data Rect = Rect
+    { rectArea     :: !Int
+    , rectSize     :: !(V2 Int)
+    , rectPosition :: !(V2 Int)
+    } deriving (Show, Eq, Ord)
 
 newFontFace :: FilePath -> IO FontFace
 newFontFace fontPath = do
@@ -126,3 +146,82 @@ createTextMesh scene (FontFace freeType face) text pixelSize = do
 
             GLW.glTextureSubImage2D texture 0 x y (fromIntegral width) (fromIntegral height) GL.GL_RGBA GL.GL_UNSIGNED_BYTE (Foreign.castPtr p)
             return (nextPos, results ++ [(charcode, V2 x y)])
+
+packImages :: V2 Int -> Int -> UV.Vector (V2 Int) -> [Packed]
+packImages (V2 textureWidth textureHeight) spacing =
+    reverse . UV.foldl' pack [] . UV.imap (,)
+
+    where
+    pack :: [Packed] -> (Int, V2 Int) -> [Packed]
+    pack ps a =
+        fromMaybe (newRegion a : ps) (tryPack a ps)
+
+    newRegion (index, V2 w h) =
+        let layouts = [Layout index (V2 spacing spacing) False]
+            spaces = relocateSpaces (V2 spacing spacing) (V2 (w + spacing) (h + spacing)) (newRect (V2 spacing spacing) (V2 (textureWidth - spacing) (textureHeight - spacing)))
+        in Packed layouts spaces
+
+    tryPack _ [] = Nothing
+
+    tryPack (index, V2 w h) (r : rs) =
+        case tryPackOne (index, V2 (w + spacing) (h + spacing)) r of
+            Just r' -> Just (r' : rs)
+            Nothing -> fmap (r :) (tryPack (index, V2 w h) rs)
+
+tryPackOne :: (Int, V2 Int) -> Packed -> Maybe Packed
+tryPackOne (index, V2 w h) (Packed layouts spaces) = do
+    (Rect _ _ rp, rotated) <- s1 `mplus` s2
+    let layout = Layout index rp rotated
+        size = if rotated then V2 h w else V2 w h
+        (intersectSpaces, restSpaces) = List.partition (hasIntersection rp size) spaces
+        relocated = removeInclusion . concatMap (relocateSpaces rp size) $ intersectSpaces
+    return $ Packed (layout : layouts) (restSpaces ++ relocated)
+    where
+    s1 = List.find locatable $ zip spaces (repeat False)
+    s2 = List.find locatable $ zip spaces (repeat True)
+    locatable (Rect _ (V2 rw rh) _, False) = rw >= w && rh >= h
+    locatable (Rect _ (V2 rw rh) _, True)  = rh >= w && rw >= h
+
+hasIntersection :: V2 Int -> V2 Int -> Rect -> Bool
+hasIntersection (V2 x y) (V2 w h) (Rect _ (V2 rw rh) (V2 rx ry)) = dx < w + rw && dy < h + rh
+    where
+    (cx, cy) = (x * 2 + w, y * 2 + h)
+    (rcx, rcy) = (rx * 2 + rw, ry * 2 + rh)
+    (dx, dy) = (abs (cx - rcx), abs (cy - rcy))
+
+relocateSpaces :: V2 Int -> V2 Int -> Rect -> [Rect]
+relocateSpaces p s r =
+    horizontalSpaces p s r ++ verticalSpaces p s r
+
+horizontalSpaces :: V2 Int -> V2 Int -> Rect -> [Rect]
+horizontalSpaces (V2 _ y) (V2 _ h) (Rect _ (V2 rw rh) (V2 rx ry))
+    | ry < y && (y + h) < (ry + rh) = [s1, s2]
+    | ry < y = [s1]
+    | (y + h) < (ry + rh) = [s2]
+    | otherwise = []
+    where
+    s1 = newRect (V2 rx ry) (V2 rw (y - ry))
+    s2 = newRect (V2 rx (y + h)) (V2 rw (ry + rh - y - h))
+
+verticalSpaces :: V2 Int -> V2 Int -> Rect -> [Rect]
+verticalSpaces (V2 x _) (V2 w _) (Rect _ (V2 rw rh) (V2 rx ry))
+    | rx < x && (x + w) < (rx + rw) = [s1, s2]
+    | rx < x = [s1]
+    | (x + w) < (rx + rw) = [s2]
+    | otherwise = []
+    where
+    s1 = newRect (V2 rx ry) (V2 (x - rx) rh)
+    s2 = newRect (V2 (x + w) ry) (V2 (rx + rw - x - w) rh)
+
+removeInclusion :: [Rect] -> [Rect]
+removeInclusion = removeInclusion' . List.sort
+    where
+    removeInclusion' [] = []
+    removeInclusion' (x : xs)
+        | any (inclusion x) xs = removeInclusion' xs
+        | otherwise = x : removeInclusion' xs
+    inclusion (Rect _ (V2 w h) (V2 x y)) (Rect _ (V2 rw rh) (V2 rx ry)) =
+        rx <= x && x + w <= rx + rw && ry <= y && y + h <= ry + rh
+
+newRect :: V2 Int -> V2 Int -> Rect
+newRect p (V2 w h) = Rect (w * h) (V2 w h) p
