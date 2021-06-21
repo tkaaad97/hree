@@ -19,8 +19,7 @@ import qualified Data.Text as Text (unpack)
 import qualified Data.Vector as BV (fromList, (!))
 import qualified Data.Vector.Storable as SV (generate, length)
 import qualified Data.Vector.Unboxed as UV (Vector, foldl', fromList, imap,
-                                            length, map, mapMaybe, scanl,
-                                            zipWith, (!))
+                                            length, mapMaybe, scanl', zip, (!))
 import qualified Foreign (allocaArray, castPtr, nullPtr, peek, peekElemOff,
                           pokeElemOff, with)
 import qualified FreeType
@@ -92,8 +91,7 @@ createText scene (FontFace freeType face) text pixelSize = do
             zip ([0..] :: [Int]) . map packedLayouts $ packResults
 
     let charVec = UV.fromList str
-        advanceSums = UV.scanl (+) 0 . UV.map (glyphInfoAdvance . (glyphMap Map.!)) $ charVec
-        charPosVec = UV.zipWith (\c advanceSum -> (c, V2 (fromIntegral advanceSum / fromIntegral unitLength) 0)) charVec advanceSums
+        charPosVec = UV.zip charVec . UV.scanl' (calcCharPos glyphMap 0) (V2 0 0) $ charVec
 
     meshIds <- map Hree.addedMeshId <$> mapM (\(materialIndex, material) -> createMesh materialIndex material uvMap glyphVec charPosVec)
                 (zip [0..] materials)
@@ -104,6 +102,12 @@ createText scene (FontFace freeType face) text pixelSize = do
     textureSize = V2 1024 1024 :: V2 Int
     V2 twidth theight = textureSize
     unitLength = 1024 :: Int
+
+    calcCharPos glyphMap sx (V2 x y) c
+        | c == '\n' = V2 sx (y - fromIntegral pixelSize / fromIntegral unitLength)
+        | otherwise =
+            let advance = glyphInfoAdvance $ glyphMap Map.! c
+            in V2 (x + fromIntegral advance / fromIntegral unitLength) y
 
     toUv glyph (V2 x y) =
         let V2 _ gh = glyphInfoSize glyph
@@ -170,7 +174,7 @@ createText scene (FontFace freeType face) text pixelSize = do
                 (i, m, uv) <- Map.lookup char uvMap
                 let glyph = glyphVec BV.! i
                     V2 gw gh = glyphInfoSize glyph
-                if m == materialIndex && gw > 0 && gh > 0
+                if m == materialIndex && gw > 0 && gh > 0 && char /= '\n'
                     then return (i, pos, uv)
                     else Nothing
             vs = SV.generate (UV.length xs) (toSpriteVertex glyphVec . (xs UV.!))
