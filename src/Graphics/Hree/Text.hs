@@ -1,6 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE StandaloneDeriving         #-}
 module Graphics.Hree.Text
     ( FontFace
+    , OriginLocation(..)
+    , TextOption
+    , PartialTextOption
     , GlyphInfo
     , createText
     , deleteFontFace
@@ -11,15 +17,18 @@ import Control.Monad (forM_, when)
 import Data.Bits (shift, (.|.))
 import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
+import Data.Functor.Identity (Identity(..))
 import qualified Data.List as List (find, partition, sort)
 import qualified Data.Map.Strict as Map (fromList, lookup, (!))
 import Data.Maybe (fromMaybe)
+import Data.Monoid (Last(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Vector as BV (fromList, (!))
 import qualified Data.Vector.Storable as SV (generate, length)
 import qualified Data.Vector.Unboxed as UV (Vector, foldl', fromList, imap,
                                             length, mapMaybe, scanl', zip, (!))
+import Data.Word (Word8)
 import qualified Foreign (allocaArray, castPtr, nullPtr, peek, peekElemOff,
                           pokeElemOff, with)
 import qualified FreeType
@@ -54,6 +63,82 @@ data Rect = Rect
     , rectSize     :: !(V2 Int)
     , rectPosition :: !(V2 Int)
     } deriving (Show, Eq, Ord)
+
+data TextOption_ f = TextOption
+    { characterHeight  :: !(f Float)
+    , characterSpacing :: !(f Float)
+    , lineSpacing      :: !(f Float)
+    , pixelWidth       :: !(f Int)
+    , pixelHeight      :: !(f Int)
+    , originPosition   :: !(f (V2 Float))
+    , originLocation   :: !(f OriginLocation)
+    , faceColor        :: !(f (V4 Word8))
+    }
+
+data OriginLocation =
+    OriginLocationBottom |
+    OriginLocationTop |
+    OriginLocationFirstBaseLine |
+    OriginLocationLastBaseLine
+    deriving (Show, Eq, Enum)
+
+type TextOption = TextOption_ Identity
+type PartialTextOption = TextOption_ Last
+
+deriving instance Eq TextOption
+deriving instance Eq PartialTextOption
+deriving instance Show TextOption
+deriving instance Show PartialTextOption
+
+instance Semigroup PartialTextOption where
+    a <> b = TextOption
+        { characterHeight = characterHeight a <> characterHeight b
+        , characterSpacing = characterSpacing a <> characterSpacing b
+        , lineSpacing = lineSpacing a <> lineSpacing b
+        , pixelWidth = pixelWidth a <> pixelWidth b
+        , pixelHeight = pixelHeight a <> pixelHeight b
+        , originPosition = originPosition a <> originPosition b
+        , originLocation = originLocation a <> originLocation b
+        , faceColor = faceColor a <> faceColor b
+        }
+
+instance Monoid PartialTextOption where
+    mempty = TextOption
+        { characterHeight = mempty
+        , characterSpacing = mempty
+        , lineSpacing = mempty
+        , pixelWidth = mempty
+        , pixelHeight = mempty
+        , originPosition = mempty
+        , originLocation = mempty
+        , faceColor = mempty
+        }
+
+defaultTextOption :: TextOption
+defaultTextOption = TextOption
+    { characterHeight = pure (1 / 16)
+    , characterSpacing = pure 0
+    , lineSpacing = pure 0
+    , pixelWidth = pure 0
+    , pixelHeight = pure 128
+    , originPosition = pure (V2 0 0)
+    , originLocation = pure OriginLocationBottom
+    , faceColor = pure (V4 0 0 0 255)
+    }
+
+overrideTextOption :: TextOption -> PartialTextOption -> TextOption
+overrideTextOption option override = TextOption
+    { characterHeight = fromMaybe (characterHeight option) (toIdentity . characterHeight $ override)
+    , characterSpacing = fromMaybe (characterSpacing option) (toIdentity . characterSpacing $ override)
+    , lineSpacing = fromMaybe (lineSpacing option) (toIdentity . lineSpacing $ override)
+    , pixelWidth = fromMaybe (pixelWidth option) (toIdentity . pixelWidth $ override)
+    , pixelHeight = fromMaybe (pixelHeight option) (toIdentity . pixelHeight $ override)
+    , originPosition = fromMaybe (originPosition option) (toIdentity . originPosition $ override)
+    , originLocation = fromMaybe (originLocation option) (toIdentity . originLocation $ override)
+    , faceColor = fromMaybe (faceColor option) (toIdentity . faceColor $ override)
+    }
+    where
+    toIdentity = fmap Identity . getLast
 
 newFontFace :: FilePath -> IO FontFace
 newFontFace fontPath = do
