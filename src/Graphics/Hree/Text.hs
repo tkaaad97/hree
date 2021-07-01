@@ -1,7 +1,6 @@
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Graphics.Hree.Text
     ( FontFace
     , OriginLocation(..)
@@ -73,6 +72,7 @@ data TextOption_ f = TextOption
     , originPosition   :: !(f (V2 Float))
     , originLocation   :: !(f OriginLocation)
     , faceColor        :: !(f (V4 Word8))
+    , textureSize      :: !(f (V2 Int))
     }
 
 data OriginLocation =
@@ -100,6 +100,7 @@ instance Semigroup PartialTextOption where
         , originPosition = originPosition a <> originPosition b
         , originLocation = originLocation a <> originLocation b
         , faceColor = faceColor a <> faceColor b
+        , textureSize = textureSize a <> textureSize b
         }
 
 instance Monoid PartialTextOption where
@@ -112,6 +113,7 @@ instance Monoid PartialTextOption where
         , originPosition = mempty
         , originLocation = mempty
         , faceColor = mempty
+        , textureSize = mempty
         }
 
 defaultTextOption :: TextOption
@@ -124,6 +126,7 @@ defaultTextOption = TextOption
     , originPosition = pure (V2 0 0)
     , originLocation = pure OriginLocationBottom
     , faceColor = pure (V4 0 0 0 255)
+    , textureSize = pure (V2 2048 2048)
     }
 
 overrideTextOption :: TextOption -> PartialTextOption -> TextOption
@@ -136,6 +139,7 @@ overrideTextOption option override = TextOption
     , originPosition = fromMaybe (originPosition option) (toIdentity . originPosition $ override)
     , originLocation = fromMaybe (originLocation option) (toIdentity . originLocation $ override)
     , faceColor = fromMaybe (faceColor option) (toIdentity . faceColor $ override)
+    , textureSize = fromMaybe (textureSize option) (toIdentity . textureSize $ override)
     }
     where
     toIdentity = fmap Identity . getLast
@@ -152,20 +156,26 @@ deleteFontFace (FontFace freeType face) = do
     FreeType.ft_Done_Face face
     FreeType.ft_Done_FreeType freeType
 
-createText :: Hree.Scene -> FontFace -> Text -> Int -> IO Hree.NodeId
-createText scene (FontFace freeType face) text pixelSize = do
+createText :: Hree.Scene -> FontFace -> Text -> Float -> IO Hree.NodeId
+createText scene fontFace text charHeight =
+    createTextWithOption scene fontFace text partialOption
+    where
+    partialOption = mempty { characterHeight = pure charHeight }
+
+createTextWithOption :: Hree.Scene -> FontFace -> Text -> PartialTextOption -> IO Hree.NodeId
+createTextWithOption scene (FontFace freeType face) text partialOption = do
     let str = Text.unpack text
         charcodes = nubOrd str
 
     isScalable <- FreeType.FT_IS_SCALABLE face
     when isScalable
-      $ FreeType.ft_Set_Pixel_Sizes face 0 (fromIntegral pixelSize)
+      $ FreeType.ft_Set_Pixel_Sizes face (fromIntegral . pixelWidth $ option) (fromIntegral . pixelHeight $ option)
 
     glyphs <- mapM loadMetrics charcodes
     let glyphMap = Map.fromList . map (\a -> (glyphInfoCharcode a, a)) $ glyphs
         glyphVec = BV.fromList glyphs
         glyphSizeVec = UV.fromList $ map glyphInfoSize glyphs
-        packResults = packGlyphs textureSize 1 glyphSizeVec
+        packResults = packGlyphs (runIdentity . textureSize $ option) 1 glyphSizeVec
 
     materials <- mapM (createMaterial glyphVec) packResults
     let uvMap = Map.fromList .
@@ -176,7 +186,8 @@ createText scene (FontFace freeType face) text pixelSize = do
             zip ([0..] :: [Int]) . map packedLayouts $ packResults
 
     let charVec = UV.fromList str
-        charPosVec = UV.zip charVec . UV.scanl' (calcCharPos glyphMap 0) (V2 0 0) $ charVec
+        origin = runIdentity . originPosition $ option
+        charPosVec = UV.zip charVec . UV.scanl' (calcCharPos glyphMap 0) origin $ charVec
 
     meshIds <- map Hree.addedMeshId <$> mapM (\(materialIndex, material) -> createMesh materialIndex material uvMap glyphVec charPosVec)
                 (zip [0..] materials)
@@ -184,15 +195,20 @@ createText scene (FontFace freeType face) text pixelSize = do
     Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.fromList childNodeIds } False
 
     where
-    textureSize = V2 1024 1024 :: V2 Int
-    V2 twidth theight = textureSize
-    unitLength = 1024 :: Int
+    option = overrideTextOption defaultTextOption partialOption
+    V2 twidth theight = runIdentity . textureSize $ option
+    lineS = runIdentity . lineSpacing $ option
+    charH = runIdentity . characterHeight $ option
+    charS = runIdentity . characterSpacing $ option
+    pixelH = runIdentity . pixelHeight $ option
+
+    pixelLength = charH / fromIntegral pixelH
 
     calcCharPos glyphMap sx (V2 x y) c
-        | c == '\n' = V2 sx (y - fromIntegral pixelSize / fromIntegral unitLength)
+        | c == '\n' = V2 sx (y - (charH + lineS))
         | otherwise =
             let advance = glyphInfoAdvance $ glyphMap Map.! c
-            in V2 (x + fromIntegral advance / fromIntegral unitLength) y
+            in V2 (x + fromIntegral advance * pixelLength + charS) y
 
     toUv glyph (V2 x y) =
         let V2 _ gh = glyphInfoSize glyph
@@ -200,10 +216,10 @@ createText scene (FontFace freeType face) text pixelSize = do
 
     toSpriteVertex glyphVec (index, V2 sx sy, uv) =
         let GlyphInfo _ (V2 w h) (V2 bx by) _ = glyphVec BV.! index
-            size = V3 (fromIntegral w / fromIntegral unitLength) (fromIntegral h / fromIntegral unitLength) 0
+            size = V3 (fromIntegral w * pixelLength) (fromIntegral h * pixelLength) 0
             uvSize = V2 (fromIntegral w / fromIntegral twidth) (- fromIntegral h / fromIntegral theight)
-            x = sx + fromIntegral bx / fromIntegral unitLength
-            y = sy + fromIntegral (by - h) / fromIntegral unitLength
+            x = sx + fromIntegral bx * pixelLength
+            y = sy + fromIntegral (by - h) * pixelLength
             position = V3 x y 0
         in Hree.SpriteVertex position size (V3 0 0 0) 0 uv uvSize 0 0
 
@@ -224,7 +240,7 @@ createText scene (FontFace freeType face) text pixelSize = do
         (tname, texture) <- Hree.addTexture scene "textmesh" settings sourceData
         (_, sampler) <- Hree.addSampler scene tname
         let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
-        Foreign.allocaArray (pixelSize * pixelSize * 4) $ \p ->
+        Foreign.allocaArray (pixelH * pixelH * 4) $ \p ->
             mapM_ (renderBitmap p texture glyphs) layouts
 
         return material
