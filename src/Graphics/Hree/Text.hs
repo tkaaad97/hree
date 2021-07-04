@@ -43,8 +43,8 @@ data FontFace = FontFace !FreeType.FT_Library !FreeType.FT_Face
 data GlyphInfo = GlyphInfo
     { glyphInfoCharcode :: !Char
     , glyphInfoSize     :: !(V2 Int)
-    , glyphInfoBearing  :: !(V2 Int)
-    , glyphInfoAdvance  :: !Int
+    , glyphInfoBearing  :: !(V2 Double)
+    , glyphInfoAdvance  :: !Double
     } deriving (Show, Eq)
 
 data Packed = Packed
@@ -122,7 +122,7 @@ defaultTextOption = TextOption
     , characterSpacing = pure 0
     , lineSpacing = pure 0
     , pixelWidth = pure 0
-    , pixelHeight = pure 128
+    , pixelHeight = pure 64
     , originPosition = pure (V2 0 0)
     , originLocation = pure OriginLocationBottom
     , faceColor = pure (V4 0 0 0 255)
@@ -171,13 +171,29 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
     when isScalable
       $ FreeType.ft_Set_Pixel_Sizes face (fromIntegral . pixelWidth $ option) (fromIntegral . pixelHeight $ option)
 
+    faceRec <- Foreign.peek face
+
+    fontSizeMetrics <- fmap FreeType.srMetrics . Foreign.peek . FreeType.frSize $ faceRec
+    let unitsPerEM = fromIntegral (FreeType.frUnits_per_EM faceRec) :: Int
+        pixelSizeX = fromIntegral (FreeType.smX_ppem fontSizeMetrics) :: Int
+        pixelSizeY = fromIntegral (FreeType.smY_ppem fontSizeMetrics) :: Int
+        pixelSize = V2 pixelSizeX pixelSizeY
+        scaleX = fromIntegral (FreeType.smX_scale fontSizeMetrics) / 65536 :: Double
+        unitLen = realToFrac charH / fromIntegral unitsPerEM :: Double
+        maxAdvance = fromIntegral (FreeType.smMax_advance fontSizeMetrics) / 64 :: Double
+        pixelLenX = maxAdvance * unitLen / scaleX
+        pixelLenY = realToFrac charH / fromIntegral pixelSizeY :: Double
+        pixelLen = V2 pixelLenX pixelLenY
+        ascender = unitLen * fromIntegral (FreeType.frAscender faceRec) / fromIntegral unitsPerEM :: Double
+        descender = unitLen * fromIntegral (FreeType.frDescender faceRec) / fromIntegral unitsPerEM :: Double
+
     glyphs <- mapM loadMetrics charcodes
     let glyphMap = Map.fromList . map (\a -> (glyphInfoCharcode a, a)) $ glyphs
         glyphVec = BV.fromList glyphs
         glyphSizeVec = UV.fromList $ map glyphInfoSize glyphs
         packResults = packGlyphs (runIdentity . textureSize $ option) 1 glyphSizeVec
 
-    materials <- mapM (createMaterial glyphVec) packResults
+    materials <- mapM (createMaterial pixelSize glyphVec) packResults
     let uvMap = Map.fromList .
             map (\(materialIndex, Layout index pos) ->
                     let glyph = glyphVec BV.! index
@@ -186,10 +202,9 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
             zip ([0..] :: [Int]) . map packedLayouts $ packResults
 
     let charVec = UV.fromList str
-        origin = runIdentity . originPosition $ option
-        charPosVec = UV.zip charVec . UV.scanl' (calcCharPos glyphMap 0) origin $ charVec
+        charPosVec = UV.zip charVec . UV.scanl' (calcCharPos pixelLenX glyphMap 0) (V2 0 0) $ charVec
 
-    meshIds <- map Hree.addedMeshId <$> mapM (\(materialIndex, material) -> createMesh materialIndex material uvMap glyphVec charPosVec)
+    meshIds <- map Hree.addedMeshId <$> mapM (\(materialIndex, material) -> createMesh pixelLen materialIndex material uvMap glyphVec charPosVec)
                 (zip [0..] materials)
     childNodeIds <- mapM (\meshId -> Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False) meshIds
     Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.fromList childNodeIds } False
@@ -200,26 +215,23 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
     lineS = runIdentity . lineSpacing $ option
     charH = runIdentity . characterHeight $ option
     charS = runIdentity . characterSpacing $ option
-    pixelH = runIdentity . pixelHeight $ option
 
-    pixelLength = charH / fromIntegral pixelH
-
-    calcCharPos glyphMap sx (V2 x y) c
-        | c == '\n' = V2 sx (y - (charH + lineS))
+    calcCharPos pixelLenX glyphMap sx (V2 x y) c
+        | c == '\n' = V2 sx (y - realToFrac (charH + lineS))
         | otherwise =
             let advance = glyphInfoAdvance $ glyphMap Map.! c
-            in V2 (x + fromIntegral advance * pixelLength + charS) y
+            in V2 (x + advance * pixelLenX + realToFrac charS) y
 
     toUv glyph (V2 x y) =
         let V2 _ gh = glyphInfoSize glyph
         in V2 (fromIntegral x / fromIntegral twidth) (fromIntegral (y + gh) / fromIntegral theight)
 
-    toSpriteVertex glyphVec (index, V2 sx sy, uv) =
+    toSpriteVertex (V2 pixelLenX pixelLenY) glyphVec (index, V2 sx sy, uv) =
         let GlyphInfo _ (V2 w h) (V2 bx by) _ = glyphVec BV.! index
-            size = V3 (fromIntegral w * pixelLength) (fromIntegral h * pixelLength) 0
+            size = V3 (realToFrac (fromIntegral w * pixelLenX)) (realToFrac (fromIntegral h * pixelLenY)) 0
             uvSize = V2 (fromIntegral w / fromIntegral twidth) (- fromIntegral h / fromIntegral theight)
-            x = sx + fromIntegral bx * pixelLength
-            y = sy + fromIntegral (by - h) * pixelLength
+            x = realToFrac (sx + bx * pixelLenX)
+            y = realToFrac (sy + (by - fromIntegral h) * pixelLenY)
             position = V3 x y 0
         in Hree.SpriteVertex position size (V3 0 0 0) 0 uv uvSize 0 0
 
@@ -228,19 +240,19 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
         metrics <- FreeType.gsrMetrics <$> (Foreign.peek . FreeType.frGlyph =<< Foreign.peek face)
         let w = fromIntegral (FreeType.gmWidth metrics) `shift` (-6)
             h = fromIntegral (FreeType.gmHeight metrics) `shift` (-6)
-            bx = fromIntegral (FreeType.gmHoriBearingX metrics) `shift` (-6)
-            by = fromIntegral (FreeType.gmHoriBearingY metrics) `shift` (-6)
-            advance = fromIntegral (FreeType.gmHoriAdvance metrics) `shift` (-6)
+            bx = fromIntegral (FreeType.gmHoriBearingX metrics) / 64
+            by = fromIntegral (FreeType.gmHoriBearingY metrics) / 64
+            advance = fromIntegral (FreeType.gmHoriAdvance metrics) / 64
         return (GlyphInfo charcode (V2 w h) (V2 bx by) advance)
 
-    createMaterial glyphs (Packed layouts _) = do
+    createMaterial (V2 pixelSizeX pixelSizeY) glyphs (Packed layouts _) = do
         let settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
             sourceData = Hree.TextureSourceData (fromIntegral twidth) (fromIntegral theight) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE Foreign.nullPtr
 
         (tname, texture) <- Hree.addTexture scene "textmesh" settings sourceData
         (_, sampler) <- Hree.addSampler scene tname
         let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
-        Foreign.allocaArray (pixelH * pixelH * 4) $ \p ->
+        Foreign.allocaArray (pixelSizeX * pixelSizeY * 4) $ \p ->
             mapM_ (renderBitmap p texture glyphs) layouts
 
         return material
@@ -270,7 +282,7 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
                     Foreign.pokeElemOff p i (V4 (255 - color) (255 - color) (255 - color) color)
                 GLW.glTextureSubImage2D texture 0 (fromIntegral x) (fromIntegral y) (fromIntegral width) (fromIntegral height) GL.GL_RGBA GL.GL_UNSIGNED_BYTE (Foreign.castPtr p)
 
-    createMesh materialIndex material uvMap glyphVec charPosVec = do
+    createMesh pixelLen materialIndex material uvMap glyphVec charPosVec = do
         let xs = flip UV.mapMaybe charPosVec $ \(char, pos) -> do
                 (i, m, uv) <- Map.lookup char uvMap
                 let glyph = glyphVec BV.! i
@@ -278,7 +290,7 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
                 if m == materialIndex && gw > 0 && gh > 0 && char /= '\n'
                     then return (i, pos, uv)
                     else Nothing
-            vs = SV.generate (UV.length xs) (toSpriteVertex glyphVec . (xs UV.!))
+            vs = SV.generate (UV.length xs) (toSpriteVertex pixelLen glyphVec . (xs UV.!))
         (geo, _) <- Hree.newSpriteGeometry scene
         geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
         let mesh = Hree.Mesh geo' material . Just . SV.length $ vs
