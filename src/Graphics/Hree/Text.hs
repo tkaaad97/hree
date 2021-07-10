@@ -18,6 +18,7 @@ import Control.Monad (forM_, when)
 import Data.Bits (shift, (.|.))
 import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
+import Data.Foldable (foldl')
 import Data.Functor.Identity (Identity(..))
 import qualified Data.List as List (find, partition, sort)
 import qualified Data.Map.Strict as Map (fromList, lookup, (!))
@@ -25,7 +26,7 @@ import Data.Maybe (fromMaybe)
 import Data.Monoid (Last(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
-import qualified Data.Vector as BV (fromList, (!))
+import qualified Data.Vector as BV (Vector, fromList, (!))
 import qualified Data.Vector.Storable as SV (generate, length)
 import qualified Data.Vector.Unboxed as UV (Vector, foldl', fromList, imap,
                                             last, length, mapMaybe, null,
@@ -200,7 +201,8 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
     let uvMap = Map.fromList .
             map (\(materialIndex, Layout index pos) ->
                     let glyph = glyphVec BV.! index
-                    in (glyphInfoCharcode glyph, (index, materialIndex, toUv glyph pos))) .
+                        (_, textureSize') = materials !! materialIndex
+                    in (glyphInfoCharcode glyph, (index, materialIndex, toUv textureSize' glyph pos))) .
             concatMap (\(i, xs) -> zip (repeat i) xs) .
             zip ([0..] :: [Int]) . map packedLayouts $ packResults
 
@@ -225,14 +227,14 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
             let advance = glyphInfoAdvance $ glyphMap Map.! c
             in V2 (x + advance * pixelLenX + realToFrac charS) y
 
-    toUv glyph (V2 x y) =
+    toUv (V2 tw th) glyph (V2 x y) =
         let V2 _ gh = glyphInfoSize glyph
-        in V2 (fromIntegral x / fromIntegral twidth) (fromIntegral (y + gh) / fromIntegral theight)
+        in V2 (fromIntegral x / tw) (fromIntegral (y + gh) / th)
 
-    toSpriteVertex (V2 ox oy) (V2 pixelLenX pixelLenY) glyphVec (index, V2 sx sy, uv) =
+    toSpriteVertex (V2 tw th) (V2 ox oy) (V2 pixelLenX pixelLenY) glyphVec (index, V2 sx sy, uv) =
         let GlyphInfo _ (V2 w h) (V2 bx by) _ = glyphVec BV.! index
             size = V3 (realToFrac (fromIntegral w * pixelLenX)) (realToFrac (fromIntegral h * pixelLenY)) 0
-            uvSize = V2 (fromIntegral w / fromIntegral twidth) (- fromIntegral h / fromIntegral theight)
+            uvSize = V2 (fromIntegral w / tw) (- fromIntegral h / th)
             x = realToFrac (sx + bx * pixelLenX - ox)
             y = realToFrac (sy + (by - fromIntegral h) * pixelLenY - oy)
             position = V3 x y 0
@@ -248,8 +250,10 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
             advance = fromIntegral (FreeType.gmHoriAdvance metrics) / 64
         return (GlyphInfo charcode (V2 w h) (V2 bx by) advance)
 
+
     createMaterial (V2 pixelSizeX pixelSizeY) glyphs (Packed layouts _) = do
-        let settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
+        let V2 twidth' theight' = minimizeTextureSize glyphs layouts
+            settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth') (fromIntegral theight') False
             sourceData = Hree.TextureSourceData (fromIntegral twidth) (fromIntegral theight) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE Foreign.nullPtr
 
         (tname, texture) <- Hree.addTexture scene "textmesh" settings sourceData
@@ -258,7 +262,7 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
         Foreign.allocaArray (pixelSizeX * pixelSizeY * 4) $ \p ->
             mapM_ (renderBitmap p texture glyphs) layouts
 
-        return material
+        return (material, fromIntegral <$> V2 twidth' theight')
 
     renderBitmap p texture glyphs (Layout index (V2 x y)) =
         FreeType.ft_Bitmap_With freeType $ \convertBitmap -> do
@@ -290,7 +294,7 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
     relocateOrigin _ _ _ OriginLocationFirstBaseLine (V2 ox oy) = V2 ox oy
     relocateOrigin _ _ bottom OriginLocationLastBaseLine (V2 ox oy) = V2 ox (oy + bottom)
 
-    createMesh ascender descender pixelLen materialIndex material uvMap glyphVec charPosVec = do
+    createMesh ascender descender pixelLen materialIndex (material, textureSize') uvMap glyphVec charPosVec = do
         let xs = flip UV.mapMaybe charPosVec $ \(char, pos) -> do
                 (i, m, uv) <- Map.lookup char uvMap
                 let glyph = glyphVec BV.! i
@@ -300,7 +304,7 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
                     else Nothing
             V2 _ bottomLine = if UV.null xs then V2 0 0 else (\(_, a, _) -> a) $ UV.last xs
             origin = relocateOrigin ascender descender bottomLine (runIdentity $ originLocation option) (fmap realToFrac . runIdentity . originPosition $ option)
-            vs = SV.generate (UV.length xs) (toSpriteVertex origin pixelLen glyphVec . (xs UV.!))
+            vs = SV.generate (UV.length xs) (toSpriteVertex textureSize' origin pixelLen glyphVec . (xs UV.!))
         (geo, _) <- Hree.newSpriteGeometry scene
         geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
         let mesh = Hree.Mesh geo' material . Just . SV.length $ vs
@@ -326,6 +330,19 @@ packGlyphs (V2 textureWidth textureHeight) spacing =
         case tryPackOne (index, V2 (w + spacing) (h + spacing)) r of
             Just r' -> Just (r' : rs)
             Nothing -> fmap (r :) (tryPack (index, V2 w h) rs)
+
+minimizeTextureSize :: BV.Vector GlyphInfo -> [Layout] -> V2 Int
+minimizeTextureSize glyphVec layouts = fmap minPow2 maxPos
+    where
+    bottomLeftPos (Layout i (V2 px py)) =
+        let glyph = glyphVec BV.! i
+            V2 sx sy = glyphInfoSize glyph
+        in V2 (px + sx) (py + sy)
+    maxPos = foldl' (\(V2 ax ay) (V2 bx by) -> V2 (max ax bx) (max ay by)) (V2 1 1) (map bottomLeftPos layouts)
+    minPow2 = minPow2_ 1
+    minPow2_ a x
+        | a >= x = a
+        | otherwise = minPow2_ (a * 2) x
 
 tryPackOne :: (Int, V2 Int) -> Packed -> Maybe Packed
 tryPackOne (index, V2 w h) (Packed layouts spaces) = do
