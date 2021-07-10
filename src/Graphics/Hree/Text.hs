@@ -20,7 +20,7 @@ import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
 import Data.Foldable (foldl')
 import Data.Functor.Identity (Identity(..))
-import qualified Data.List as List (find, partition, sort)
+import qualified Data.List as List (delete, find, partition, sort)
 import qualified Data.Map.Strict as Map (fromList, lookup, (!))
 import Data.Maybe (fromMaybe)
 import Data.Monoid (Last(..))
@@ -169,7 +169,7 @@ createText scene fontFace text charHeight =
 createTextWithOption :: Hree.Scene -> FontFace -> Text -> PartialTextOption -> IO Hree.NodeId
 createTextWithOption scene (FontFace freeType face) text partialOption = do
     let str = Text.unpack text
-        charcodes = nubOrd str
+        charcodes = List.delete '\n' . nubOrd $ str
 
     isScalable <- FreeType.FT_IS_SCALABLE face
     when isScalable
@@ -280,7 +280,7 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
                 buffer = FreeType.bBuffer bitmap
                 pitch = FreeType.bPitch bitmap
 
-            when (width > 0 && height > 0) $ do
+            when (width > 0 && height > 0 && charcode /= '\n') $ do
                 forM_ [0..(fromIntegral $ width * height - 1)] $ \i -> do
                     let (py, px) = divMod i (fromIntegral width)
                     color <- Foreign.peekElemOff buffer (py * fromIntegral pitch + px)
