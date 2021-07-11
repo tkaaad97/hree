@@ -17,14 +17,14 @@ module Graphics.Hree.Text
     , newFontFace
     ) where
 
-import Control.Monad (forM_, when)
+import Control.Monad (forM_, unless, when)
 import Data.Bits (shift, (.|.))
 import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
 import Data.Foldable (foldl')
 import Data.Functor.Identity (Identity(..))
 import qualified Data.HashTable.IO as HT
-import Data.IORef (IORef)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import qualified Data.List as List (delete, find, partition, sort)
 import qualified Data.Map.Strict as Map (fromList, lookup, (!))
 import Data.Maybe (fromMaybe)
@@ -59,7 +59,8 @@ data SizeInfo = SizeInfo
     } deriving (Show, Eq)
 
 data FontState = FontState
-    { fontStateCharVec     :: !(UV.Vector Char)
+    { fontStateDeleted     :: !Bool
+    , fontStateCharVec     :: !(UV.Vector Char)
     , fontStateGlyphVec    :: !(BV.Vector GlyphInfo)
     , fontStateCharUvMap   :: !(HT.BasicHashTable Char UvInfo)
     , fontStatePackedVec   :: !(BV.Vector Packed)
@@ -217,6 +218,34 @@ deleteFontFace (FontFace freeType face) = do
     FreeType.ft_Done_Face face
     FreeType.ft_Done_FreeType freeType
 
+newFont :: FilePath -> IO Font
+newFont fontPath = newFontWithOption fontPath mempty
+
+newFontWithOption :: FilePath -> PartialFontOption -> IO Font
+newFontWithOption fontPath partialOption = do
+    face <- newFontFace fontPath
+    setFontPixelSize face pixelW pixelH
+    sizeInfo <- loadFontSizeInfo face
+    charUvMap <- HT.newSized reserveSize
+    let state = FontState False mempty mempty charUvMap mempty mempty
+    stateRef <- newIORef state
+    return (Font face option sizeInfo stateRef)
+    where
+    option = overrideFontOption defaultFontOption partialOption
+    pixelW = runIdentity . pixelWidth $ option
+    pixelH = runIdentity . pixelHeight $ option
+    reserveSize = 256
+
+deleteFont :: Font -> IO ()
+deleteFont (Font face _ _ stateRef) = do
+    state <- readIORef stateRef
+    unless (fontStateDeleted state) $ do
+        deleteFontFace face
+        charUvMap <- HT.new
+        let deletedState = FontState True mempty mempty charUvMap mempty mempty
+        writeIORef stateRef deletedState
+        -- TODO delete textures
+
 createText :: Hree.Scene -> FontFace -> Text -> Float -> IO Hree.NodeId
 createText scene fontFace text charHeight =
     createTextWithOption scene fontFace text mempty partialOption
@@ -365,6 +394,24 @@ createTextWithOption scene (FontFace freeType face) text partialFontOption parti
         geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
         let mesh = Hree.Mesh geo' material . Just . SV.length $ vs
         Hree.addMesh scene mesh
+
+setFontPixelSize :: FontFace -> Int -> Int -> IO ()
+setFontPixelSize (FontFace _ face) pixelW pixelH = do
+    isScalable <- FreeType.FT_IS_SCALABLE face
+    when isScalable
+      $ FreeType.ft_Set_Pixel_Sizes face (fromIntegral pixelW) (fromIntegral pixelH)
+
+loadFontSizeInfo :: FontFace -> IO SizeInfo
+loadFontSizeInfo (FontFace _ face) = do
+    faceRec <- Foreign.peek face
+    fontSizeMetrics <- fmap FreeType.srMetrics . Foreign.peek . FreeType.frSize $ faceRec
+    let unitsPerEM = fromIntegral (FreeType.frUnits_per_EM faceRec) :: Int
+        pixelSizeX = fromIntegral (FreeType.smX_ppem fontSizeMetrics) :: Int
+        pixelSizeY = fromIntegral (FreeType.smY_ppem fontSizeMetrics) :: Int
+        pixelSize = V2 pixelSizeX pixelSizeY
+        ascender = fromIntegral (FreeType.frAscender faceRec)
+        descender = - fromIntegral (FreeType.frDescender faceRec)
+    return (SizeInfo pixelSize unitsPerEM ascender descender)
 
 packGlyphs :: V2 Int -> Int -> UV.Vector (V2 Int) -> [Packed]
 packGlyphs (V2 textureWidth textureHeight) spacing =
