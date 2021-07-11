@@ -4,7 +4,8 @@ module Font1 where
 import qualified Data.Text as Text (pack, replace)
 import Example
 import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Text as Hree (OriginLocation(..), TextOption,
+import qualified Graphics.Hree.Text as Hree (FontOption_(..),
+                                             OriginLocation(..),
                                              TextOption_(..),
                                              createTextWithOption, newFontFace)
 import qualified Graphics.UI.GLFW as GLFW
@@ -30,15 +31,17 @@ main = do
     la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
 
     init fontPath phrase originLocation w = do
-        let opt = mempty
+        let fontOption = mempty
+                { Hree.pixelHeight = pure 128
+                }
+            textOption = mempty
                 { Hree.characterHeight = pure (1 / 16)
                 , Hree.originLocation = pure originLocation
-                , Hree.pixelHeight = pure 128
                 }
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         font <- Hree.newFontFace fontPath
-        nodeId <- Hree.createTextWithOption scene font (Text.replace "\\n" "\n" . Text.pack $ phrase) opt
+        nodeId <- Hree.createTextWithOption scene font (Text.replace "\\n" "\n" . Text.pack $ phrase) fontOption textOption
         Hree.addRootNodes scene (pure nodeId)
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera

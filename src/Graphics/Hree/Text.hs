@@ -3,6 +3,9 @@
 {-# LANGUAGE StandaloneDeriving #-}
 module Graphics.Hree.Text
     ( FontFace
+    , FontOption
+    , FontOption_(..)
+    , PartialFontOption
     , OriginLocation(..)
     , TextOption
     , TextOption_(..)
@@ -67,24 +70,44 @@ data Rect = Rect
     , rectPosition :: !(V2 Int)
     } deriving (Show, Eq, Ord)
 
+data FontOption_ f = FontOption
+    { pixelWidth  :: !(f Int)
+    , pixelHeight :: !(f Int)
+    , faceColor   :: !(f (V4 Word8))
+    , textureSize :: !(f (V2 Int))
+    }
+
+type FontOption = FontOption_ Identity
+type PartialFontOption = FontOption_ Last
+
+deriving instance Eq FontOption
+deriving instance Eq PartialFontOption
+deriving instance Show FontOption
+deriving instance Show PartialFontOption
+
+instance Semigroup PartialFontOption where
+    a <> b = FontOption
+        { pixelWidth = pixelWidth a <> pixelWidth b
+        , pixelHeight = pixelHeight a <> pixelHeight b
+        , faceColor = faceColor a <> faceColor b
+        , textureSize = textureSize a <> textureSize b
+        }
+
+instance Monoid PartialFontOption where
+    mempty = FontOption
+        { pixelWidth = mempty
+        , pixelHeight = mempty
+        , faceColor = mempty
+        , textureSize = mempty
+        }
+
 data TextOption_ f = TextOption
     { characterHeight  :: !(f Float)
     , characterSpacing :: !(f Float)
     , lineSpacing      :: !(f Float)
-    , pixelWidth       :: !(f Int)
-    , pixelHeight      :: !(f Int)
     , originPosition   :: !(f (V2 Float))
     , originLocation   :: !(f OriginLocation)
-    , faceColor        :: !(f (V4 Word8))
-    , textureSize      :: !(f (V2 Int))
     }
-
-data OriginLocation =
-    OriginLocationBottom |
-    OriginLocationTop |
-    OriginLocationFirstBaseLine |
-    OriginLocationLastBaseLine
-    deriving (Show, Read, Eq, Enum)
 
 type TextOption = TextOption_ Identity
 type PartialTextOption = TextOption_ Last
@@ -99,12 +122,8 @@ instance Semigroup PartialTextOption where
         { characterHeight = characterHeight a <> characterHeight b
         , characterSpacing = characterSpacing a <> characterSpacing b
         , lineSpacing = lineSpacing a <> lineSpacing b
-        , pixelWidth = pixelWidth a <> pixelWidth b
-        , pixelHeight = pixelHeight a <> pixelHeight b
         , originPosition = originPosition a <> originPosition b
         , originLocation = originLocation a <> originLocation b
-        , faceColor = faceColor a <> faceColor b
-        , textureSize = textureSize a <> textureSize b
         }
 
 instance Monoid PartialTextOption where
@@ -112,25 +131,42 @@ instance Monoid PartialTextOption where
         { characterHeight = mempty
         , characterSpacing = mempty
         , lineSpacing = mempty
-        , pixelWidth = mempty
-        , pixelHeight = mempty
         , originPosition = mempty
         , originLocation = mempty
-        , faceColor = mempty
-        , textureSize = mempty
         }
+
+data OriginLocation =
+    OriginLocationBottom |
+    OriginLocationTop |
+    OriginLocationFirstBaseLine |
+    OriginLocationLastBaseLine
+    deriving (Show, Read, Eq, Enum)
+
+defaultFontOption :: FontOption
+defaultFontOption = FontOption
+    { pixelWidth = pure 0
+    , pixelHeight = pure 64
+    , faceColor = pure (V4 0 0 0 255)
+    , textureSize = pure (V2 2048 2048)
+    }
+
+overrideFontOption :: FontOption -> PartialFontOption -> FontOption
+overrideFontOption option override = FontOption
+    { pixelWidth = fromMaybe (pixelWidth option) (toIdentity . pixelWidth $ override)
+    , pixelHeight = fromMaybe (pixelHeight option) (toIdentity . pixelHeight $ override)
+    , faceColor = fromMaybe (faceColor option) (toIdentity . faceColor $ override)
+    , textureSize = fromMaybe (textureSize option) (toIdentity . textureSize $ override)
+    }
+    where
+    toIdentity = fmap Identity . getLast
 
 defaultTextOption :: TextOption
 defaultTextOption = TextOption
     { characterHeight = pure (1 / 16)
     , characterSpacing = pure 0
     , lineSpacing = pure 0
-    , pixelWidth = pure 0
-    , pixelHeight = pure 64
     , originPosition = pure (V2 0 0)
     , originLocation = pure OriginLocationBottom
-    , faceColor = pure (V4 0 0 0 255)
-    , textureSize = pure (V2 2048 2048)
     }
 
 overrideTextOption :: TextOption -> PartialTextOption -> TextOption
@@ -138,12 +174,8 @@ overrideTextOption option override = TextOption
     { characterHeight = fromMaybe (characterHeight option) (toIdentity . characterHeight $ override)
     , characterSpacing = fromMaybe (characterSpacing option) (toIdentity . characterSpacing $ override)
     , lineSpacing = fromMaybe (lineSpacing option) (toIdentity . lineSpacing $ override)
-    , pixelWidth = fromMaybe (pixelWidth option) (toIdentity . pixelWidth $ override)
-    , pixelHeight = fromMaybe (pixelHeight option) (toIdentity . pixelHeight $ override)
     , originPosition = fromMaybe (originPosition option) (toIdentity . originPosition $ override)
     , originLocation = fromMaybe (originLocation option) (toIdentity . originLocation $ override)
-    , faceColor = fromMaybe (faceColor option) (toIdentity . faceColor $ override)
-    , textureSize = fromMaybe (textureSize option) (toIdentity . textureSize $ override)
     }
     where
     toIdentity = fmap Identity . getLast
@@ -162,18 +194,18 @@ deleteFontFace (FontFace freeType face) = do
 
 createText :: Hree.Scene -> FontFace -> Text -> Float -> IO Hree.NodeId
 createText scene fontFace text charHeight =
-    createTextWithOption scene fontFace text partialOption
+    createTextWithOption scene fontFace text mempty partialOption
     where
     partialOption = mempty { characterHeight = pure charHeight }
 
-createTextWithOption :: Hree.Scene -> FontFace -> Text -> PartialTextOption -> IO Hree.NodeId
-createTextWithOption scene (FontFace freeType face) text partialOption = do
+createTextWithOption :: Hree.Scene -> FontFace -> Text -> PartialFontOption -> PartialTextOption -> IO Hree.NodeId
+createTextWithOption scene (FontFace freeType face) text partialFontOption partialTextOption = do
     let str = Text.unpack text
         charcodes = List.delete '\n' . nubOrd $ str
 
     isScalable <- FreeType.FT_IS_SCALABLE face
     when isScalable
-      $ FreeType.ft_Set_Pixel_Sizes face (fromIntegral . pixelWidth $ option) (fromIntegral . pixelHeight $ option)
+      $ FreeType.ft_Set_Pixel_Sizes face (fromIntegral . pixelWidth $ fontOption) (fromIntegral . pixelHeight $ fontOption)
 
     faceRec <- Foreign.peek face
 
@@ -193,7 +225,7 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
     let glyphMap = Map.fromList . map (\a -> (glyphInfoCharcode a, a)) $ glyphs
         glyphVec = BV.fromList glyphs
         glyphSizeVec = UV.fromList $ map glyphInfoSize glyphs
-        packResults = packGlyphs (runIdentity . textureSize $ option) 1 glyphSizeVec
+        packResults = packGlyphs (runIdentity . textureSize $ fontOption) 1 glyphSizeVec
 
     materials <- mapM (createMaterial pixelSize glyphVec) packResults
     let uvMap = Map.fromList .
@@ -213,11 +245,12 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
     Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.fromList childNodeIds } False
 
     where
-    option = overrideTextOption defaultTextOption partialOption
-    V2 twidth theight = runIdentity . textureSize $ option
-    lineS = runIdentity . lineSpacing $ option
-    charH = runIdentity . characterHeight $ option
-    charS = runIdentity . characterSpacing $ option
+    fontOption = overrideFontOption defaultFontOption partialFontOption
+    textOption = overrideTextOption defaultTextOption partialTextOption
+    V2 twidth theight = runIdentity . textureSize $ fontOption
+    lineS = runIdentity . lineSpacing $ textOption
+    charH = runIdentity . characterHeight $ textOption
+    charS = runIdentity . characterSpacing $ textOption
 
     calcCharPos pixelLenX glyphMap sx (V2 x y) c
         | c == '\n' = V2 sx (y - realToFrac (charH + lineS))
@@ -301,7 +334,7 @@ createTextWithOption scene (FontFace freeType face) text partialOption = do
                     then return (i, pos, uv)
                     else Nothing
             V2 _ bottomLine = if UV.null xs then V2 0 0 else (\(_, a, _) -> a) $ UV.last xs
-            origin = relocateOrigin ascender descender bottomLine (runIdentity $ originLocation option) (fmap realToFrac . runIdentity . originPosition $ option)
+            origin = relocateOrigin ascender descender bottomLine (runIdentity $ originLocation textOption) (fmap realToFrac . runIdentity . originPosition $ textOption)
             vs = SV.generate (UV.length xs) (toSpriteVertex textureSize' origin pixelLen glyphVec . (xs UV.!))
         (geo, _) <- Hree.newSpriteGeometry scene
         geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
