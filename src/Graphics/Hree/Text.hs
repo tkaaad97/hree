@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 module Graphics.Hree.Text
-    ( FontFace
+    ( Font
+    , FontFace
     , FontOption
     , FontOption_(..)
     , PartialFontOption
@@ -13,29 +14,31 @@ module Graphics.Hree.Text
     , GlyphInfo
     , createText
     , createTextWithOption
-    , deleteFontFace
-    , newFontFace
+    , deleteFont
+    , newFont
+    , newFontWithOption
     ) where
 
+import Control.Exception (throwIO)
 import Control.Monad (forM_, unless, when)
 import Data.Bits (shift, (.|.))
 import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
-import Data.Foldable (foldl')
 import Data.Functor.Identity (Identity(..))
 import qualified Data.HashTable.IO as HT
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import qualified Data.List as List (delete, find, partition, sort)
-import qualified Data.Map.Strict as Map (fromList, lookup, (!))
 import Data.Maybe (fromMaybe)
 import Data.Monoid (Last(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
-import qualified Data.Vector as BV (Vector, fromList, (!))
+import qualified Data.Vector as BV (Vector, generateM, imapM, last, length, map,
+                                    null, snoc, take, (!))
 import qualified Data.Vector.Storable as SV (generate, length)
-import qualified Data.Vector.Unboxed as UV (Vector, foldl', fromList, imap,
-                                            last, length, mapMaybe, null,
-                                            scanl', zip, (!))
+import qualified Data.Vector.Unboxed as UV (Vector, filter, filterM, foldl',
+                                            fromList, generate, imap, last,
+                                            length, mapM, null, scanl', zip,
+                                            (!))
 import Data.Word (Word8)
 import qualified Foreign (allocaArray, castPtr, nullPtr, peek, peekElemOff,
                           pokeElemOff, with)
@@ -64,14 +67,17 @@ data FontState = FontState
     , fontStateGlyphVec    :: !(BV.Vector GlyphInfo)
     , fontStateCharUvMap   :: !(HT.BasicHashTable Char UvInfo)
     , fontStatePackedVec   :: !(BV.Vector Packed)
-    , fontStateMaterialVec :: !(BV.Vector Hree.SpriteMaterial)
+    , fontStateMaterialVec :: !(BV.Vector MaterialInfo)
     }
 
 data UvInfo = UvInfo
-    { uvInfoMaterialIndex :: !Int
+    { uvInfoGlyphIndex    :: !Int
+    , uvInfoMaterialIndex :: !Int
     , uvInfoUvPos         :: !(V2 Float)
     , uvInfoUvSize        :: !(V2 Float)
     } deriving (Show ,Eq)
+
+data MaterialInfo = MaterialInfo !Hree.SpriteMaterial !Hree.Texture
 
 data GlyphInfo = GlyphInfo
     { glyphInfoCharcode :: !Char
@@ -246,84 +252,142 @@ deleteFont (Font face _ _ stateRef) = do
         writeIORef stateRef deletedState
         -- TODO delete textures
 
-createText :: Hree.Scene -> FontFace -> Text -> Float -> IO Hree.NodeId
+createText :: Hree.Scene -> Font -> Text -> Float -> IO Hree.NodeId
 createText scene fontFace text charHeight =
-    createTextWithOption scene fontFace text mempty partialOption
+    createTextWithOption scene fontFace text partialOption
     where
     partialOption = mempty { characterHeight = pure charHeight }
 
-createTextWithOption :: Hree.Scene -> FontFace -> Text -> PartialFontOption -> PartialTextOption -> IO Hree.NodeId
-createTextWithOption scene (FontFace freeType face) text partialFontOption partialTextOption = do
-    let str = Text.unpack text
-        charcodes = List.delete '\n' . nubOrd $ str
+createTextWithOption :: Hree.Scene -> Font -> Text -> PartialTextOption -> IO Hree.NodeId
+createTextWithOption scene font text partialTextOption = do
+    fontState <- loadCharactersToFont scene font str
 
+    let charVec = UV.fromList str
+        glyphVec = fontStateGlyphVec fontState
+        charUvMap = fontStateCharUvMap fontState
+        materials = fontStateMaterialVec fontState
+
+    charPosVec <- UV.zip charVec . UV.scanl' (calcCharPos 0) (V2 0 0) <$> UV.mapM (getCharAdvance glyphVec charUvMap) charVec
+
+    meshIds <- BV.map Hree.addedMeshId <$>
+        BV.imapM (createMesh fontState charPosVec) materials
+    childNodeIds <- mapM (\meshId -> Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False) meshIds
+    Hree.addNode scene Hree.newNode { Hree.nodeChildren = childNodeIds } False
+
+    where
+    Font _ _ sizeInfo _ = font
+    str = Text.unpack text
+    textOption = overrideTextOption defaultTextOption partialTextOption
+    lineS = runIdentity . lineSpacing $ textOption
+    charH = runIdentity . characterHeight $ textOption
+    charS = runIdentity . characterSpacing $ textOption
+    V2 pixelSizeX pixelSizeY = sizeInfoPixelSize sizeInfo
+    unitsPerEM = sizeInfoUnitsPerEM sizeInfo
+    unitLen = realToFrac charH / fromIntegral unitsPerEM :: Double
+    pixelLenY = realToFrac charH / fromIntegral pixelSizeY :: Double
+    pixelLenX = pixelLenY * fromIntegral pixelSizeY / fromIntegral pixelSizeX
+    ascender = unitLen * fromIntegral (sizeInfoAscenderUnits sizeInfo) :: Double
+    descender = - unitLen * fromIntegral (sizeInfoDescenderUnits sizeInfo) :: Double
+
+    getCharAdvance glyphVec charUvMap c
+        | c == '\n' = return (c, 0)
+        | otherwise = do
+            maybeUvInfo <- HT.lookup charUvMap c
+            case maybeUvInfo of
+                Just uvInfo -> do
+                    let glyphIndex = uvInfoGlyphIndex uvInfo
+                    return (c, glyphInfoAdvance (glyphVec BV.! glyphIndex))
+                Nothing -> return (c, 0)
+
+
+    calcCharPos sx (V2 x y) (c, advance)
+        | c == '\n' = V2 sx (y - realToFrac (charH + lineS))
+        | otherwise = V2 (x + advance * pixelLenX + realToFrac charS) y
+
+    toSpriteVertex (V2 ox oy) glyphVec (index, (V2 sx sy, (uv, uvSize))) =
+        let GlyphInfo _ (V2 w h) (V2 bx by) _ = glyphVec BV.! index
+            size = V3 (realToFrac (fromIntegral w * pixelLenX)) (realToFrac (fromIntegral h * pixelLenY)) 0
+            x = realToFrac (sx + bx * pixelLenX - ox)
+            y = realToFrac (sy + (by - fromIntegral h) * pixelLenY - oy)
+            position = V3 x y 0
+        in Hree.SpriteVertex position size (V3 0 0 0) 0 uv uvSize 0 0
+
+    relocateOrigin bottom OriginLocationBottom (V2 ox oy) = V2 ox (oy + bottom - descender)
+    relocateOrigin _ OriginLocationTop (V2 ox oy) = V2 ox (oy + ascender)
+    relocateOrigin _ OriginLocationFirstBaseLine (V2 ox oy) = V2 ox oy
+    relocateOrigin bottom OriginLocationLastBaseLine (V2 ox oy) = V2 ox (oy + bottom)
+
+    createMesh fontState charPosVec materialIndex (MaterialInfo material _) = do
+        let FontState _ _ glyphVec charUvMap _ _ = fontState
+        xs <- fmap (UV.filter ((>= 0) . fst)) . flip UV.mapM charPosVec $ \(char, pos) -> do
+            maybeUvInfo <- HT.lookup charUvMap char
+            case maybeUvInfo of
+                Just uvInfo -> do
+                    let UvInfo i m uv uvSize = uvInfo
+                    if m == materialIndex && uvSize /= V2 0 0
+                        then return (i, (pos, (uv, uvSize)))
+                        else return (-1, (V2 0 0, (V2 0 0, V2 0 0)))
+                Nothing -> return (-1, (V2 0 0, (V2 0 0, V2 0 0)))
+
+        let V2 _ bottomLine = if UV.null xs then V2 0 0 else (\(_, (a, _)) -> a) $ UV.last xs
+            origin = relocateOrigin bottomLine (runIdentity $ originLocation textOption) (fmap realToFrac . runIdentity . originPosition $ textOption)
+            vs = SV.generate (UV.length xs) (toSpriteVertex origin glyphVec . (xs UV.!))
+
+        (geo, _) <- Hree.newSpriteGeometry scene
+        geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
+        let mesh = Hree.Mesh geo' material . Just . SV.length $ vs
+        Hree.addMesh scene mesh
+
+setFontPixelSize :: FontFace -> Int -> Int -> IO ()
+setFontPixelSize (FontFace _ face) pixelW pixelH = do
     isScalable <- FreeType.FT_IS_SCALABLE face
     when isScalable
-      $ FreeType.ft_Set_Pixel_Sizes face (fromIntegral . pixelWidth $ fontOption) (fromIntegral . pixelHeight $ fontOption)
+      $ FreeType.ft_Set_Pixel_Sizes face (fromIntegral pixelW) (fromIntegral pixelH)
 
+loadFontSizeInfo :: FontFace -> IO SizeInfo
+loadFontSizeInfo (FontFace _ face) = do
     faceRec <- Foreign.peek face
-
     fontSizeMetrics <- fmap FreeType.srMetrics . Foreign.peek . FreeType.frSize $ faceRec
     let unitsPerEM = fromIntegral (FreeType.frUnits_per_EM faceRec) :: Int
         pixelSizeX = fromIntegral (FreeType.smX_ppem fontSizeMetrics) :: Int
         pixelSizeY = fromIntegral (FreeType.smY_ppem fontSizeMetrics) :: Int
         pixelSize = V2 pixelSizeX pixelSizeY
-        unitLen = realToFrac charH / fromIntegral unitsPerEM :: Double
-        pixelLenY = realToFrac charH / fromIntegral pixelSizeY :: Double
-        pixelLenX = pixelLenY * fromIntegral pixelSizeY / fromIntegral pixelSizeX
-        pixelLen = V2 pixelLenX pixelLenY
-        ascender = unitLen * fromIntegral (FreeType.frAscender faceRec) :: Double
-        descender = - unitLen * fromIntegral (FreeType.frDescender faceRec) :: Double
+        ascender = fromIntegral (FreeType.frAscender faceRec)
+        descender = - fromIntegral (FreeType.frDescender faceRec)
+    return (SizeInfo pixelSize unitsPerEM ascender descender)
 
-    glyphs <- mapM loadMetrics charcodes
-    let glyphMap = Map.fromList . map (\a -> (glyphInfoCharcode a, a)) $ glyphs
-        glyphVec = BV.fromList glyphs
-        glyphSizeVec = UV.fromList $ map glyphInfoSize glyphs
-        packResults = packGlyphs (runIdentity . textureSize $ fontOption) 1 glyphSizeVec
+loadCharactersToFont :: Hree.Scene -> Font -> String -> IO FontState
+loadCharactersToFont scene (Font (FontFace freeType face) fontOption sizeInfo stateRef) str = do
+    state <- readIORef stateRef
+    let FontState deleted charcodes glyphVec charUvMap packResults materials = state
+        startGlyphIndex = UV.length charcodes
+    when deleted . throwIO . userError $ "font deleted"
 
-    materials <- mapM (createMaterial pixelSize glyphVec) packResults
-    let uvMap = Map.fromList .
-            map (\(materialIndex, Layout index pos) ->
-                    let glyph = glyphVec BV.! index
-                        (_, textureSize') = materials !! materialIndex
-                    in (glyphInfoCharcode glyph, (index, materialIndex, toUv textureSize' glyph pos))) .
-            concatMap (\(i, xs) -> zip (repeat i) xs) .
-            zip ([0..] :: [Int]) . map packedLayouts $ packResults
+    addedCharcodes <- findNewCharacters charUvMap str
+    let addedCharCount = UV.length addedCharcodes
+    addedGlyphVec <- BV.generateM addedCharCount (loadMetrics . (addedCharcodes UV.!))
+    let glyphSizeVec = UV.generate addedCharCount (glyphInfoSize . (addedGlyphVec BV.!))
+        newPackResults = packGlyphs startGlyphIndex textureSize' 1 packResults glyphSizeVec
+        newGlyphVec = glyphVec <> addedGlyphVec
 
-    let charVec = UV.fromList str
-        charPosVec = UV.zip charVec . UV.scanl' (calcCharPos pixelLenX glyphMap 0) (V2 0 0) $ charVec
+    newMaterials <- BV.imapM (createOrUpdateMaterial charUvMap materials newGlyphVec startGlyphIndex) newPackResults
 
-    meshIds <- map Hree.addedMeshId <$> mapM (\(materialIndex, material) -> createMesh  ascender descender pixelLen materialIndex material uvMap glyphVec charPosVec)
-                (zip [0..] materials)
-    childNodeIds <- mapM (\meshId -> Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False) meshIds
-    Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.fromList childNodeIds } False
+    let newCharcodes = charcodes `mappend` addedCharcodes
+        newState = FontState deleted newCharcodes newGlyphVec charUvMap newPackResults newMaterials
+    writeIORef stateRef newState
+    return newState
 
     where
-    fontOption = overrideFontOption defaultFontOption partialFontOption
-    textOption = overrideTextOption defaultTextOption partialTextOption
-    V2 twidth theight = runIdentity . textureSize $ fontOption
-    lineS = runIdentity . lineSpacing $ textOption
-    charH = runIdentity . characterHeight $ textOption
-    charS = runIdentity . characterSpacing $ textOption
+    pixelSize = sizeInfoPixelSize sizeInfo
+    V2 pixelSizeX pixelSizeY = pixelSize
+    textureSize' = runIdentity . textureSize $ fontOption
+    V2 twidth theight = textureSize'
+    V2 tw th = fmap fromIntegral textureSize'
 
-    calcCharPos pixelLenX glyphMap sx (V2 x y) c
-        | c == '\n' = V2 sx (y - realToFrac (charH + lineS))
-        | otherwise =
-            let advance = glyphInfoAdvance $ glyphMap Map.! c
-            in V2 (x + advance * pixelLenX + realToFrac charS) y
-
-    toUv (V2 tw th) glyph (V2 x y) =
-        let V2 _ gh = glyphInfoSize glyph
-        in V2 (fromIntegral x / tw) (fromIntegral (y + gh) / th)
-
-    toSpriteVertex (V2 tw th) (V2 ox oy) (V2 pixelLenX pixelLenY) glyphVec (index, V2 sx sy, uv) =
-        let GlyphInfo _ (V2 w h) (V2 bx by) _ = glyphVec BV.! index
-            size = V3 (realToFrac (fromIntegral w * pixelLenX)) (realToFrac (fromIntegral h * pixelLenY)) 0
-            uvSize = V2 (fromIntegral w / tw) (- fromIntegral h / th)
-            x = realToFrac (sx + bx * pixelLenX - ox)
-            y = realToFrac (sy + (by - fromIntegral h) * pixelLenY - oy)
-            position = V3 x y 0
-        in Hree.SpriteVertex position size (V3 0 0 0) 0 uv uvSize 0 0
+    toUvInfo materialIndex (V2 gw gh) (Layout index (V2 x y)) =
+        let uvPos = V2 (fromIntegral x / tw) (fromIntegral (y + gh) / th)
+            uvSize = V2 (fromIntegral gw / tw) (- fromIntegral gh / th)
+        in UvInfo index materialIndex uvPos uvSize
 
     loadMetrics charcode = do
         FreeType.ft_Load_Char face (fromIntegral . ord $ charcode) (FreeType.FT_LOAD_DEFAULT .|. FreeType.FT_LOAD_NO_BITMAP)
@@ -335,19 +399,36 @@ createTextWithOption scene (FontFace freeType face) text partialFontOption parti
             advance = fromIntegral (FreeType.gmHoriAdvance metrics) / 64
         return (GlyphInfo charcode (V2 w h) (V2 bx by) advance)
 
+    createOrUpdateMaterial charUvMap materials glyphVec startGlyphIndex materialIndex (Packed layouts _) = do
+        materialInfo <- if materialIndex >= BV.length materials
+            then do
+                let settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
+                    sourceData = Hree.TextureSourceData 0 0 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE Foreign.nullPtr
 
-    createMaterial (V2 pixelSizeX pixelSizeY) glyphs (Packed layouts _) = do
-        let V2 twidth' theight' = minimizeTextureSize glyphs layouts
-            settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth') (fromIntegral theight') False
-            sourceData = Hree.TextureSourceData (fromIntegral twidth) (fromIntegral theight) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE Foreign.nullPtr
+                (tname, texture) <- Hree.addTexture scene "textmesh" settings sourceData
+                (_, sampler) <- Hree.addSampler scene tname
+                let texture' = Hree.Texture (texture, sampler)
+                    material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, texture') }
+                    materialInfo = MaterialInfo material texture'
+                return materialInfo
+            else return (materials BV.! materialIndex)
 
-        (tname, texture) <- Hree.addTexture scene "textmesh" settings sourceData
-        (_, sampler) <- Hree.addSampler scene tname
-        let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
-        Foreign.allocaArray (pixelSizeX * pixelSizeY * 4) $ \p ->
-            mapM_ (renderBitmap p texture glyphs) layouts
+        when (materialIndex >= BV.length materials - 1) $ do
+            let MaterialInfo _ (Hree.Texture (texture, _)) = materialInfo
+                addedLayouts = filter ((>= startGlyphIndex) . layoutIndex) layouts
 
-        return (material, fromIntegral <$> V2 twidth' theight')
+            Foreign.allocaArray (pixelSizeX * pixelSizeY * 4) $ \p ->
+                mapM_ (renderBitmap p texture glyphVec) addedLayouts
+
+            mapM_ (insertCharUvMap charUvMap glyphVec materialIndex) addedLayouts
+
+        return materialInfo
+
+    insertCharUvMap charUvMap glyphVec materialIndex (Layout index p) = do
+        let glyph = glyphVec BV.! index
+            char = glyphInfoCharcode glyph
+            uvInfo = toUvInfo materialIndex (glyphInfoSize glyph) (Layout index p)
+        HT.insert charUvMap char uvInfo
 
     renderBitmap p texture glyphs (Layout index (V2 x y)) =
         FreeType.ft_Bitmap_With freeType $ \convertBitmap -> do
@@ -374,83 +455,38 @@ createTextWithOption scene (FontFace freeType face) text partialFontOption parti
                     Foreign.pokeElemOff p i (V4 (255 - color) (255 - color) (255 - color) color)
                 GLW.glTextureSubImage2D texture 0 (fromIntegral x) (fromIntegral y) (fromIntegral width) (fromIntegral height) GL.GL_RGBA GL.GL_UNSIGNED_BYTE (Foreign.castPtr p)
 
-    relocateOrigin _ descender bottom OriginLocationBottom (V2 ox oy) = V2 ox (oy + bottom - descender)
-    relocateOrigin ascender _ _ OriginLocationTop (V2 ox oy) = V2 ox (oy + ascender)
-    relocateOrigin _ _ _ OriginLocationFirstBaseLine (V2 ox oy) = V2 ox oy
-    relocateOrigin _ _ bottom OriginLocationLastBaseLine (V2 ox oy) = V2 ox (oy + bottom)
+findNewCharacters :: HT.BasicHashTable Char UvInfo -> String -> IO (UV.Vector Char)
+findNewCharacters charMap str =
+    UV.filterM (fmap (== Nothing) . HT.lookup charMap) charcodes
+    where
+    charcodes = UV.fromList . List.delete '\n' . nubOrd $ str
 
-    createMesh ascender descender pixelLen materialIndex (material, textureSize') uvMap glyphVec charPosVec = do
-        let xs = flip UV.mapMaybe charPosVec $ \(char, pos) -> do
-                (i, m, uv) <- Map.lookup char uvMap
-                let glyph = glyphVec BV.! i
-                    V2 gw gh = glyphInfoSize glyph
-                if m == materialIndex && gw > 0 && gh > 0 && char /= '\n'
-                    then return (i, pos, uv)
-                    else Nothing
-            V2 _ bottomLine = if UV.null xs then V2 0 0 else (\(_, a, _) -> a) $ UV.last xs
-            origin = relocateOrigin ascender descender bottomLine (runIdentity $ originLocation textOption) (fmap realToFrac . runIdentity . originPosition $ textOption)
-            vs = SV.generate (UV.length xs) (toSpriteVertex textureSize' origin pixelLen glyphVec . (xs UV.!))
-        (geo, _) <- Hree.newSpriteGeometry scene
-        geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
-        let mesh = Hree.Mesh geo' material . Just . SV.length $ vs
-        Hree.addMesh scene mesh
-
-setFontPixelSize :: FontFace -> Int -> Int -> IO ()
-setFontPixelSize (FontFace _ face) pixelW pixelH = do
-    isScalable <- FreeType.FT_IS_SCALABLE face
-    when isScalable
-      $ FreeType.ft_Set_Pixel_Sizes face (fromIntegral pixelW) (fromIntegral pixelH)
-
-loadFontSizeInfo :: FontFace -> IO SizeInfo
-loadFontSizeInfo (FontFace _ face) = do
-    faceRec <- Foreign.peek face
-    fontSizeMetrics <- fmap FreeType.srMetrics . Foreign.peek . FreeType.frSize $ faceRec
-    let unitsPerEM = fromIntegral (FreeType.frUnits_per_EM faceRec) :: Int
-        pixelSizeX = fromIntegral (FreeType.smX_ppem fontSizeMetrics) :: Int
-        pixelSizeY = fromIntegral (FreeType.smY_ppem fontSizeMetrics) :: Int
-        pixelSize = V2 pixelSizeX pixelSizeY
-        ascender = fromIntegral (FreeType.frAscender faceRec)
-        descender = - fromIntegral (FreeType.frDescender faceRec)
-    return (SizeInfo pixelSize unitsPerEM ascender descender)
-
-packGlyphs :: V2 Int -> Int -> UV.Vector (V2 Int) -> [Packed]
-packGlyphs (V2 textureWidth textureHeight) spacing =
-    reverse . UV.foldl' pack [] . UV.imap (,)
+packGlyphs :: Int -> V2 Int -> Int -> BV.Vector Packed -> UV.Vector (V2 Int) -> BV.Vector Packed
+packGlyphs start (V2 textureWidth textureHeight) spacing xs =
+    UV.foldl' pack xs . UV.imap (,)
 
     where
-    pack :: [Packed] -> (Int, V2 Int) -> [Packed]
-    pack ps a =
-        fromMaybe (newRegion a : ps) (tryPack a ps)
+    unsnoc v
+        | BV.null v = Nothing
+        | otherwise = Just (BV.take (BV.length v - 1) v, BV.last v)
+
+    pack ps a = fromMaybe (ps `BV.snoc` newRegion a) (tryPack a (unsnoc ps))
 
     newRegion (index, V2 w h) =
-        let layouts = [Layout index (V2 spacing spacing)]
+        let layouts = pure (Layout (start + index) (V2 spacing spacing))
             spaces = relocateSpaces (V2 spacing spacing) (V2 (w + spacing) (h + spacing)) (newRect (V2 spacing spacing) (V2 (textureWidth - spacing) (textureHeight - spacing)))
         in Packed layouts spaces
 
-    tryPack _ [] = Nothing
+    tryPack _ Nothing = Nothing
+    tryPack (index, V2 w h) (Just (rs, r)) =
+        case tryPackOne start (index, V2 (w + spacing) (h + spacing)) r of
+            Just r' -> Just (rs `BV.snoc` r')
+            Nothing -> Nothing
 
-    tryPack (index, V2 w h) (r : rs) =
-        case tryPackOne (index, V2 (w + spacing) (h + spacing)) r of
-            Just r' -> Just (r' : rs)
-            Nothing -> fmap (r :) (tryPack (index, V2 w h) rs)
-
-minimizeTextureSize :: BV.Vector GlyphInfo -> [Layout] -> V2 Int
-minimizeTextureSize glyphVec layouts = fmap minPow2 maxPos
-    where
-    bottomLeftPos (Layout i (V2 px py)) =
-        let glyph = glyphVec BV.! i
-            V2 sx sy = glyphInfoSize glyph
-        in V2 (px + sx) (py + sy)
-    maxPos = foldl' (\(V2 ax ay) (V2 bx by) -> V2 (max ax bx) (max ay by)) (V2 1 1) (map bottomLeftPos layouts)
-    minPow2 = minPow2_ 1
-    minPow2_ a x
-        | a >= x = a
-        | otherwise = minPow2_ (a * 2) x
-
-tryPackOne :: (Int, V2 Int) -> Packed -> Maybe Packed
-tryPackOne (index, V2 w h) (Packed layouts spaces) = do
+tryPackOne :: Int -> (Int, V2 Int) -> Packed -> Maybe Packed
+tryPackOne start (index, V2 w h) (Packed layouts spaces) = do
     Rect _ _ rp <- List.find locatable spaces
-    let layout = Layout index rp
+    let layout = Layout (index + start) rp
         size = V2 w h
         (intersectSpaces, restSpaces) = List.partition (hasIntersection rp size) spaces
         relocated = removeInclusion . concatMap (relocateSpaces rp size) $ intersectSpaces

@@ -7,7 +7,8 @@ import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Text as Hree (FontOption_(..),
                                              OriginLocation(..),
                                              TextOption_(..),
-                                             createTextWithOption, newFontFace)
+                                             createTextWithOption, deleteFont,
+                                             newFontWithOption)
 import qualified Graphics.UI.GLFW as GLFW
 import Linear (V3(..))
 import Prelude hiding (init)
@@ -40,8 +41,8 @@ main = do
                 }
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        font <- Hree.newFontFace fontPath
-        nodeId <- Hree.createTextWithOption scene font (Text.replace "\\n" "\n" . Text.pack $ phrase) fontOption textOption
+        font <- Hree.newFontWithOption fontPath fontOption
+        nodeId <- Hree.createTextWithOption scene font (Text.replace "\\n" "\n" . Text.pack $ phrase) textOption
         Hree.addRootNodes scene (pure nodeId)
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
