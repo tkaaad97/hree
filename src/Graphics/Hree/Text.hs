@@ -23,6 +23,8 @@ import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
 import Data.Foldable (foldl')
 import Data.Functor.Identity (Identity(..))
+import qualified Data.HashTable.IO as HT
+import Data.IORef (IORef)
 import qualified Data.List as List (delete, find, partition, sort)
 import qualified Data.Map.Strict as Map (fromList, lookup, (!))
 import Data.Maybe (fromMaybe)
@@ -46,6 +48,29 @@ import Linear (V2(..), V3(..), V4(..))
 import System.Directory (canonicalizePath)
 
 data FontFace = FontFace !FreeType.FT_Library !FreeType.FT_Face
+
+data Font = Font !FontFace !FontOption !SizeInfo !(IORef FontState)
+
+data SizeInfo = SizeInfo
+    { sizeInfoPixelSize      :: !(V2 Int)
+    , sizeInfoUnitsPerEM     :: !Int
+    , sizeInfoAscenderUnits  :: !Int
+    , sizeInfoDescenderUnits :: !Int
+    } deriving (Show, Eq)
+
+data FontState = FontState
+    { fontStateCharVec     :: !(UV.Vector Char)
+    , fontStateGlyphVec    :: !(BV.Vector GlyphInfo)
+    , fontStateCharUvMap   :: !(HT.BasicHashTable Char UvInfo)
+    , fontStatePackedVec   :: !(BV.Vector Packed)
+    , fontStateMaterialVec :: !(BV.Vector Hree.SpriteMaterial)
+    }
+
+data UvInfo = UvInfo
+    { uvInfoMaterialIndex :: !Int
+    , uvInfoUvPos         :: !(V2 Float)
+    , uvInfoUvSize        :: !(V2 Float)
+    } deriving (Show ,Eq)
 
 data GlyphInfo = GlyphInfo
     { glyphInfoCharcode :: !Char
