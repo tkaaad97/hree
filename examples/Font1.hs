@@ -1,16 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Font1 where
 
-import qualified Data.Text as Text (pack, replace)
+import qualified Data.Text as Text (length, pack, replace, splitAt, unpack)
 import Example
 import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.Text as Hree (FontOption_(..),
                                              OriginLocation(..),
                                              TextOption_(..),
                                              createTextWithOption, deleteFont,
+                                             loadCharactersIntoFont,
                                              newFontWithOption)
 import qualified Graphics.UI.GLFW as GLFW
-import Linear (V3(..))
+import Linear (V2(..), V3(..))
 import Prelude hiding (init)
 import System.Environment (getArgs)
 
@@ -34,15 +35,20 @@ main = do
     init fontPath phrase originLocation w = do
         let fontOption = mempty
                 { Hree.pixelHeight = pure 128
+                , Hree.textureSize = pure (V2 512 512)
                 }
             textOption = mempty
                 { Hree.characterHeight = pure (1 / 16)
                 , Hree.originLocation = pure originLocation
                 }
+            text = Text.replace "\\n" "\n" . Text.pack $ phrase
+            (textA, textB) = Text.splitAt (Text.length text `div` 2) text
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         font <- Hree.newFontWithOption fontPath fontOption
-        nodeId <- Hree.createTextWithOption scene font (Text.replace "\\n" "\n" . Text.pack $ phrase) textOption
+        Hree.loadCharactersIntoFont scene font (Text.unpack textA)
+        Hree.loadCharactersIntoFont scene font (Text.unpack textB)
+        nodeId <- Hree.createTextWithOption scene font text textOption
         Hree.addRootNodes scene (pure nodeId)
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera

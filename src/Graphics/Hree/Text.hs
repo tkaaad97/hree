@@ -14,13 +14,14 @@ module Graphics.Hree.Text
     , GlyphInfo
     , createText
     , createTextWithOption
+    , loadCharactersIntoFont
     , deleteFont
     , newFont
     , newFontWithOption
     ) where
 
 import Control.Exception (throwIO)
-import Control.Monad (forM_, unless, when)
+import Control.Monad (forM_, unless, void, when)
 import Data.Bits (shift, (.|.))
 import Data.Char (ord)
 import Data.Containers.ListUtils (nubOrd)
@@ -260,7 +261,7 @@ createText scene fontFace text charHeight =
 
 createTextWithOption :: Hree.Scene -> Font -> Text -> PartialTextOption -> IO Hree.NodeId
 createTextWithOption scene font text partialTextOption = do
-    fontState <- loadCharactersToFont scene font str
+    fontState <- loadCharactersIntoFont_ scene font str
 
     let charVec = UV.fromList str
         glyphVec = fontStateGlyphVec fontState
@@ -356,8 +357,11 @@ loadFontSizeInfo (FontFace _ face) = do
         descender = - fromIntegral (FreeType.frDescender faceRec)
     return (SizeInfo pixelSize unitsPerEM ascender descender)
 
-loadCharactersToFont :: Hree.Scene -> Font -> String -> IO FontState
-loadCharactersToFont scene (Font (FontFace freeType face) fontOption sizeInfo stateRef) str = do
+loadCharactersIntoFont :: Hree.Scene -> Font -> String -> IO ()
+loadCharactersIntoFont scene font str = void (loadCharactersIntoFont_ scene font str)
+
+loadCharactersIntoFont_ :: Hree.Scene -> Font -> String -> IO FontState
+loadCharactersIntoFont_ scene (Font (FontFace freeType face) fontOption sizeInfo stateRef) str = do
     state <- readIORef stateRef
     let FontState deleted charcodes glyphVec charUvMap packResults materials = state
         startGlyphIndex = UV.length charcodes
