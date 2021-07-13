@@ -45,10 +45,10 @@ main = do
             (textA, textB) = Text.splitAt (Text.length text `div` 2) text
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        font <- Hree.newFontWithOption fontPath fontOption
-        Hree.loadCharactersIntoFont scene font (Text.unpack textA)
-        Hree.loadCharactersIntoFont scene font (Text.unpack textB)
-        nodeId <- Hree.createTextWithOption scene font text textOption
+        font <- Hree.newFontWithOption scene fontPath fontOption
+        Hree.loadCharactersIntoFont font (Text.unpack textA)
+        Hree.loadCharactersIntoFont font (Text.unpack textB)
+        nodeId <- Hree.createTextWithOption font text textOption
         Hree.addRootNodes scene (pure nodeId)
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera

@@ -53,7 +53,7 @@ import System.Directory (canonicalizePath)
 
 data FontFace = FontFace !FreeType.FT_Library !FreeType.FT_Face
 
-data Font = Font !FontFace !FontOption !SizeInfo !(IORef FontState)
+data Font = Font !Hree.Scene !FontFace !FontOption !SizeInfo !(IORef FontState)
 
 data SizeInfo = SizeInfo
     { sizeInfoPixelSize      :: !(V2 Int)
@@ -225,18 +225,18 @@ deleteFontFace (FontFace freeType face) = do
     FreeType.ft_Done_Face face
     FreeType.ft_Done_FreeType freeType
 
-newFont :: FilePath -> IO Font
-newFont fontPath = newFontWithOption fontPath mempty
+newFont :: Hree.Scene -> FilePath -> IO Font
+newFont scene fontPath = newFontWithOption scene fontPath mempty
 
-newFontWithOption :: FilePath -> PartialFontOption -> IO Font
-newFontWithOption fontPath partialOption = do
+newFontWithOption :: Hree.Scene -> FilePath -> PartialFontOption -> IO Font
+newFontWithOption scene fontPath partialOption = do
     face <- newFontFace fontPath
     setFontPixelSize face pixelW pixelH
     sizeInfo <- loadFontSizeInfo face
     charUvMap <- HT.newSized reserveSize
     let state = FontState False mempty mempty charUvMap mempty mempty
     stateRef <- newIORef state
-    return (Font face option sizeInfo stateRef)
+    return (Font scene face option sizeInfo stateRef)
     where
     option = overrideFontOption defaultFontOption partialOption
     pixelW = runIdentity . pixelWidth $ option
@@ -244,7 +244,7 @@ newFontWithOption fontPath partialOption = do
     reserveSize = 256
 
 deleteFont :: Font -> IO ()
-deleteFont (Font face _ _ stateRef) = do
+deleteFont (Font _ face _ _ stateRef) = do
     state <- readIORef stateRef
     unless (fontStateDeleted state) $ do
         deleteFontFace face
@@ -253,15 +253,15 @@ deleteFont (Font face _ _ stateRef) = do
         writeIORef stateRef deletedState
         -- TODO delete textures
 
-createText :: Hree.Scene -> Font -> Text -> Float -> IO Hree.NodeId
-createText scene fontFace text charHeight =
-    createTextWithOption scene fontFace text partialOption
+createText :: Font -> Text -> Float -> IO Hree.NodeId
+createText fontFace text charHeight =
+    createTextWithOption fontFace text partialOption
     where
     partialOption = mempty { characterHeight = pure charHeight }
 
-createTextWithOption :: Hree.Scene -> Font -> Text -> PartialTextOption -> IO Hree.NodeId
-createTextWithOption scene font text partialTextOption = do
-    fontState <- loadCharactersIntoFont_ scene font str
+createTextWithOption :: Font -> Text -> PartialTextOption -> IO Hree.NodeId
+createTextWithOption font text partialTextOption = do
+    fontState <- loadCharactersIntoFont_ font str
 
     let charVec = UV.fromList str
         glyphVec = fontStateGlyphVec fontState
@@ -276,7 +276,7 @@ createTextWithOption scene font text partialTextOption = do
     Hree.addNode scene Hree.newNode { Hree.nodeChildren = childNodeIds } False
 
     where
-    Font _ _ sizeInfo _ = font
+    Font scene _ _ sizeInfo _ = font
     str = Text.unpack text
     textOption = overrideTextOption defaultTextOption partialTextOption
     lineS = runIdentity . lineSpacing $ textOption
@@ -357,11 +357,11 @@ loadFontSizeInfo (FontFace _ face) = do
         descender = - fromIntegral (FreeType.frDescender faceRec)
     return (SizeInfo pixelSize unitsPerEM ascender descender)
 
-loadCharactersIntoFont :: Hree.Scene -> Font -> String -> IO ()
-loadCharactersIntoFont scene font str = void (loadCharactersIntoFont_ scene font str)
+loadCharactersIntoFont :: Font -> String -> IO ()
+loadCharactersIntoFont font str = void (loadCharactersIntoFont_ font str)
 
-loadCharactersIntoFont_ :: Hree.Scene -> Font -> String -> IO FontState
-loadCharactersIntoFont_ scene (Font (FontFace freeType face) fontOption sizeInfo stateRef) str = do
+loadCharactersIntoFont_ :: Font -> String -> IO FontState
+loadCharactersIntoFont_ (Font scene (FontFace freeType face) fontOption sizeInfo stateRef) str = do
     state <- readIORef stateRef
     let FontState deleted charcodes glyphVec charUvMap packResults materials = state
         startGlyphIndex = UV.length charcodes
