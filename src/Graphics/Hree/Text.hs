@@ -24,7 +24,6 @@ import Control.Exception (throwIO)
 import Control.Monad (forM_, unless, void, when)
 import Data.Bits (shift, (.|.))
 import Data.Char (ord)
-import Data.Containers.ListUtils (nubOrd)
 import Data.Functor.Identity (Identity(..))
 import qualified Data.HashTable.IO as HT
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -35,11 +34,12 @@ import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Vector as BV (Vector, generateM, imapM, last, length, map,
                                     null, snoc, take, (!))
+import qualified Data.Vector.Algorithms.Intro as V (sort)
 import qualified Data.Vector.Storable as SV (generate, length)
 import qualified Data.Vector.Unboxed as UV (Vector, filter, filterM, foldl',
-                                            fromList, generate, imap, last,
-                                            length, mapM, null, scanl', zip,
-                                            (!))
+                                            freeze, fromList, generate, imap,
+                                            last, length, mapM, null, scanl',
+                                            thaw, uniq, zip, (!))
 import Data.Word (Word8)
 import qualified Foreign (allocaArray, castPtr, nullPtr, peek, peekElemOff,
                           pokeElemOff, with)
@@ -460,10 +460,15 @@ loadCharactersIntoFont_ (Font scene (FontFace freeType face) fontOption sizeInfo
                 GLW.glTextureSubImage2D texture 0 (fromIntegral x) (fromIntegral y) (fromIntegral width) (fromIntegral height) GL.GL_RGBA GL.GL_UNSIGNED_BYTE (Foreign.castPtr p)
 
 findNewCharacters :: HT.BasicHashTable Char UvInfo -> String -> IO (UV.Vector Char)
-findNewCharacters charMap str =
+findNewCharacters charMap str = do
+    charcodes <- fmap (UV.filter (/= '\n')) . nubOrd . UV.fromList $ str
     UV.filterM (fmap (== Nothing) . HT.lookup charMap) charcodes
     where
-    charcodes = UV.fromList . List.delete '\n' . nubOrd $ str
+    nubOrd :: UV.Vector Char -> IO (UV.Vector Char)
+    nubOrd v = do
+        mv <- UV.thaw v
+        V.sort mv
+        UV.uniq <$> UV.freeze mv
 
 packGlyphs :: Int -> V2 Int -> Int -> BV.Vector Packed -> UV.Vector (V2 Int) -> BV.Vector Packed
 packGlyphs start (V2 textureWidth textureHeight) spacing xs =
