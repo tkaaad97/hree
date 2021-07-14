@@ -1,11 +1,9 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE ExistentialQuantification  #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE DataKinds                 #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE KindSignatures            #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE StandaloneDeriving        #-}
 module Graphics.Hree.GL.Types
     ( AttribBinding(..)
     , AttributeFormat(..)
@@ -86,8 +84,8 @@ import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Functor.Identity (Identity)
 import Data.Map.Strict (Map)
-import Data.Monoid (Monoid(..))
-import Data.Semigroup (Last(..), Semigroup(..))
+import Data.Monoid (Last(..), Monoid(..))
+import Data.Semigroup (Semigroup(..))
 import qualified Data.Vector as BV (Vector)
 import qualified Data.Vector.Storable as SV (Vector)
 import Foreign (Ptr, Storable)
@@ -205,20 +203,13 @@ data RenderOption_ f = RenderOption
     , renderOptionColorMask :: !(f BVec4)
     }
 
-newtype LastMaybe a = LastMaybe
-    { unLastMaybe :: Last (Maybe a)
-    } deriving (Show, Eq, Semigroup)
-
 type RenderOption = RenderOption_ Identity
-type PartialRenderOption = RenderOption_ LastMaybe
+type PartialRenderOption = RenderOption_ Last
 
 deriving instance Eq RenderOption
 deriving instance Eq PartialRenderOption
 deriving instance Show RenderOption
 deriving instance Show PartialRenderOption
-
-instance Monoid (LastMaybe a) where
-    mempty = LastMaybe (Last Nothing)
 
 instance Semigroup PartialRenderOption where
     a <> b = RenderOption

@@ -4,12 +4,11 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PolyKinds                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TemplateHaskellQuotes      #-}
 module Graphics.Hree.Program
     ( ProgramOption_(..)
     , ProgramOption
@@ -75,9 +74,9 @@ import Data.Functor.Identity (Identity(..))
 import Data.Hashable (Hashable(..))
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
-import Data.Monoid (Monoid(..))
+import Data.Monoid (Last(..), Monoid(..))
 import Data.Proxy (Proxy(..))
-import Data.Semigroup (Last(..), Semigroup(..))
+import Data.Semigroup (Semigroup(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (replace)
 import qualified Data.Text.Lazy as Text (toStrict)
@@ -118,19 +117,13 @@ data ProgramOption_ f = ProgramOption
     , programOptionUseVertexSkinning       :: !(f Bool)
     } deriving (Generic)
 
-newtype LastMaybe a = LastMaybe
-    { unLastMaybe :: Last (Maybe a)
-    } deriving (Show, Eq, Semigroup)
 type ProgramOption = ProgramOption_ Identity
-type PartialProgramOption = ProgramOption_ LastMaybe
+type PartialProgramOption = ProgramOption_ Last
 
 deriving instance Eq ProgramOption
 deriving instance Eq PartialProgramOption
 deriving instance Show ProgramOption
 deriving instance Show PartialProgramOption
-
-instance Monoid (LastMaybe a) where
-    mempty = LastMaybe (Last Nothing)
 
 instance Hashable ProgramOption where
 
