@@ -8,7 +8,7 @@
 {-# LANGUAGE PolyKinds                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TemplateHaskellQuotes      #-}
+{-# LANGUAGE TemplateHaskell            #-}
 module Graphics.Hree.Program
     ( ProgramOption_(..)
     , ProgramOption
