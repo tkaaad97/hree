@@ -30,6 +30,7 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import qualified Data.List as List (delete, find, partition, sort)
 import Data.Maybe (fromMaybe)
 import Data.Monoid (Last(..))
+import Data.Semigroup (Semigroup(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Vector as BV (Vector, generateM, imapM, last, length, map,
