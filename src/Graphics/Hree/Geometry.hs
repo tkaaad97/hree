@@ -5,7 +5,10 @@ module Graphics.Hree.Geometry
     , addVerticesToGeometry
     , newGeometry
     , newSpriteGeometry
-    , setIndexBuffer
+    , setIndexBufferSource
+    , setIndexBufferSourceUByte
+    , setIndexBufferSourceUShort
+    , setIndexBufferSourceUInt
     ) where
 
 import Data.ByteString (ByteString)
@@ -15,30 +18,30 @@ import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy(..))
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
+import Data.Word (Word16, Word32, Word8)
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.Vertex
-import Graphics.Hree.Scene (addBuffer)
 import Graphics.Hree.Types
 import Linear (V2(..), V3(..))
 
 newGeometry :: Geometry
 newGeometry = Geometry Map.empty IntMap.empty Nothing 0
 
-addAttribBindings :: Geometry -> Int -> Map ByteString AttributeFormat -> (GLW.Buffer, BindBufferSetting) -> Geometry
+addAttribBindings :: Geometry -> Int -> Map ByteString AttributeFormat -> (BufferSource, BindBufferSetting) -> Geometry
 addAttribBindings geo bindingIndex xs b = geo'
     where
     adding = Map.map (AttribBinding (GLW.BindingIndex $ fromIntegral bindingIndex)) xs
     attribBindings = Map.union (geometryAttribBindings geo) adding
-    buffers = IntMap.insert bindingIndex b (geometryBuffers geo)
-    geo' = geo { geometryAttribBindings = attribBindings, geometryBuffers = buffers }
+    bufferSources = IntMap.insert bindingIndex b (geometryBufferSources geo)
+    geo' = geo { geometryAttribBindings = attribBindings, geometryBufferSources = bufferSources }
 
-addVerticesToGeometry :: forall a. (Vertex a) => Geometry -> Vector a -> GL.GLenum -> Scene -> IO Geometry
-addVerticesToGeometry geometry storage usage scene = do
-    buffer <- addBuffer scene (BufferSourceVector storage usage)
-    let buffers' = IntMap.insert bindingIndex (buffer, bbs) buffers
-    return (Geometry attribBindings' buffers' indexBuffer count)
+addVerticesToGeometry :: forall a. (Vertex a) => Geometry -> Vector a -> GL.GLenum -> Geometry
+addVerticesToGeometry geometry storage usage =
+    let bufferSource = BufferSourceVector storage usage
+        bufferSources' = IntMap.insert bindingIndex (bufferSource, bbs) buffers
+    in Geometry attribBindings' bufferSources' indexBuffer count
     where
     Geometry attribBindings buffers indexBuffer c = geometry
     count = if c == 0 then Vector.length storage else c
@@ -53,14 +56,34 @@ addVerticesToGeometry geometry storage usage scene = do
         | IntMap.null m = d
         | otherwise = fst . IntMap.findMax $ m
 
-setIndexBuffer :: Geometry -> IndexBuffer -> Geometry
-setIndexBuffer geo indexBuffer = geo { geometryIndexBuffer = Just indexBuffer }
+setIndexBufferSource :: Geometry -> IndexBufferSource -> Geometry
+setIndexBufferSource geo indexBufferSource = geo { geometryIndexBufferSource = Just indexBufferSource }
 
-newSpriteGeometry :: Scene -> IO (Geometry, Vector SpriteOffset)
-newSpriteGeometry scene = do
-    geo <- addVerticesToGeometry newGeometry offsets GL.GL_STATIC_READ scene
-    return (geo, offsets)
+setIndexBufferSourceUByte :: Geometry -> Vector Word8 -> Geometry
+setIndexBufferSourceUByte geo v = setIndexBufferSource geo indexBufferSource
     where
+    s = BufferSourceVector v GL.GL_STATIC_READ
+    l = fromIntegral (Vector.length v)
+    indexBufferSource = IndexBufferSource s GL.GL_UNSIGNED_BYTE l 0
+
+setIndexBufferSourceUShort :: Geometry -> Vector Word16 -> Geometry
+setIndexBufferSourceUShort geo v = setIndexBufferSource geo indexBufferSource
+    where
+    s = BufferSourceVector v GL.GL_STATIC_READ
+    l = fromIntegral (Vector.length v)
+    indexBufferSource = IndexBufferSource s GL.GL_UNSIGNED_SHORT l 0
+
+setIndexBufferSourceUInt :: Geometry -> Vector Word32 -> Geometry
+setIndexBufferSourceUInt geo v = setIndexBufferSource geo indexBufferSource
+    where
+    s = BufferSourceVector v GL.GL_STATIC_READ
+    l = fromIntegral (Vector.length v)
+    indexBufferSource = IndexBufferSource s GL.GL_UNSIGNED_INT l 0
+
+newSpriteGeometry :: (Geometry, Vector SpriteOffset)
+newSpriteGeometry = (geo, offsets)
+    where
+    geo = addVerticesToGeometry newGeometry offsets GL.GL_STATIC_READ
     offsets = Vector.fromList
         [ SpriteOffset (V3 0 0 0) (V2 0 0)
         , SpriteOffset (V3 1 0 0) (V2 1 0)

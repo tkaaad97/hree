@@ -108,8 +108,7 @@ main =
 
     createMesh scene material = do
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 1 1 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1) GL.GL_FALSE 0
-        (geo, _) <- Hree.newSpriteGeometry scene
-        geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
+            geo' = Hree.addVerticesToGeometry (fst Hree.newSpriteGeometry) vs GL.GL_STATIC_READ
         Hree.addMesh scene $ Hree.Mesh geo' material (Just 1)
 
     createUvAnimation ubb sprites =
@@ -129,7 +128,7 @@ main =
         let uvx = fromIntegral (spriteX sp) / twidth'
             uvy = fromIntegral (spriteY sp + spriteH sp) / theight'
             uvw = fromIntegral (spriteW sp) / twidth'
-            uvh = - (fromIntegral (spriteH sp)) / theight'
+            uvh = - fromIntegral (spriteH sp) / theight'
             px = 0.02 * fromIntegral (spriteOX sp - 64)
             py = 0.02 * fromIntegral (spriteOY sp - 64)
             sx = 0.02 * fromIntegral (spriteW sp)

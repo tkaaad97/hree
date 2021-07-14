@@ -24,8 +24,8 @@ main =
     init w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        (geometry, _) <- Hree.createBoxGeometry 0.5 0.5 0.5 scene
-        let material = Material.flatColorMaterial (V4 0.2 0.4 0.6 1)
+        let (geometry, _) = Hree.createBoxGeometry 0.5 0.5 0.5
+            material = Material.flatColorMaterial (V4 0.2 0.4 0.6 1)
             mesh = Hree.Mesh geometry material Nothing
         meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
         nodeId <- Hree.addNode scene Hree.newNode{ Hree.nodeMesh = Just meshId } True

@@ -39,8 +39,8 @@ main =
     init w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        (geometry, _) <- Hree.createBoxGeometry 0.5 0.5 0.5 scene
-        geometry' <- Hree.addVerticesToGeometry geometry vs GL.GL_STATIC_READ scene
+        let (geometry, _) = Hree.createBoxGeometry 0.5 0.5 0.5
+            geometry' = Hree.addVerticesToGeometry geometry vs GL.GL_STATIC_READ
         texture <- mkTexture scene
         let material = (Hree.basicMaterial (V3 0.5 (-1) (-1)))
                 { Hree.materialTextures = pure (Hree.BaseColorMapping, texture)

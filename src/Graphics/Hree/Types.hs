@@ -4,6 +4,7 @@
 module Graphics.Hree.Types
     ( ClearOption(..)
     , Geometry(..)
+    , GeometryInfo(..)
     , LightId(..)
     , LightStore
     , Material(..)
@@ -30,8 +31,8 @@ import Chronos (Time)
 import Data.ByteString (ByteString)
 import qualified Data.Component as Component
 import Data.Hashable (Hashable(..))
-import Data.IntMap.Strict (IntMap)
 import Data.IORef (IORef)
+import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Vector as BV
@@ -52,10 +53,17 @@ import Graphics.Hree.Program
 import Linear (V4(..))
 
 data Geometry = Geometry
-    { geometryAttribBindings :: !(Map ByteString AttribBinding)
-    , geometryBuffers        :: !(IntMap (GLW.Buffer, BindBufferSetting))
-    , geometryIndexBuffer    :: !(Maybe IndexBuffer)
-    , geometryVerticesCount  :: !Int
+    { geometryAttribBindings    :: !(Map ByteString AttribBinding)
+    , geometryBufferSources     :: !(IntMap (BufferSource, BindBufferSetting))
+    , geometryIndexBufferSource :: !(Maybe IndexBufferSource)
+    , geometryVerticesCount     :: !Int
+    } deriving (Show)
+
+data GeometryInfo = GeometryInfo
+    { geometryInfoAttribBindings :: !(Map ByteString AttribBinding)
+    , geometryInfoBuffers        :: !(IntMap (GLW.Buffer, BindBufferSetting))
+    , geometryInfoIndexBuffer    :: !(Maybe IndexBuffer)
+    , geometryInfoVerticesCount  :: !Int
     } deriving (Show)
 
 data TextureMappingType =
@@ -98,11 +106,10 @@ data Mesh b = Mesh
 
 data MeshInfo = MeshInfo
     { meshInfoId            :: !MeshId
-    , meshInfoGeometry      :: !Geometry
+    , meshInfoGeometry      :: !GeometryInfo
     , meshInfoMaterial      :: !MaterialInfo
     , meshInfoInstanceCount :: !(Maybe Int)
     , meshInfoSkin          :: !(Maybe SkinId)
-    , meshInfoBuffers       :: !(SV.Vector GLW.Buffer)
     , meshInfoProgram       :: !ProgramName
     , meshInfoVertexArray   :: !(Maybe GLW.VertexArray)
     } deriving (Show)

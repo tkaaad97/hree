@@ -39,10 +39,9 @@ import qualified Data.Vector.Storable.Mutable as MSV (STVector, new, write)
 import qualified Data.Vector.Unboxed as UV (generate, mapM_)
 import Data.Word
 import qualified Graphics.GL as GL
-import Graphics.Hree.Geometry (addVerticesToGeometry, newGeometry,
-                               setIndexBuffer)
 import Graphics.Hree.GL.Vertex (BasicVertex(..))
-import Graphics.Hree.Scene (addIndexBufferUInt)
+import Graphics.Hree.Geometry (addVerticesToGeometry, newGeometry,
+                               setIndexBufferSourceUInt)
 import Graphics.Hree.Types (Geometry, Scene)
 import Linear (Additive(..), V2(..), V3(..), V4(..))
 import qualified Linear (cross, normalize)
@@ -50,9 +49,9 @@ import qualified Linear (cross, normalize)
 type Parser = StateT ByteString (Either String)
 
 data PLY = PLY
-    { plyHeader  :: !PLYHeader
-    , plyBuffers :: !(Vector Buffer)
-    } deriving (Show, Eq)
+    { plyHeader        :: !PLYHeader
+    , plyBufferSources :: !(Vector Buffer)
+    }
 
 data PLYHeader = PLYHeader
     { phFormat         :: !PLYFormat
@@ -344,13 +343,13 @@ loadPLYFile path = do
     bs <- BS.readFile path
     either (throwIO . userError) return $ evalStateT plyParser bs
 
-loadGeometryFromFile :: FilePath -> Scene -> IO Geometry
-loadGeometryFromFile path scene = do
+loadGeometryFromFile :: FilePath -> IO Geometry
+loadGeometryFromFile path = do
     ply <- loadPLYFile path
-    createGeometryFromPLY ply scene
+    createGeometryFromPLY ply
 
-createGeometryFromPLY :: PLY -> Scene -> IO Geometry
-createGeometryFromPLY (PLY (PLYHeader _ ehs) buffers) scene = do
+createGeometryFromPLY :: PLY -> IO Geometry
+createGeometryFromPLY (PLY (PLYHeader _ ehs) buffers) = do
     vertexElemIndex <- maybe (throwIO . userError $ "vertex element not found") return
         $ Vector.findIndex ((== "vertex") . ehName) ehs
     let Buffer vertexBuffer = buffers Vector.! vertexElemIndex
@@ -373,10 +372,10 @@ createGeometryFromPLY (PLY (PLYHeader _ ehs) buffers) scene = do
                 then onJust maybeIndices (vs, maybeIndices) $ calculateNormals vs
                 else (vs, maybeIndices)
 
-    geo <- addVerticesToGeometry newGeometry vs' GL.GL_STATIC_READ scene
+    let geo = addVerticesToGeometry newGeometry vs' GL.GL_STATIC_READ
+        geo' = onJust maybeIndices' geo (setIndexBufferSourceUInt geo)
 
-    onJust maybeIndices' (return geo) $
-        fmap (setIndexBuffer geo) . addIndexBufferUInt scene
+    return geo'
 
     where
     onJust (Just a) _ f = f a

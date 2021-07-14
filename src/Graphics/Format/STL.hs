@@ -16,8 +16,8 @@ import qualified Data.Vector as Vector
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word16, Word32, Word8)
 import qualified Graphics.GL as GL
-import Graphics.Hree.Geometry
 import Graphics.Hree.GL.Vertex (BasicVertex(..))
+import Graphics.Hree.Geometry
 import Graphics.Hree.Types (Scene)
 import Linear (V2(..), V3(..), V4(..))
 
@@ -82,13 +82,12 @@ instance Serialize STL where
         triangles <- Vector.replicateM (fromIntegral num) get
         return (STL header num triangles)
 
-createGeometryFromSTL :: STL -> Scene -> IO (Geometry, SV.Vector BasicVertex)
-createGeometryFromSTL stl scene = do
+createGeometryFromSTL :: STL -> IO (Geometry, SV.Vector BasicVertex)
+createGeometryFromSTL stl = do
     let len = fromIntegral (stlTriangleNum stl) * 3
         vs = SV.generate len f
-        geo = newGeometry
-    geo' <- addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
-    return (geo', vs)
+        geo = addVerticesToGeometry newGeometry vs GL.GL_STATIC_READ
+    return (geo, vs)
     where
     f i =
         let (d, m) = divMod i 3
@@ -101,8 +100,8 @@ createGeometryFromSTL stl scene = do
             normal = triangleNormal triangle
         in BasicVertex position normal (V2 0 0) (V4 255 255 255 255)
 
-loadGeometryFromFile :: FilePath -> Scene -> IO Geometry
-loadGeometryFromFile path scene = do
+loadGeometryFromFile :: FilePath -> IO Geometry
+loadGeometryFromFile path = do
     bs <- ByteString.readFile path
     stl <- either (throwIO . userError) return $ Serialize.decode bs
-    fst <$> createGeometryFromSTL stl scene
+    fst <$> createGeometryFromSTL stl

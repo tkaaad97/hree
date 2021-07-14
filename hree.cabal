@@ -3,8 +3,6 @@ cabal-version: 2.2
 -- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: c0e48e1a327ef876a6c7024e90a179717c311c92c438388043ec4f2e9a1779ee
 
 name:           hree
 version:        0.9.0

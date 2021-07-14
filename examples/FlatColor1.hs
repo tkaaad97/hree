@@ -37,8 +37,8 @@ main =
     init w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
-        let mesh = Hree.Mesh geometry material Nothing
+        let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+            mesh = Hree.Mesh geometry material Nothing
         meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
         _ <- Hree.addNode scene Hree.newNode{ Hree.nodeMesh = Just meshId } True
         camera <- Hree.newCamera proj la

@@ -33,8 +33,8 @@ spec = do
     describe "addMesh" $ do
         runOnOSMesaContext width height . it "change scene state" $ do
             scene <- Hree.newScene
-            geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
-            let mesh = Hree.Mesh geometry material Nothing
+            let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+                mesh = Hree.Mesh geometry material Nothing
             meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             meshId `shouldBe` Hree.MeshId 1
             counter <- getSceneProp scene Hree.ssMeshCounter
@@ -44,8 +44,8 @@ spec = do
 
         runOnOSMesaContext width height . specify "use same geometry twice" $ do
             scene <- Hree.newScene
-            geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
-            let mesh = Hree.Mesh geometry material Nothing
+            let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+                mesh = Hree.Mesh geometry material Nothing
             meshId1 <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             meshId1 `shouldBe` Hree.MeshId 1
             meshId2 <- Hree.addedMeshId <$> Hree.addMesh scene mesh
@@ -58,8 +58,8 @@ spec = do
     describe "removeMesh" $ do
         runOnOSMesaContext width height . it "remove mesh" $ do
             scene <- Hree.newScene
-            geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
-            let mesh = Hree.Mesh geometry material Nothing
+            let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+                mesh = Hree.Mesh geometry material Nothing
             meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             (`shouldBe` [GLW.Buffer 1]) =<< getSceneProp scene Hree.ssBuffers
             Hree.removeMesh scene meshId
@@ -87,9 +87,9 @@ spec = do
     describe "deleteScene" $ do
         runOnOSMesaContext width height . it "delete meshes" $ do
             scene <- Hree.newScene
-            geometry1 <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
-            geometry2 <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
-            let mesh1 = Hree.Mesh geometry1 material Nothing
+            let geometry1 = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+                geometry2 = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+                mesh1 = Hree.Mesh geometry1 material Nothing
                 mesh2 = Hree.Mesh geometry2 material Nothing
             _ <- Hree.addMesh scene mesh1
             _ <- Hree.addMesh scene mesh2

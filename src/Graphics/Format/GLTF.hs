@@ -74,7 +74,8 @@ import qualified Data.Vector.Unboxed as UV (Vector, generateM, length, map,
                                             unsafeFreeze, (!))
 import qualified Data.Vector.Unboxed.Mutable as MUV (read, replicate, write)
 import Data.Word (Word16, Word32, Word8)
-import qualified Foreign (Ptr, Storable(..), allocaBytes, castPtr, peekByteOff)
+import qualified Foreign (Ptr, Storable(..), allocaBytes, castPtr, mallocBytes,
+                          newForeignPtr_, peekByteOff, withForeignPtr)
 import qualified Foreign.C.String as Foreign (peekCString)
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
@@ -84,13 +85,14 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip(..),
                                         AttributeFormat(..),
                                         BindBufferSetting(..), BufferSource(..),
                                         FlatColorMaterialBlock, Geometry(..),
-                                        IndexBuffer(..), Interpolation(..),
-                                        KeyFrames(..), Mat4, Material(..),
-                                        Mesh(..), MeshId, Node(..), NodeId,
-                                        Quaternion, Scene, SkinId,
-                                        StandardMaterial, StandardMaterialBlock,
-                                        Texture(..), TextureMappingType(..),
-                                        Transform(..), TransformChannel(..),
+                                        IndexBufferSource(..),
+                                        Interpolation(..), KeyFrames(..), Mat4,
+                                        Material(..), Mesh(..), MeshId,
+                                        Node(..), NodeId, Quaternion, Scene,
+                                        SkinId, StandardMaterial,
+                                        StandardMaterialBlock, Texture(..),
+                                        TextureMappingType(..), Transform(..),
+                                        TransformChannel(..),
                                         TransformTrack(..), Vec3, Vec4,
                                         addAttribBindings, addBuffer, addMesh,
                                         addNode, addRootNodes, addSampler,
@@ -720,15 +722,15 @@ loadSceneFromGLTFInternal maybeBuffer0 basepath gltf scene = do
         skins_ = gltfSkins gltf
         rootNodes = maybe mempty sceneNodes $ scenes_ BV.!? 0
     defaultTexture <- Hree.mkDefaultTextureIfNotExists scene
-    bufferAndBss <- createBuffers maybeBuffer0 basepath scene buffers_
-    let (buffers, bss) = BV.unzip bufferAndBss
+    bufferAndBss <- createBufferSources maybeBuffer0 basepath buffers_
+    let (bufferSources, bss) = BV.unzip bufferAndBss
     sources <- createTextureSources basepath scene bss bufferViews_ images_
     samplers <- createSamplers scene samplers_
     let textures = createTextures defaultTexture sources samplers textures_
         materials = createMaterials textures materials_
     nodeIds <- createNodes scene nodes_ rootNodes
     skinIds <- createSkins scene nodes_ nodeIds bss bufferViews_ accessors_ skins_
-    meshes <- createGLTFMeshes scene bss buffers bufferViews_ accessors_ materials meshes_
+    meshes <- createGLTFMeshes bss bufferSources bufferViews_ accessors_ materials meshes_
     animations <- createAnimations nodeIds bss bufferViews_ accessors_ animations_
     BV.imapM_ (createMeshNodes scene nodeIds meshes skinIds) nodes_
     let sup = Supplement nodeIds animations
@@ -805,37 +807,36 @@ parseUri cd byteLength uri =
     where
     (scheme, remainder) = ByteString.break (== ':') uri
 
-createBuffer :: FilePath -> Hree.Scene -> Buffer -> IO (GLW.Buffer, ByteString)
-createBuffer cd scene (Buffer byteLength (Just uri)) = do
+createBufferSource :: FilePath -> Buffer -> IO (Hree.BufferSource, ByteString)
+createBufferSource cd (Buffer byteLength (Just uri)) = do
     bs <- parseUri cd byteLength (Text.encodeUtf8 uri)
-    buffer <- Hree.addBuffer scene (Hree.BufferSourceByteString bs GL.GL_STATIC_READ)
-    return (buffer, bs)
-createBuffer _ _ (Buffer _ Nothing) =
+    return (Hree.BufferSourceByteString bs GL.GL_STATIC_READ, bs)
+createBufferSource _ (Buffer _ Nothing) =
     throwIO . userError $ "createBuffer failed because data uri is unknown"
 
-createBuffers :: Maybe ByteString -> FilePath -> Hree.Scene -> BV.Vector Buffer -> IO (BV.Vector (GLW.Buffer, ByteString))
-createBuffers Nothing cd scene buffers = BV.mapM (createBuffer cd scene) buffers
-createBuffers (Just bs0) cd scene buffers = do
-    buffer <- Hree.addBuffer scene (Hree.BufferSourceByteString bs0 GL.GL_STATIC_READ)
-    BV.cons (buffer, bs0) <$> BV.mapM (createBuffer cd scene) (BV.drop 1 buffers)
+createBufferSources :: Maybe ByteString -> FilePath -> BV.Vector Buffer -> IO (BV.Vector (Hree.BufferSource, ByteString))
+createBufferSources Nothing cd buffers = BV.mapM (createBufferSource cd) buffers
+createBufferSources (Just bs0) cd buffers = do
+    let bufferSource = Hree.BufferSourceByteString bs0 GL.GL_STATIC_READ
+    BV.cons (bufferSource, bs0) <$> BV.mapM (createBufferSource cd) (BV.drop 1 buffers)
 
-createGLTFMeshes :: Hree.Scene -> BV.Vector ByteString -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock))))
-createGLTFMeshes scene bufferSources buffers bufferViews accessors materials =
-    BV.mapM (createMeshes scene bufferSources buffers bufferViews accessors materials)
+createGLTFMeshes :: BV.Vector ByteString -> BV.Vector Hree.BufferSource -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> BV.Vector Mesh -> IO (BV.Vector (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock))))
+createGLTFMeshes bufferByteStrings bufferSources bufferViews accessors materials =
+    BV.mapM (createMeshes bufferByteStrings bufferSources bufferViews accessors materials)
 
-createMeshes :: Hree.Scene -> BV.Vector ByteString -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> Mesh -> IO (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock)))
-createMeshes scene bufferSources buffers bufferViews accessors materials =
-    BV.mapM (createMeshFromPrimitive scene bufferSources buffers bufferViews accessors materials) . meshPrimitives
+createMeshes :: BV.Vector ByteString -> BV.Vector Hree.BufferSource -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> Mesh -> IO (BV.Vector (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock)))
+createMeshes bufferByteStrings bufferSources bufferViews accessors materials =
+    BV.mapM (createMeshFromPrimitive bufferByteStrings bufferSources bufferViews accessors materials) . meshPrimitives
 
-createMeshFromPrimitive :: Hree.Scene -> BV.Vector ByteString -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> Primitive -> IO (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock))
-createMeshFromPrimitive scene bufferSources buffers bufferViews accessors materials primitive = do
+createMeshFromPrimitive :: BV.Vector ByteString -> BV.Vector Hree.BufferSource -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Hree.StandardMaterial -> Primitive -> IO (Either (Hree.Mesh Hree.FlatColorMaterialBlock) (Hree.Mesh Hree.StandardMaterialBlock))
+createMeshFromPrimitive bufferByteStrings bufferSources bufferViews accessors materials primitive = do
 #ifdef ENABLE_DRACO
     let draco = parseMaybeDracoExtension =<< primitiveExtensions primitive
     geometry <-
-        maybe (createGeometry buffers bufferViews accessors primitive)
-              (createGeometryDraco scene bufferSources bufferViews accessors (primitiveAttributes primitive)) draco
+        maybe (createGeometry bufferSources bufferViews accessors primitive)
+              (createGeometryDraco bufferByteStrings bufferViews accessors (primitiveAttributes primitive)) draco
 #else
-    geometry <- createGeometry buffers bufferViews accessors primitive
+    geometry <- createGeometry bufferSources bufferViews accessors primitive
 #endif
     let defaultMaterial = Hree.flatColorMaterial (Linear.V4 0.5 0.5 0.5 1)
         mesh = maybe (Left $ Hree.Mesh geometry defaultMaterial Nothing) Right $ do
@@ -844,22 +845,22 @@ createMeshFromPrimitive scene bufferSources buffers bufferViews accessors materi
             return $ Hree.Mesh geometry material Nothing
     return mesh
 
-createGeometry :: BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Primitive -> IO Hree.Geometry
-createGeometry buffers bufferViews accessors primitive = do
+createGeometry :: BV.Vector Hree.BufferSource -> BV.Vector BufferView -> BV.Vector Accessor -> Primitive -> IO Hree.Geometry
+createGeometry bufferSources bufferViews accessors primitive = do
     attributes <- either (throwIO . userError) return . mapM f . Map.toList . primitiveAttributes $ primitive
     let (_, geometry) = foldl addAttribBinding (1, Hree.newGeometry) attributes
         verticesCount = minimum . map (accessorCount . snd . snd) $ attributes
         geometry1 = geometry { Hree.geometryVerticesCount = verticesCount }
 
     flip (maybe (return geometry1)) (primitiveIndices primitive) $
-        either error return . setIndexBuffer geometry1 buffers bufferViews accessors
+        either error return . setIndexBufferSource geometry1 bufferSources bufferViews accessors
     where
     f (key, aid) = do
         accessor <- maybe (Left $ "invalid accessor identifier: " ++ show aid) return $ accessors BV.!? aid
         bvid <- maybe (Left "accessor has no bufferView reference") return $ accessorBufferView accessor
         bufferView <- maybe (Left $ "invalid bufferView identifier: " ++ show bvid) return $ bufferViews BV.!? bvid
         let bid = bufferViewBuffer bufferView
-        buffer <- maybe (Left $ "invalid buffer identifier: " ++ show bid) return $ buffers BV.!? bid
+        buffer <- maybe (Left $ "invalid buffer identifier: " ++ show bid) return $ bufferSources BV.!? bid
         return ((bufferView, buffer), (key, accessor))
 
     addAttribBinding (bindingIndex, geometry0) ((bufferView, buffer), (attribKey, accessor)) =
@@ -905,22 +906,22 @@ accessorByteStride accessor = num * componentByteSize componentType
     valueType = accessorType accessor
     num = numberOfComponent valueType
 
-setIndexBuffer :: Hree.Geometry -> BV.Vector GLW.Buffer -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> Either String Hree.Geometry
-setIndexBuffer geometry buffers bufferViews accessors i = do
+setIndexBufferSource :: Hree.Geometry -> BV.Vector Hree.BufferSource -> BV.Vector BufferView -> BV.Vector Accessor -> Int -> Either String Hree.Geometry
+setIndexBufferSource geometry bufferSources bufferViews accessors i = do
     accessor <- maybe (Left $ "invalid accessor identifier: " ++ show i) return $ accessors BV.!? i
     bufferView <- maybe (Left $ "invalid bufferView identifier: " ++ show (accessorBufferView accessor)) return $ (bufferViews BV.!?) =<< accessorBufferView accessor
-    buffer <- maybe (Left $ "invalid buffer identifier: " ++ show (bufferViewBuffer bufferView)) return $ buffers BV.!? bufferViewBuffer bufferView
-    indexBuffer <- createIndexBuffer buffer bufferView accessor
-    return $ geometry { Hree.geometryIndexBuffer = Just indexBuffer }
+    buffer <- maybe (Left $ "invalid buffer identifier: " ++ show (bufferViewBuffer bufferView)) return $ bufferSources BV.!? bufferViewBuffer bufferView
+    indexBufferSource <- createIndexBufferSource buffer bufferView accessor
+    return $ geometry { Hree.geometryIndexBufferSource = Just indexBufferSource }
 
-createIndexBuffer :: GLW.Buffer -> BufferView -> Accessor -> Either String Hree.IndexBuffer
-createIndexBuffer buffer bufferView accessor = do
+createIndexBufferSource :: Hree.BufferSource -> BufferView -> Accessor -> Either String Hree.IndexBufferSource
+createIndexBufferSource bufferSource bufferView accessor = do
     unless (accessorType accessor == Scalar) $
         Left ("accessorType should be SCALAR. but actual accessorType: " ++ show (accessorType accessor))
     dataType <- convertToIndexBufferDataType (accessorComponentType accessor)
     let count = accessorCount accessor
         offset = bufferViewByteOffset bufferView + accessorByteOffset accessor
-    return $ Hree.IndexBuffer buffer dataType (fromIntegral count) offset
+    return $ Hree.IndexBufferSource bufferSource dataType (fromIntegral count) offset
 
 convertToIndexBufferDataType :: ComponentType -> Either String GL.GLenum
 convertToIndexBufferDataType UnsignedByte' = return GL.GL_UNSIGNED_BYTE
@@ -1353,8 +1354,8 @@ parseMaybeDracoExtension :: Aeson.Object -> Maybe DracoExtension
 parseMaybeDracoExtension extensions =
     Aeson.parseMaybe Aeson.parseJSON =<< HM.lookup "KHR_draco_mesh_compression" extensions
 
-createGeometryDraco :: Hree.Scene -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Map Text Int -> DracoExtension -> IO Hree.Geometry
-createGeometryDraco scene bufferSources bufferViews accessors attributes extension = do
+createGeometryDraco :: BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> Map Text Int -> DracoExtension -> IO Hree.Geometry
+createGeometryDraco bufferSources bufferViews accessors attributes extension = do
     attrs <- getAttributeInfo
     withDecoder $ \decoder -> do
         withDecoderBuffer $ \decoderBuffer -> do
@@ -1376,8 +1377,8 @@ createGeometryDraco scene bufferSources bufferViews accessors attributes extensi
                             throwIO . userError =<< Foreign.peekCString =<< Draco.errorMsg status
                         pc <- Draco.castMeshToPointCloud mesh
                         (_, geometry) <- foldM (addAttribBinding pc) (0, Hree.newGeometry) attrs
-                        indexBuffer <- mkIndexBuffer mesh
-                        return $ geometry { Hree.geometryIndexBuffer = Just indexBuffer }
+                        indexBufferSource <- mkIndexBufferSource mesh
+                        return $ geometry { Hree.geometryIndexBufferSource = Just indexBufferSource }
 
                   | otherwise -> throwIO . userError $ "unknown encoded geometry type: " ++ show gtype
     where
@@ -1411,31 +1412,31 @@ createGeometryDraco scene bufferSources bufferViews accessors attributes extensi
             return (key, accessor, attrIndex)
 
     addAttribBinding pc (bindingIndex, geometry0) (attribKey, accessor, attrIndex) = do
-        buffer <- createAttributeDataBuffer pc accessor attrIndex
+        bufferSource <- createAttributeDataBuffer pc accessor attrIndex
         let stride = accessorByteStride accessor
             bbs = Hree.BindBufferSetting 0 stride 0
             attribFormat = Map.singleton (convertAttribName attribKey) (accessorToAttributeFormat accessor)
-            geometry1 = Hree.addAttribBindings geometry0 bindingIndex attribFormat (buffer, bbs)
+            geometry1 = Hree.addAttribBindings geometry0 bindingIndex attribFormat (bufferSource, bbs)
         return (bindingIndex + 1, geometry1)
 
     createAttributeDataBuffer pc accessor attrIndex = do
         let stride = accessorByteStride accessor
             byteSize = accessorCount accessor * stride
         attr <- Draco.getAttributeByUniqueId pc (fromIntegral attrIndex)
-        Foreign.allocaBytes byteSize $ \ptr -> do
-            getAttributeDataArray pc attr (accessorComponentType accessor) (fromIntegral byteSize) ptr
-            Hree.addBuffer scene (Hree.BufferSourcePtr ptr byteSize GL.GL_STATIC_READ)
+        ptr <- Foreign.newForeignPtr_ =<< Foreign.mallocBytes byteSize
+        Foreign.withForeignPtr ptr $ getAttributeDataArray pc attr (accessorComponentType accessor) (fromIntegral byteSize)
+        return (Hree.BufferSourcePtr ptr byteSize GL.GL_STATIC_READ)
 
-    mkIndexBuffer mesh = do
+    mkIndexBufferSource mesh = do
         numFaces <- Draco.getNumFaces mesh
         let numIndices = fromIntegral numFaces * 3
             byteSize = numIndices * Foreign.sizeOf (undefined :: Word32)
-        Foreign.allocaBytes byteSize $ \ptr -> do
-            r <- Draco.getIndices mesh (fromIntegral byteSize) ptr
-            unless r . throwIO . userError $ "getIndices failed"
-            buffer <- Hree.addBuffer scene (Hree.BufferSourcePtr ptr byteSize GL.GL_STATIC_READ)
-            let indexBuffer = Hree.IndexBuffer buffer GL.GL_UNSIGNED_INT (fromIntegral numIndices) 0
-            return indexBuffer
+        ptr <- Foreign.newForeignPtr_ =<< Foreign.mallocBytes byteSize
+        r <- Foreign.withForeignPtr ptr $ Draco.getIndices mesh (fromIntegral byteSize)
+        unless r . throwIO . userError $ "getIndices failed"
+        let bufferSource = Hree.BufferSourcePtr ptr byteSize GL.GL_STATIC_READ
+            indexBufferSource = Hree.IndexBufferSource bufferSource GL.GL_UNSIGNED_INT (fromIntegral numIndices) 0
+        return indexBufferSource
 
     getAttributeDataArray pc attr Byte' byteSize ptr = do
         r <- Draco.getAttributeInt8ArrayForAllPoints pc attr byteSize (Foreign.castPtr ptr)

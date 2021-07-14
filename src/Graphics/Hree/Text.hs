@@ -335,9 +335,8 @@ createTextWithOption font text partialTextOption = do
             origin = relocateOrigin bottomLine (runIdentity $ originLocation textOption) (fmap realToFrac . runIdentity . originPosition $ textOption)
             vs = SV.generate (UV.length xs) (toSpriteVertex origin glyphVec . (xs UV.!))
 
-        (geo, _) <- Hree.newSpriteGeometry scene
-        geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
-        let mesh = Hree.Mesh geo' material . Just . SV.length $ vs
+        let geo = Hree.addVerticesToGeometry (fst Hree.newSpriteGeometry) vs GL.GL_STATIC_READ
+        let mesh = Hree.Mesh geo material . Just . SV.length $ vs
         Hree.addMesh scene mesh
 
 setFontPixelSize :: FontFace -> Int -> Int -> IO ()

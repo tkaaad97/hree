@@ -1,6 +1,5 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE DataKinds    #-}
+{-# LANGUAGE TypeFamilies #-}
 module Graphics.Hree.Material.SpriteMaterial
     ( MaxSpriteTileCount
     , SpriteMaterial

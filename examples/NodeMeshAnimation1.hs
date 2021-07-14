@@ -143,8 +143,7 @@ main =
 
     createMesh scene material (V2 (V2 x y) (V2 w h)) = do
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 (x / twidth') (y / theight')) (V2 (w / twidth') (h / theight')) GL.GL_FALSE 0
-        (geo, _) <- Hree.newSpriteGeometry scene
-        geo' <- Hree.addVerticesToGeometry geo vs GL.GL_STATIC_READ scene
+            geo' = Hree.addVerticesToGeometry (fst Hree.newSpriteGeometry) vs GL.GL_STATIC_READ
         fmap Hree.addedMeshId . Hree.addMesh scene $ Hree.Mesh geo' material (Just 1)
 
     createMeshes scene material uvs = SV.mapM (createMesh scene material) uvs

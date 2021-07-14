@@ -115,8 +115,8 @@ main =
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
 
-        indexBuffer <- Hree.addIndexBufferUInt scene indices
-        geometry <- Hree.addVerticesToGeometry Hree.newGeometry { Hree.geometryIndexBuffer = Just indexBuffer } vs GL.GL_STREAM_DRAW scene
+        let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+                        `Hree.setIndexBufferSourceUInt` indices
 
         nodeId2 <- Hree.addNode scene Hree.newNode { Hree.nodeRotation = Quaternion 1 (V3 0 0 0) } False
         nodeId1 <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.singleton nodeId2, Hree.nodeTranslation = V3 0 1 0 } False

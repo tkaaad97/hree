@@ -16,6 +16,7 @@ module Graphics.Hree.GL.Types
     , BindBufferSetting(..)
     , DrawMethod(..)
     , IndexBuffer(..)
+    , IndexBufferSource(..)
     , ProgramInfo(..)
     , RenderInfo(..)
     , RenderOption_(..)
@@ -83,12 +84,12 @@ module Graphics.Hree.GL.Types
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Functor.Identity (Identity)
-import Data.Map.Strict (Map)
+import Data.Map.Strict (Map, size)
 import Data.Monoid (Last(..), Monoid(..))
 import Data.Semigroup (Semigroup(..))
 import qualified Data.Vector as BV (Vector)
 import qualified Data.Vector.Storable as SV (Vector)
-import Foreign (Ptr, Storable)
+import Foreign (ForeignPtr, Ptr, Storable)
 import GHC.TypeNats (Nat)
 import qualified GLW
 import qualified Graphics.GL as GL
@@ -285,9 +286,14 @@ data DrawMethod =
     deriving (Show, Eq)
 
 data BufferSource =
-    BufferSourcePtr !(Ptr ()) !Int !GL.GLenum |
+    BufferSourcePtr !(ForeignPtr ()) !Int !GL.GLenum |
     forall a. Storable a => BufferSourceVector !(SV.Vector a) !GL.GLenum |
     BufferSourceByteString !ByteString !GL.GLenum
+
+instance Show BufferSource where
+    show BufferSourcePtr {}        = "BufferSourcePtr"
+    show BufferSourceVector {}     = "BufferSourceVector"
+    show BufferSourceByteString {} = "BufferSourceByteString"
 
 data BindBufferSetting = BindBufferSetting
     { bindBufferSettingOffset  :: !Int
@@ -310,6 +316,13 @@ data IndexBuffer = IndexBuffer
     , ibCount      :: !GL.GLsizei
     , ibByteOffset :: !Int
     } deriving (Show, Eq)
+
+data IndexBufferSource = IndexBufferSource
+    { ibsBufferSource :: !BufferSource
+    , ibsDataType     :: !GL.GLenum
+    , ibsCount        :: !GL.GLsizei
+    , ibsByteOffset   :: !Int
+    } deriving (Show)
 
 newtype LimitedVector (n :: Nat) a = LimitedVector
     { unLimitedVector :: SV.Vector a

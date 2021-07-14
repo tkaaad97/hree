@@ -11,8 +11,8 @@ module Graphics.Hree.GL.UniformBlock
     ) where
 
 import Control.Monad (when)
-import qualified Foreign (ForeignPtr, Ptr, Storable(..), castPtr,
-                          mallocForeignPtr, withForeignPtr)
+import qualified Foreign (ForeignPtr, Ptr, Storable(..), castForeignPtr,
+                          castPtr, mallocForeignPtr, withForeignPtr)
 import qualified GLW (Buffer, glBindBufferBase)
 import qualified Graphics.GL as GL
 import Graphics.Hree.GL (updateBuffer)
@@ -28,7 +28,7 @@ newUniformBlockBinder :: (Block a) => GLW.Buffer -> a -> IO (UniformBlockBinder 
 newUniformBlockBinder buffer a = do
     ptr <- Foreign.mallocForeignPtr
     Foreign.withForeignPtr ptr (`Foreign.poke` Std140 a)
-    Foreign.withForeignPtr ptr $ \p -> updateBuffer buffer (BufferSourcePtr (Foreign.castPtr p) (Foreign.sizeOf (Std140 a)) GL.GL_DYNAMIC_DRAW)
+    updateBuffer buffer (BufferSourcePtr (Foreign.castForeignPtr ptr) (Foreign.sizeOf (Std140 a)) GL.GL_DYNAMIC_DRAW)
     return $ UniformBlockBinder buffer ptr
 
 updateUniformBlock :: (Eq a, Block a) => UniformBlockBinder a -> a -> IO ()

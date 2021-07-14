@@ -38,7 +38,7 @@ main =
     init w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        geometry <- Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW scene
+        let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
         texture <- mkTexture scene
         let material = (Hree.basicMaterial (V3 0 0 (-1)))
                 { Hree.materialTextures = pure (Hree.BaseColorMapping, texture)

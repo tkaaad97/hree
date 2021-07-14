@@ -60,8 +60,8 @@ main = do
 
         | otherwise = do
             geometry <- case extension of
-                            ".stl" -> STL.loadGeometryFromFile path scene
-                            ".ply" -> PLY.loadGeometryFromFile path scene
+                            ".stl" -> STL.loadGeometryFromFile path
+                            ".ply" -> PLY.loadGeometryFromFile path
                             _ -> throwIO . userError $ "unknown format. path: " ++ path
             let material = Material.basicMaterial $ V3 0.5 (-1) (-0.5)
                 mesh = Hree.Mesh geometry material Nothing

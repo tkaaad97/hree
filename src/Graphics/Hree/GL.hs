@@ -38,7 +38,8 @@ import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV (Vector, length, map, mapMaybe, toList)
 import qualified Data.Vector.Storable as SV
-import qualified Foreign (Storable(..), alloca, allocaArray, castPtr, withArray)
+import qualified Foreign (Storable(..), alloca, allocaArray, castPtr, withArray,
+                          withForeignPtr)
 import qualified GLW
 import qualified GLW.Groups.Boolean as Boolean
 import qualified GLW.Groups.EnableCap as EnableCap
@@ -348,9 +349,9 @@ setColorMask (Just beforeOption) option @ (V4 red green blue alpha)
     | otherwise = GL.glColorMask red green blue alpha
 
 createBuffer :: BufferSource -> IO GLW.Buffer
-createBuffer (BufferSourcePtr ptr len usage) = do
+createBuffer (BufferSourcePtr fptr len usage) = do
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
-    GLW.glNamedBufferData buffer (fromIntegral len) ptr usage
+    Foreign.withForeignPtr fptr $ \ptr -> GLW.glNamedBufferData buffer (fromIntegral len) ptr usage
     return buffer
 createBuffer (BufferSourceVector vec usage) = do
     let n = SV.length vec
@@ -365,8 +366,8 @@ createBuffer (BufferSourceByteString bs usage) = do
     return buffer
 
 updateBuffer :: GLW.Buffer -> BufferSource -> IO ()
-updateBuffer buffer (BufferSourcePtr ptr len usage) = do
-    GLW.glNamedBufferData buffer (fromIntegral len) ptr usage
+updateBuffer buffer (BufferSourcePtr fptr len usage) =
+    Foreign.withForeignPtr fptr $ \ptr -> GLW.glNamedBufferData buffer (fromIntegral len) ptr usage
 updateBuffer buffer (BufferSourceVector vec usage) = do
     let n = SV.length vec
         size = fromIntegral $ n * Foreign.sizeOf (SV.head vec)

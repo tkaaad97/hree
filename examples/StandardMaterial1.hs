@@ -34,7 +34,7 @@ main = do
     init path metalness roughness w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        geometry <- STL.loadGeometryFromFile path scene
+        geometry <- STL.loadGeometryFromFile path
         let material = Material.standardMaterial $
                 Material.standardMaterialBlock
                     { Material.metallicFactor = metalness

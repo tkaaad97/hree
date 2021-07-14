@@ -4,9 +4,6 @@
 module Graphics.Hree.Scene
     ( AddedMesh(..)
     , addBuffer
-    , addIndexBufferUByte
-    , addIndexBufferUInt
-    , addIndexBufferUShort
     , addLight
     , addMesh
     , addNode
@@ -235,7 +232,7 @@ nodeToRenderInfos renderer scene state =
         vao <- maybe (lift $ mkMeshVertexArray scene meshInfo program) return maybeVao
         globalMatrix <- lift $ fromMaybe Linear.identity <$> Component.readComponent globalMatrixStore nodeId
         defaultTexture <- lift $ mkDefaultTextureIfNotExists scene
-        maybeSkin <- maybe (return Nothing) (lift . Component.readComponent skinStore) $ maybeSkinId
+        maybeSkin <- maybe (return Nothing) (lift . Component.readComponent skinStore) maybeSkinId
         let matrix = globalMatrix !*! inverseBindMatrix
         let renderInfo = toRenderInfo program defaultTexture meshInfo vao maybeSkin matrix (nodeInfoUniformBlocks node)
         return renderInfo
@@ -270,10 +267,10 @@ toRenderInfo program defaultTexture meshInfo vao skin matrix nodeUbs =
 
 resolveDrawMethod :: MeshInfo -> DrawMethod
 resolveDrawMethod mesh =
-    let indicesCount = fromIntegral . geometryVerticesCount . meshInfoGeometry $ mesh
-        indexBuffer = geometryIndexBuffer . meshInfoGeometry $ mesh
+    let indicesCount = fromIntegral . geometryInfoVerticesCount . meshInfoGeometry $ mesh
+        indexBufferSource = geometryInfoIndexBuffer . meshInfoGeometry $ mesh
         instanceCount = fromIntegral <$> meshInfoInstanceCount mesh
-    in resolve indicesCount indexBuffer instanceCount
+    in resolve indicesCount indexBufferSource instanceCount
 
     where
     resolve indicesCount Nothing Nothing =
@@ -298,20 +295,21 @@ addMesh_ scene mesh maybeSkinId = do
         poption = resolveProgramOption mesh maybeSkin
         pname = getProgramName pspec poption
     (materialInfo, ubb) <- mkMaterialInfo poption
-    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc materialInfo pname)
+    geoInfo <- instantiateGeometry geo
+    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc materialInfo geoInfo pname)
     let meshId = meshInfoId minfo
     Component.addComponent (sceneMeshStore scene) meshId minfo
     return $ AddedMesh meshId ubb
 
     where
     material = meshMaterial mesh
+    geo = meshGeometry mesh
+    instanceCount = meshInstanceCount mesh
 
-    addMeshFunc materialInfo p state =
+    addMeshFunc materialInfo geoInfo p state =
         let meshId = ssMeshCounter state
             meshIdNext = meshId + 1
-            bos = map fst . IntMap.elems $ buffers
-            bos' = SV.fromList $ (materialInfoUniformBlock materialInfo) : maybe bos ((: bos) . ibBuffer) maybeIndexBuffer
-            minfo = MeshInfo meshId geo materialInfo instanceCount maybeSkinId bos' p Nothing
+            minfo = MeshInfo meshId geoInfo materialInfo instanceCount maybeSkinId p Nothing
             newState = state
                 { ssMeshCounter = meshIdNext
                 }
@@ -326,27 +324,38 @@ addMesh_ scene mesh maybeSkinId = do
         ubb <- newUniformBlockBinder buffer block
         return (MaterialInfo buffer textures roption poption pspec, ubb)
 
-    geo = meshGeometry mesh
-    instanceCount = meshInstanceCount mesh
-    buffers = geometryBuffers geo
-    maybeIndexBuffer = geometryIndexBuffer geo
+instantiateGeometry :: Geometry -> IO GeometryInfo
+instantiateGeometry geo = do
+    buffers <- fmap IntMap.fromList . mapM createBuffer' . IntMap.assocs $ bufferSources
+    indexBuffer <- maybe (return Nothing) (fmap Just . instantiateIndexBuffer) indexBufferSource
+    return (GeometryInfo attribBindings buffers indexBuffer verticesCount)
+    where
+    Geometry attribBindings bufferSources indexBufferSource verticesCount = geo
+    createBuffer' (i, (bs, bbs)) = do
+            b <- createBuffer bs
+            return (i, (b, bbs))
+
+instantiateIndexBuffer :: IndexBufferSource -> IO IndexBuffer
+instantiateIndexBuffer (IndexBufferSource s dataType count offset) = do
+    b <- createBuffer s
+    return (IndexBuffer b dataType count offset)
 
 mkMeshVertexArray :: Scene -> MeshInfo -> ProgramInfo -> IO GLW.VertexArray
 mkMeshVertexArray scene meshInfo program =
     maybe f return (meshInfoVertexArray meshInfo)
     where
     meshId = meshInfoId meshInfo
-    geo = meshInfoGeometry $ meshInfo
+    geo = meshInfoGeometry meshInfo
     meshStore = sceneMeshStore scene
     setVao vao a = a { meshInfoVertexArray = Just vao }
     f = do
-        vao <- createVertexArray (geometryAttribBindings geo) (geometryBuffers geo) (geometryIndexBuffer geo) program
+        vao <- createVertexArray (geometryInfoAttribBindings geo) (geometryInfoBuffers geo) (geometryInfoIndexBuffer geo) program
         void $ Component.modifyComponent meshStore (setVao vao) meshId
         return vao
 
 removeMesh :: Scene -> MeshId -> IO ()
 removeMesh scene meshId = do
-    vao <- ((id =<<) . fmap meshInfoVertexArray) <$> Component.readComponent (sceneMeshStore scene) meshId
+    vao <- (id =<<) . fmap meshInfoVertexArray <$> Component.readComponent (sceneMeshStore scene) meshId
     maybe (return ()) GLW.deleteObject vao
     void $ Component.removeComponent (sceneMeshStore scene) meshId
 
@@ -487,21 +496,6 @@ addBufferResource scene buffer =
     addBufferFunc state =
         let buffers = buffer : ssBuffers state
         in (state { ssBuffers = buffers }, ())
-
-addIndexBufferUByte :: Scene -> SV.Vector Word8 -> IO IndexBuffer
-addIndexBufferUByte scene v = do
-    buffer <- addBuffer scene (BufferSourceVector v GL.GL_STATIC_READ)
-    return (IndexBuffer buffer GL.GL_UNSIGNED_BYTE (fromIntegral . SV.length $ v) 0)
-
-addIndexBufferUShort :: Scene -> SV.Vector Word16 -> IO IndexBuffer
-addIndexBufferUShort scene v = do
-    buffer <- addBuffer scene (BufferSourceVector v GL.GL_STATIC_READ)
-    return (IndexBuffer buffer GL.GL_UNSIGNED_SHORT (fromIntegral . SV.length $ v) 0)
-
-addIndexBufferUInt :: Scene -> SV.Vector Word32 -> IO IndexBuffer
-addIndexBufferUInt scene v = do
-    buffer <- addBuffer scene (BufferSourceVector v GL.GL_STATIC_READ)
-    return (IndexBuffer buffer GL.GL_UNSIGNED_INT (fromIntegral . SV.length $ v) 0)
 
 removeBuffer :: Scene -> GLW.Buffer -> IO ()
 removeBuffer scene buffer = do
