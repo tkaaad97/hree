@@ -31,6 +31,7 @@ module Graphics.Hree.Scene
     , translateNode
     , updateLight
     , updateMeshInstanceCount
+    , updateMeshVertexBuffer
     , updateNode
     , materialBlockBindingIndex
     , cameraBlockBindingIndex
@@ -40,7 +41,7 @@ module Graphics.Hree.Scene
     ) where
 
 import qualified Chronos as Time (Time, epoch, now)
-import Control.Exception (bracketOnError, throwIO)
+import Control.Exception (bracket, bracketOnError, throwIO)
 import Control.Monad (unless, void, when)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..))
@@ -493,6 +494,22 @@ updateMeshInstanceCount scene meshId c =
     void $ Component.modifyComponent meshStore f meshId
     where
     f m = m { meshInfoInstanceCount = c }
+    meshStore = sceneMeshStore scene
+
+updateMeshVertexBuffer :: Scene -> MeshId -> Int -> (Ptr () -> IO ()) -> IO ()
+updateMeshVertexBuffer scene meshId bindingIndex f = do
+    meshInfo <- maybe
+        (throwIO . userError $ "mesh not found. meshId: " ++ show meshId)
+        return =<< Component.readComponent meshStore meshId
+    let geo = meshInfoGeometry meshInfo
+    buffer <- maybe
+        (throwIO . userError $ "bindingIndex not found. meshId: " ++ show meshId ++ " bindingIndex: " ++ show bindingIndex)
+        (return . fst) . IntMap.lookup bindingIndex . geometryInfoBuffers $ geo
+    bracket
+        (GLW.glMapNamedBuffer buffer GL.GL_READ_WRITE)
+        f
+        (const . void $ GLW.glUnmapNamedBuffer buffer)
+    where
     meshStore = sceneMeshStore scene
 
 addBufferResource :: Scene -> GLW.Buffer -> IO ()
