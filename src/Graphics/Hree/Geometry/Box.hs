@@ -5,8 +5,8 @@ module Graphics.Hree.Geometry.Box
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import qualified Graphics.GL as GL
-import Graphics.Hree.GL.Vertex (PositionAndNormal(..))
 import Graphics.Hree.Geometry (Geometry, addVerticesToGeometry, newGeometry)
+import Graphics.Hree.GL.Vertex (PositionAndNormal(..))
 import Linear (V3(..))
 
 createBoxGeometry :: Float -> Float -> Float -> (Geometry, Vector PositionAndNormal)

@@ -63,8 +63,7 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip,
                                         addVerticesToGeometry,
                                         modifyUniformBlock, newNode,
                                         newSpriteGeometry, singleVariationClip)
-import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial,
-                                                                SpriteMaterialBlock(..),
+import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial, SpriteMaterialBlock(..),
                                                                 SpriteTile(..),
                                                                 maxSpriteTileCount,
                                                                 spriteMaterial)

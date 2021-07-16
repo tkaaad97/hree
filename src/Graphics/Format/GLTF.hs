@@ -848,7 +848,7 @@ createMeshFromPrimitive bufferByteStrings bufferSources bufferViews accessors ma
 createGeometry :: BV.Vector Hree.BufferSource -> BV.Vector BufferView -> BV.Vector Accessor -> Primitive -> IO Hree.Geometry
 createGeometry bufferSources bufferViews accessors primitive = do
     attributes <- either (throwIO . userError) return . mapM f . Map.toList . primitiveAttributes $ primitive
-    let (_, geometry) = foldl addAttribBinding (1, Hree.newGeometry) attributes
+    let geometry = foldl addAttribBinding Hree.newGeometry attributes
         verticesCount = minimum . map (accessorCount . snd . snd) $ attributes
         geometry1 = geometry { Hree.geometryVerticesCount = verticesCount }
 
@@ -863,9 +863,8 @@ createGeometry bufferSources bufferViews accessors primitive = do
         buffer <- maybe (Left $ "invalid buffer identifier: " ++ show bid) return $ bufferSources BV.!? bid
         return ((bufferView, buffer), (key, accessor))
 
-    addAttribBinding (bindingIndex, geometry0) ((bufferView, buffer), (attribKey, accessor)) =
-        let geometry1 = Hree.addAttribBindings geometry0 bindingIndex attribFormat (buffer, bbs)
-        in (bindingIndex + 1, geometry1)
+    addAttribBinding geometry ((bufferView, buffer), (attribKey, accessor)) =
+        Hree.addAttribBindings geometry attribFormat (buffer, bbs)
         where
         offset = bufferViewByteOffset bufferView + accessorByteOffset accessor
         stride = fromMaybe (calcStrideFromAccessors [accessor]) $ bufferViewByteStride bufferView
@@ -1367,7 +1366,7 @@ createGeometryDraco bufferSources bufferViews accessors attributes extension = d
                         ok <- Draco.ok status
                         unless ok $
                             throwIO . userError =<< Foreign.peekCString =<< Draco.errorMsg status
-                        (_, geometry) <- foldM (addAttribBinding pc) (0, Hree.newGeometry) attrs
+                        geometry <- foldM (addAttribBinding pc) Hree.newGeometry attrs
                         return geometry
                   | n == Draco.encodedGeometryTypeTriangularMesh ->
                     withMesh $ \mesh -> do
@@ -1376,7 +1375,7 @@ createGeometryDraco bufferSources bufferViews accessors attributes extension = d
                         unless ok $
                             throwIO . userError =<< Foreign.peekCString =<< Draco.errorMsg status
                         pc <- Draco.castMeshToPointCloud mesh
-                        (_, geometry) <- foldM (addAttribBinding pc) (0, Hree.newGeometry) attrs
+                        geometry <- foldM (addAttribBinding pc) Hree.newGeometry attrs
                         indexBufferSource <- mkIndexBufferSource mesh
                         return $ geometry { Hree.geometryIndexBufferSource = Just indexBufferSource }
 
@@ -1411,13 +1410,13 @@ createGeometryDraco bufferSources bufferViews accessors attributes extension = d
             attrIndex <- Map.lookup key (dracoExtensionAttributes extension)
             return (key, accessor, attrIndex)
 
-    addAttribBinding pc (bindingIndex, geometry0) (attribKey, accessor, attrIndex) = do
+    addAttribBinding pc geometry0 (attribKey, accessor, attrIndex) = do
         bufferSource <- createAttributeDataBuffer pc accessor attrIndex
         let stride = accessorByteStride accessor
             bbs = Hree.BindBufferSetting 0 stride 0
             attribFormat = Map.singleton (convertAttribName attribKey) (accessorToAttributeFormat accessor)
-            geometry1 = Hree.addAttribBindings geometry0 bindingIndex attribFormat (bufferSource, bbs)
-        return (bindingIndex + 1, geometry1)
+            geometry1 = Hree.addAttribBindings geometry0 attribFormat (bufferSource, bbs)
+        return geometry1
 
     createAttributeDataBuffer pc accessor attrIndex = do
         let stride = accessorByteStride accessor

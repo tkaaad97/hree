@@ -39,9 +39,9 @@ import qualified Data.Vector.Storable.Mutable as MSV (STVector, new, write)
 import qualified Data.Vector.Unboxed as UV (generate, mapM_)
 import Data.Word
 import qualified Graphics.GL as GL
-import Graphics.Hree.GL.Vertex (BasicVertex(..))
 import Graphics.Hree.Geometry (addVerticesToGeometry, newGeometry,
                                setIndexBufferSourceUInt)
+import Graphics.Hree.GL.Vertex (BasicVertex(..))
 import Graphics.Hree.Types (Geometry, Scene)
 import Linear (Additive(..), V2(..), V3(..), V4(..))
 import qualified Linear (cross, normalize)

@@ -29,23 +29,28 @@ import Linear (V2(..), V3(..))
 newGeometry :: Geometry
 newGeometry = Geometry Map.empty IntMap.empty Nothing 0
 
-addAttribBindings :: Geometry -> Int -> Map ByteString AttributeFormat -> (BufferSource, BindBufferSetting) -> Geometry
-addAttribBindings geo bindingIndex xs b = geo'
+addAttribBindings :: Geometry -> Map ByteString AttributeFormat -> (BufferSource, BindBufferSetting) -> Geometry
+addAttribBindings geo xs b = geo'
     where
+    bufferSources = geometryBufferSources geo
+    bindingIndex = (+ 1) . lookupMaxKey 0 $ bufferSources
     adding = Map.map (AttribBinding (GLW.BindingIndex $ fromIntegral bindingIndex)) xs
     attribBindings = Map.union (geometryAttribBindings geo) adding
-    bufferSources = IntMap.insert bindingIndex b (geometryBufferSources geo)
-    geo' = geo { geometryAttribBindings = attribBindings, geometryBufferSources = bufferSources }
+    bufferSources' = IntMap.insert bindingIndex b (geometryBufferSources geo)
+    geo' = geo { geometryAttribBindings = attribBindings, geometryBufferSources = bufferSources' }
+    lookupMaxKey d m
+        | IntMap.null m = d
+        | otherwise = fst . IntMap.findMax $ m
 
 addVerticesToGeometry :: forall a. (Vertex a) => Geometry -> Vector a -> GL.GLenum -> Geometry
 addVerticesToGeometry geometry storage usage =
     let bufferSource = BufferSourceVector storage usage
-        bufferSources' = IntMap.insert bindingIndex (bufferSource, bbs) buffers
+        bufferSources' = IntMap.insert bindingIndex (bufferSource, bbs) bufferSources
     in Geometry attribBindings' bufferSources' indexBuffer count
     where
-    Geometry attribBindings buffers indexBuffer c = geometry
+    Geometry attribBindings bufferSources indexBuffer c = geometry
     count = if c == 0 then Vector.length storage else c
-    bindingIndex = (+ 1) . lookupMaxKey 0 $ buffers
+    bindingIndex = (+ 1) . lookupMaxKey 0 $ bufferSources
     VertexSpec bbs fields = vertexSpec (Proxy :: Proxy a)
     keys = map vertexFieldAttribName fields
     bindings = map toAttribBinding fields
