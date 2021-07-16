@@ -3,7 +3,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Hree.Scene
     ( AddedMesh(..)
-    , addBuffer
     , addLight
     , addMesh
     , addNode
@@ -24,7 +23,6 @@ module Graphics.Hree.Scene
     , newScene
     , readNode
     , readNodeTransform
-    , removeBuffer
     , removeLight
     , removeMesh
     , removeNode
@@ -53,8 +51,8 @@ import qualified Data.ByteString.Char8 as ByteString (pack)
 import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
 import qualified Data.Component as Component
-import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.IntMap.Strict as IntMap
+import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.List (nubBy)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, isJust)
@@ -62,7 +60,7 @@ import Data.Proxy (Proxy(..))
 import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as GV (imapM_)
 import qualified Data.Vector.Storable as SV
-import Data.Word (Word16, Word32, Word8)
+import Data.Word (Word8)
 import Foreign (Ptr)
 import qualified Foreign (castPtr, copyArray, nullPtr, plusPtr, withArray)
 import GHC.TypeNats (KnownNat)
@@ -355,9 +353,23 @@ mkMeshVertexArray scene meshInfo program =
 
 removeMesh :: Scene -> MeshId -> IO ()
 removeMesh scene meshId = do
-    vao <- (id =<<) . fmap meshInfoVertexArray <$> Component.readComponent (sceneMeshStore scene) meshId
+    meshInfo <- maybe
+        (throwIO . userError $ "mesh not found. meshId: " ++ show meshId)
+        return =<< Component.readComponent (sceneMeshStore scene) meshId
+    let vao = meshInfoVertexArray meshInfo
+        geo = meshInfoGeometry meshInfo
+        material = meshInfoMaterial meshInfo
+        uniformBuffer = materialInfoUniformBlock material
     maybe (return ()) GLW.deleteObject vao
-    void $ Component.removeComponent (sceneMeshStore scene) meshId
+    deleteGeometryBuffers geo
+    GLW.deleteObject uniformBuffer
+    meshRemoved <- Component.removeComponent (sceneMeshStore scene) meshId
+    unless meshRemoved
+        . throwIO . userError $ "failed to remove mesh component. meshId: " ++ show meshId
+    where
+    deleteGeometryBuffers geo = do
+        let buffers = fmap fst . IntMap.elems . geometryInfoBuffers $ geo
+        mapM_ GLW.deleteObject buffers
 
 addNode :: Scene -> Node -> Bool -> IO NodeId
 addNode scene node isRoot = do
@@ -421,7 +433,7 @@ removeNode scene nodeId = do
             void $ Component.removeComponent (sceneNodeGlobalTransformMatrixStore scene) nodeId
 
             -- remove node uniform buffers
-            mapM_ (removeBuffer scene . snd) (nodeInfoUniformBlocks nodeInfo)
+            mapM_ (removeBufferResource scene . snd) (nodeInfoUniformBlocks nodeInfo)
 
             -- remove from root node list
             isRoot <- BV.elem nodeId . ssRootNodes <$> readIORef (sceneState scene)
@@ -483,22 +495,19 @@ updateMeshInstanceCount scene meshId c =
     f m = m { meshInfoInstanceCount = c }
     meshStore = sceneMeshStore scene
 
-addBuffer :: Scene -> BufferSource -> IO GLW.Buffer
-addBuffer scene bufferSource = do
-    buffer <- createBuffer bufferSource
-    addBufferResource scene buffer
-    return buffer
-
 addBufferResource :: Scene -> GLW.Buffer -> IO ()
-addBufferResource scene buffer =
-    atomicModifyIORef' (sceneState scene) addBufferFunc
-    where
-    addBufferFunc state =
-        let buffers = buffer : ssBuffers state
-        in (state { ssBuffers = buffers }, ())
+addBufferResource scene buffer = addBufferResources scene [buffer]
 
-removeBuffer :: Scene -> GLW.Buffer -> IO ()
-removeBuffer scene buffer = do
+addBufferResources :: Scene -> [GLW.Buffer] -> IO ()
+addBufferResources scene buffers =
+    atomicModifyIORef' (sceneState scene) addBuffersFunc
+    where
+    addBuffersFunc state =
+        let stateBuffers = ssBuffers state
+        in (state { ssBuffers = buffers ++ stateBuffers }, ())
+
+removeBufferResource :: Scene -> GLW.Buffer -> IO ()
+removeBufferResource scene buffer = do
     GLW.deleteObject buffer
     atomicModifyIORef' (sceneState scene) removeBufferFunc
     where
@@ -776,10 +785,9 @@ initialSceneState =
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
-    (buffers, textures) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
     meshes <- Component.getComponentSlice (sceneMeshStore scene)
-    vaos <- BV.mapMaybe meshInfoVertexArray <$> BV.unsafeFreeze meshes
-    BV.mapM_ GLW.deleteObject vaos
+    BV.mapM_ (removeMesh scene . meshInfoId) =<< BV.freeze meshes
+    (buffers, textures) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
     GLW.deleteObjects buffers
     GLW.deleteObjects textures
     Component.cleanComponentStore meshStore defaultPreserveSize

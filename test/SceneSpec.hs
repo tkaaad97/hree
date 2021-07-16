@@ -10,8 +10,9 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word8)
 import Foreign (Ptr)
-import qualified Foreign (castPtr, withArray)
+import qualified Foreign (alloca, castPtr, withArray)
 import GLContext
+import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
@@ -28,6 +29,18 @@ import Test.Hspec
 getSceneProp :: Hree.Scene -> (Hree.SceneState -> a) -> IO a
 getSceneProp scene property = property <$> readIORef (Hree.sceneState scene)
 
+assertBufferAlive :: GLW.Buffer -> IO ()
+assertBufferAlive buffer = do
+    GL.glGetError >>= (`shouldBe` GL.GL_NO_ERROR)
+    Foreign.alloca $ GLW.glGetNamedBufferParameteriv buffer GL.GL_BUFFER_USAGE
+    GL.glGetError >>= (`shouldBe` GL.GL_NO_ERROR)
+
+assertBufferDead :: GLW.Buffer -> IO ()
+assertBufferDead buffer = do
+    GL.glGetError >>= (`shouldBe` GL.GL_NO_ERROR)
+    Foreign.alloca $ GLW.glGetNamedBufferParameteriv buffer GL.GL_BUFFER_USAGE
+    GL.glGetError >>= (`shouldBe` GL.GL_INVALID_OPERATION)
+
 spec :: Spec
 spec = do
     describe "addMesh" $ do
@@ -39,8 +52,8 @@ spec = do
             meshId `shouldBe` Hree.MeshId 1
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 2
-            buffers <- getSceneProp scene Hree.ssBuffers
-            buffers `shouldBe` [GLW.Buffer 1]
+            assertBufferAlive (GLW.Buffer 1)
+            assertBufferAlive (GLW.Buffer 2)
 
         runOnOSMesaContext width height . specify "use same geometry twice" $ do
             scene <- Hree.newScene
@@ -52,8 +65,10 @@ spec = do
             meshId2 `shouldBe` Hree.MeshId 2
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 3
-            buffers <- getSceneProp scene Hree.ssBuffers
-            buffers `shouldBe` [GLW.Buffer 1]
+            assertBufferAlive (GLW.Buffer 1)
+            assertBufferAlive (GLW.Buffer 2)
+            assertBufferAlive (GLW.Buffer 3)
+            assertBufferAlive (GLW.Buffer 4)
 
     describe "removeMesh" $ do
         runOnOSMesaContext width height . it "remove mesh" $ do
@@ -61,9 +76,11 @@ spec = do
             let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
                 mesh = Hree.Mesh geometry material Nothing
             meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
-            (`shouldBe` [GLW.Buffer 1]) =<< getSceneProp scene Hree.ssBuffers
+            assertBufferAlive (GLW.Buffer 1)
+            assertBufferAlive (GLW.Buffer 2)
             Hree.removeMesh scene meshId
-            (`shouldBe` [GLW.Buffer 1]) =<< getSceneProp scene Hree.ssBuffers
+            assertBufferDead (GLW.Buffer 1)
+            assertBufferDead (GLW.Buffer 2)
 
     describe "addTexture" $ do
         runOnOSMesaContext width height . it "change scene state" . Foreign.withArray [0, 0, 0, 0] $ \p -> do
@@ -95,11 +112,17 @@ spec = do
             _ <- Hree.addMesh scene mesh2
             meshSize <- Component.componentSize $ Hree.sceneMeshStore scene
             meshSize `shouldBe` 2
-            (`shouldBe` [GLW.Buffer 2, GLW.Buffer 1]) =<< getSceneProp scene Hree.ssBuffers
+            assertBufferAlive (GLW.Buffer 1)
+            assertBufferAlive (GLW.Buffer 2)
+            assertBufferAlive (GLW.Buffer 3)
+            assertBufferAlive (GLW.Buffer 4)
             Hree.deleteScene scene
             meshSizeAfter <- Component.componentSize $ Hree.sceneMeshStore scene
             meshSizeAfter `shouldBe` 0
-            (`shouldBe` []) =<< getSceneProp scene Hree.ssBuffers
+            assertBufferDead (GLW.Buffer 1)
+            assertBufferDead (GLW.Buffer 2)
+            assertBufferDead (GLW.Buffer 3)
+            assertBufferDead (GLW.Buffer 4)
 
         runOnOSMesaContext width height . it "delete textures" . Foreign.withArray [0, 0, 0, 0] $ \p -> do
             scene <- Hree.newScene
