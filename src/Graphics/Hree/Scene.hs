@@ -51,8 +51,8 @@ import qualified Data.ByteString.Char8 as ByteString (pack)
 import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
 import qualified Data.Component as Component
-import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import qualified Data.IntMap.Strict as IntMap
 import Data.List (nubBy)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, isJust)
@@ -141,14 +141,14 @@ autoClear (ClearOption colorOption depthOption stencilOption) = do
         .|. (if isJust depthOption then ClearBufferMask.glDepthBufferBit else zeroFlag)
         .|. (if isJust stencilOption then ClearBufferMask.glStencilBufferBit else zeroFlag)
 
-materialBlockBindingIndex, cameraBlockBindingIndex, lightBlockBindingIndex, skinJointMatricesBlockBindingIndex, skinJointInverseMatricesBlockBindingIndex :: BufferBindingIndex
-materialBlockBindingIndex = BufferBindingIndex 1
-cameraBlockBindingIndex = BufferBindingIndex 2
-lightBlockBindingIndex = BufferBindingIndex 3
-skinJointMatricesBlockBindingIndex = BufferBindingIndex 4
-skinJointInverseMatricesBlockBindingIndex = BufferBindingIndex 5
+materialBlockBindingIndex, cameraBlockBindingIndex, lightBlockBindingIndex, skinJointMatricesBlockBindingIndex, skinJointInverseMatricesBlockBindingIndex :: UniformBufferBindingIndex
+materialBlockBindingIndex = UniformBufferBindingIndex 1
+cameraBlockBindingIndex = UniformBufferBindingIndex 2
+lightBlockBindingIndex = UniformBufferBindingIndex 3
+skinJointMatricesBlockBindingIndex = UniformBufferBindingIndex 4
+skinJointInverseMatricesBlockBindingIndex = UniformBufferBindingIndex 5
 
-renderNodes :: Time.Time -> BV.Vector (ByteString, BufferBindingIndex) -> Renderer -> Scene -> SceneState -> IO ()
+renderNodes :: Time.Time -> BV.Vector (ByteString, UniformBufferBindingIndex) -> Renderer -> Scene -> SceneState -> IO ()
 renderNodes t ubbs renderer scene state = do
     _ <- runMaybeT $ updateNodeMatrices t scene state
     skins <- Component.getComponentSlice (sceneSkinStore scene)
@@ -235,7 +235,7 @@ nodeToRenderInfos renderer scene state =
         let renderInfo = toRenderInfo program defaultTexture meshInfo vao maybeSkin matrix (nodeInfoUniformBlocks node)
         return renderInfo
 
-toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> GLW.VertexArray -> Maybe Skin -> Mat4 -> [(BufferBindingIndex, GLW.Buffer)] -> RenderInfo
+toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> GLW.VertexArray -> Maybe Skin -> Mat4 -> [(UniformBufferBindingIndex, GLW.Buffer)] -> RenderInfo
 toRenderInfo program defaultTexture meshInfo vao skin matrix nodeUbs =
     let uniforms = BV.mapMaybe toUniformEntry $ ("modelMatrix", Uniform matrix) `BV.cons` textureUniforms
         renderInfo = RenderInfo program dm vao uniforms ubs textures roption
@@ -398,7 +398,7 @@ addNode scene node isRoot = do
                 }
         in (newState, nodeInfo)
 
-addNodeUniformBlock :: (Block a) => Scene -> NodeId -> BufferBindingIndex -> a -> IO (UniformBlockBinder a)
+addNodeUniformBlock :: (Block a) => Scene -> NodeId -> UniformBufferBindingIndex -> a -> IO (UniformBlockBinder a)
 addNodeUniformBlock scene nodeId bindingIndex a = do
     binder <- mkBlockBinder scene a
     let buffer = uniformBlockBinderBuffer binder

@@ -12,7 +12,7 @@ module Graphics.Hree.GL.Types
     , AttribLFormat(..)
     , AttribInfo(..)
     , BufferSource(..)
-    , BufferBindingIndex(..)
+    , UniformBufferBindingIndex(..)
     , BindBufferSetting(..)
     , DrawMethod(..)
     , IndexBuffer(..)
@@ -151,7 +151,7 @@ data ProgramInfo = ProgramInfo
     , programInfoUniforms            :: !(Map ByteString UniformInfo)
     , programInfoUniformLocations    :: !(Map ByteString GLW.UniformLocation)
     , programInfoUniformBlocks       :: !(Map ByteString UniformBlockInfo)
-    , programInfoBufferBindingPoints :: !(BV.Vector (ByteString, BufferBindingIndex))
+    , programInfoBufferBindingPoints :: !(BV.Vector (ByteString, UniformBufferBindingIndex))
     } deriving (Show)
 
 data DepthOption = DepthOption
@@ -273,7 +273,7 @@ data RenderInfo = RenderInfo
     , riDrawMethod    :: !DrawMethod
     , riVertexArray   :: !GLW.VertexArray
     , riUniforms      :: !(BV.Vector (GLW.UniformLocation, Uniform))
-    , riUniformBlocks :: !(BV.Vector (BufferBindingIndex, GLW.Buffer))
+    , riUniformBlocks :: !(BV.Vector (UniformBufferBindingIndex, GLW.Buffer))
     , riTextures      :: !(BV.Vector Texture)
     , riRenderOption  :: !RenderOption
     }
@@ -328,8 +328,8 @@ newtype LimitedVector (n :: Nat) a = LimitedVector
     { unLimitedVector :: SV.Vector a
     } deriving (Show, Eq)
 
-newtype BufferBindingIndex = BufferBindingIndex
-    { unBufferBindingIndex :: GL.GLuint
+newtype UniformBufferBindingIndex = UniformBufferBindingIndex
+    { unUniformBufferBindingIndex :: GL.GLuint
     } deriving (Show, Eq)
 
 type BVec2 = V2 GL.GLboolean

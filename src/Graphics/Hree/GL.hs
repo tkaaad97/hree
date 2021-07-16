@@ -51,7 +51,7 @@ import qualified Graphics.GL as GL
 import Graphics.Hree.GL.Types
 import Linear (V4(..))
 
-render :: BV.Vector (ByteString, BufferBindingIndex) -> RenderInfo -> Maybe (GLW.Program, RenderOption) -> IO (Maybe (GLW.Program, RenderOption))
+render :: BV.Vector (ByteString, UniformBufferBindingIndex) -> RenderInfo -> Maybe (GLW.Program, RenderOption) -> IO (Maybe (GLW.Program, RenderOption))
 render commons a cur = do
     setCurrentProgram (fst <$> cur) program
     setRenderOption (snd <$> cur) renderOption
@@ -74,7 +74,7 @@ render commons a cur = do
         setUniformBlocksBindingPoints p . BV.mapMaybe toUniformBlockPair $ commons
         setUniformBlocksBindingPoints p . BV.mapMaybe toUniformBlockPair $ bindingPoints
         GLW.glUseProgram p
-    toUniformBlockPair (k, BufferBindingIndex bindingIndex) = do
+    toUniformBlockPair (k, UniformBufferBindingIndex bindingIndex) = do
         blockInfo <- Map.lookup k uniformBlockInfos
         return (bindingIndex, ubiUniformBlockIndex blockInfo)
 
@@ -90,10 +90,10 @@ setUniformBlocksBindingPoints program = mapM_ setUniformBlockBindingPoint
     setUniformBlockBindingPoint (bindingIndex, blockIndex) =
         GLW.glUniformBlockBinding program blockIndex bindingIndex
 
-bindUniformBlockBuffers :: BV.Vector (BufferBindingIndex, GLW.Buffer) -> IO ()
+bindUniformBlockBuffers :: BV.Vector (UniformBufferBindingIndex, GLW.Buffer) -> IO ()
 bindUniformBlockBuffers = mapM_ bindUniformBlockBuffer
     where
-    bindUniformBlockBuffer (BufferBindingIndex bindingIndex, buffer) =
+    bindUniformBlockBuffer (UniformBufferBindingIndex bindingIndex, buffer) =
         GLW.glBindBufferBase GL.GL_UNIFORM_BUFFER bindingIndex buffer
 
 bindTextures :: BV.Vector Texture -> IO ()
@@ -105,7 +105,7 @@ bindTextures xs = do
     textures = BV.toList . BV.map (\(Texture (texture, _)) -> texture) $ xs
     samplers = BV.toList . BV.map (\(Texture (_, sampler)) -> sampler) $ xs
 
-renderMany :: Foldable t => BV.Vector (ByteString, BufferBindingIndex) -> t RenderInfo -> IO ()
+renderMany :: Foldable t => BV.Vector (ByteString, UniformBufferBindingIndex) -> t RenderInfo -> IO ()
 renderMany common = void . foldrM (render common) Nothing
 
 drawWith :: DrawMethod -> IO ()

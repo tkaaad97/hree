@@ -199,7 +199,7 @@ data ProgramSpec =
     UserProgram
         !ShaderSource -- vertexShaderSource
         !ShaderSource -- fragmentShaderSource
-        !(BV.Vector (ByteString, BufferBindingIndex)) -- binding points
+        !(BV.Vector (ByteString, UniformBufferBindingIndex)) -- binding points
     deriving (Show, Eq)
 
 newtype ProgramName = ProgramName
@@ -345,7 +345,7 @@ embeddedProgramName SpriteProgram    = "sprite"
 embeddedProgramName StandardProgram  = "standard"
 embeddedProgramName TestProgram      = "test"
 
-embeddedProgramBindingPoints :: EmbeddedProgramType -> BV.Vector (ByteString, BufferBindingIndex)
+embeddedProgramBindingPoints :: EmbeddedProgramType -> BV.Vector (ByteString, UniformBufferBindingIndex)
 embeddedProgramBindingPoints _ = mempty
 
 mkProgram :: ProgramSpec -> ProgramOption -> IO ProgramInfo
@@ -358,7 +358,7 @@ mkProgram (EmbeddedProgram progType) programOption = do
 mkProgram (UserProgram (ShaderSource _ vsource) (ShaderSource _ fsource) bindingPoints) _ =
     mkProgram' vsource fsource bindingPoints
 
-mkProgram' :: ByteString -> ByteString -> BV.Vector (ByteString, BufferBindingIndex) -> IO ProgramInfo
+mkProgram' :: ByteString -> ByteString -> BV.Vector (ByteString, UniformBufferBindingIndex) -> IO ProgramInfo
 mkProgram' vsource fsource bindingPoints = do
     vshader <- mkShader (Proxy :: Proxy 'GLW.GL_VERTEX_SHADER) vsource
     fshader <- mkShader (Proxy :: Proxy 'GLW.GL_FRAGMENT_SHADER) fsource
