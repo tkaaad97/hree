@@ -84,7 +84,7 @@ module Graphics.Hree.GL.Types
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Functor.Identity (Identity)
-import Data.Map.Strict (Map, size)
+import Data.Map.Strict (Map)
 import Data.Monoid (Last(..), Monoid(..))
 import Data.Semigroup (Semigroup(..))
 import qualified Data.Vector as BV (Vector)

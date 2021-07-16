@@ -52,8 +52,8 @@ import qualified Data.ByteString.Char8 as ByteString (pack)
 import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
 import qualified Data.Component as Component
-import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.IntMap.Strict as IntMap
+import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.List (nubBy)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, isJust)

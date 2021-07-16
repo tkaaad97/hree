@@ -20,11 +20,10 @@ import qualified Codec.Picture as Picture (Image(..), PixelRGBA8, convertRGBA8,
 import qualified Codec.Picture.Types as Picture (MutableImage(..),
                                                  PixelBaseComponent,
                                                  freezeImage, newMutableImage)
-import Control.Exception (bracket, throwIO)
-import Control.Monad (void, when)
+import Control.Exception (throwIO)
+import Control.Monad (when)
 import Data.Bits (complement, (.&.))
 import Data.Function ((&))
-import qualified Data.IntMap.Strict as IntMap (findMax)
 import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Text as Text (unpack)
 import qualified Data.Text.Encoding as Text (encodeUtf8)
@@ -44,25 +43,23 @@ import qualified Data.Vector.Unboxed.Mutable as MUV (new, slice, write)
 import Data.Word (Word32)
 import qualified Foreign (Ptr, castPtr, copyArray, peekElemOff, plusPtr,
                           pokeElemOff, sizeOf)
-import qualified GLW (Buffer, glMapNamedBuffer, glUnmapNamedBuffer)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import Graphics.Format.Tiled.Types
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip,
-                                        BufferSource, Elem(..),
-                                        Geometry(geometryBufferSources),
-                                        Interpolation(..), KeyFrames(..),
-                                        LimitedVector(..), Material(..),
-                                        Mesh(..), Node(..), NodeId, Scene,
-                                        SpriteVertex(..), Texture(..),
-                                        TextureMappingType(..),
+import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip, Elem(..),
+                                        Geometry, Interpolation(..),
+                                        KeyFrames(..), LimitedVector(..),
+                                        Material(..), Mesh(..), Node(..),
+                                        NodeId, Scene, SpriteVertex(..),
+                                        Texture(..), TextureMappingType(..),
                                         TextureSettings(..),
                                         TextureSourceData(..),
                                         VariationTrack(..), addMesh, addNode,
                                         addSampler, addTexture,
                                         addVerticesToGeometry,
                                         modifyUniformBlock, newNode,
-                                        newSpriteGeometry, singleVariationClip)
+                                        newSpriteGeometry, singleVariationClip,
+                                        updateMeshVertexBuffer)
 import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial, SpriteMaterialBlock(..),
                                                                 SpriteTile(..),
                                                                 maxSpriteTileCount,
@@ -315,11 +312,11 @@ loadRegions scene config map tilesetInfos gidRanges layerIndex tileLayer = BV.ma
 
 loadRegionFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TileMaterial -> V2 Int -> IO RegionLoadInfo
 loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInfo material) tiles @ (V2 _ n) = do
-    (geometry, geometryGids, bufferSource) <- createGeometryFromTiles config map layerData origin z tilesetInfo useTileAnimation tiles
+    (geometry, geometryGids) <- createGeometryFromTiles config map layerData origin z tilesetInfo useTileAnimation tiles
     let mesh = Hree.Mesh geometry material (Just n)
     Hree.AddedMesh meshId binder <- Hree.addMesh scene mesh
     nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
-    let animations = BV.imapMaybe (createTileAnimation bufferSource binder geometryGids) (tilesetInfoAnimationFrames tilesetInfo)
+    let animations = BV.imapMaybe (createTileAnimation meshId binder geometryGids) (tilesetInfoAnimationFrames tilesetInfo)
     when useTileAnimation $ Hree.modifyUniformBlock setSpriteTileVectorSize binder
     return (RegionLoadInfo nodeId animations)
     where
@@ -337,7 +334,7 @@ loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInf
             spriteTile = Hree.SpriteTile GL.GL_FALSE GL.GL_FALSE uv usSize
         in block { Hree.spriteTiles = Hree.LimitedVector (v SV.// [(index, Hree.Elem spriteTile)]) }
 
-    createTileAnimation bufferSource binder gids index frames
+    createTileAnimation meshId binder gids index frames
         | UV.length offsets > 0 && BV.length frames > 0 =
             let durations = UV.generate (BV.length frames) ((* 1000000) . fromIntegral . frameDuration . (frames BV.!))
                 timepoints = UV.scanl (+) 0 durations
@@ -347,7 +344,7 @@ loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInf
                 keyFrames = Hree.KeyFrames Hree.InterpolationStep timepoints track
                 setter = if useTileAnimation
                             then spriteTileSetter binder index
-                            else undefined -- vboUvSetter buffer offsets TODO
+                            else vboUvSetter meshId offsets
                 animation = Hree.singleVariationClip setter keyFrames
             in Just animation
         | otherwise = Nothing
@@ -356,6 +353,14 @@ loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInf
         offsets = findOffsetsInRegion gids animationGid
 
     spriteTileSetter binder index uvRect = Hree.modifyUniformBlock (updateBlockTile index uvRect) binder
+
+    writeVertexUv ptr (V2 uv uvSize) off = do
+        vertex <- Foreign.peekElemOff ptr off
+        Foreign.pokeElemOff ptr off vertex { Hree.svUv = uv, Hree.svUvSize = uvSize }
+
+    vboUvSetter meshId offsets uvRect =
+        Hree.updateMeshVertexBuffer scene meshId 2
+            (\ptr -> UV.mapM_ (writeVertexUv (Foreign.castPtr ptr) uvRect) offsets)
 
     gidToUvRect gid =
         maybe (V2 (V2 0 0) (V2 0 0)) (\(Rect uv uvSize) -> V2 uv uvSize) $ uvBoundingRect tilesetInfo gid
@@ -366,16 +371,14 @@ findOffsetsInRegion gids target = offsets
     offsets = UV.findIndices f gids
     f gidWithFlags = unsetGidFlags gidWithFlags == target
 
-createGeometryFromTiles :: TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> Bool -> V2 Int -> IO (Hree.Geometry, UV.Vector Gid, Hree.BufferSource)
+createGeometryFromTiles :: TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TilesetInfo -> Bool -> V2 Int -> IO (Hree.Geometry, UV.Vector Gid)
 createGeometryFromTiles config map layerData origin z tilesetInfo useTileAnimation (V2 i0 n) = do
     let orderedIndices = BV.generate n (renderOrderIndex orientation renderOrder staggerAxis staggerIndex (V2 columns rows) . (+ i0))
         vertexAndGids = BV.mapMaybe mkVertex orderedIndices
         vertices = SV.generate (BV.length vertexAndGids) (fst . (vertexAndGids BV.!))
         gids = UV.generate (BV.length vertexAndGids) (snd . (vertexAndGids BV.!))
-    let geometry = Hree.addVerticesToGeometry (fst Hree.newSpriteGeometry) vertices GL.GL_STATIC_READ
-        bufferSources = Hree.geometryBufferSources geometry
-        (_, (bufferSource, _)) = IntMap.findMax bufferSources
-    return (geometry, gids, bufferSource)
+        geometry = Hree.addVerticesToGeometry (fst Hree.newSpriteGeometry) vertices GL.GL_STATIC_READ
+    return (geometry, gids)
     where
     columns = mapWidth map
     rows = mapHeight map
@@ -637,9 +640,9 @@ createTilesetInfo scene cd index (tileset, gidRange) = go (tilesetImage tileset)
         (material, _, textureSize) <- createMaterialFromImage scene cd image
         imageMaterials <- BV.mapM (createMaterialFromImage scene cd) imageSources
         return $ TilesetInfo index tileset (Just material) textureSize gidRange animationGids animationFrames imageGids imageSources imageMaterials
-    go Nothing = do
-        imageMaterials <- BV.mapM (createMaterialFromImage scene cd) imageSources
-        return $ TilesetInfo index tileset Nothing (V2 0 0) gidRange animationGids animationFrames imageGids imageSources imageMaterials
+    go Nothing =
+        TilesetInfo index tileset Nothing (V2 0 0) gidRange animationGids animationFrames imageGids imageSources
+            <$> BV.mapM (createMaterialFromImage scene cd) imageSources
     V2 firstGid _ = gidRange
 
     pickAnimationTile tile = (,) (tileId tile + firstGid) <$> tileAnimation tile
