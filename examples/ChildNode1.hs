@@ -29,7 +29,7 @@ main =
     init w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        let (geometry, _) = Hree.createBoxGeometry 0.5 0.1 0.1
+        let geometry = Hree.boxGeometry 0.5 0.1 0.1
             material = Material.flatColorMaterial (V4 0.1 0.1 0.95 1)
             childMaterial = Material.flatColorMaterial (V4 0.95 0.1 0.1 1)
             childMesh = Hree.Mesh geometry childMaterial Nothing

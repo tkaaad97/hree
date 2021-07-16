@@ -39,7 +39,7 @@ import qualified Data.Vector.Storable.Mutable as MSV (STVector, new, write)
 import qualified Data.Vector.Unboxed as UV (generate, mapM_)
 import Data.Word
 import qualified Graphics.GL as GL
-import Graphics.Hree.Geometry (addVerticesToGeometry, newGeometry,
+import Graphics.Hree.Geometry (addVerticesToGeometry, emptyGeometry,
                                setIndexBufferSourceUInt)
 import Graphics.Hree.GL.Vertex (BasicVertex(..))
 import Graphics.Hree.Types (Geometry, Scene)
@@ -372,7 +372,7 @@ createGeometryFromPLY (PLY (PLYHeader _ ehs) buffers) = do
                 then onJust maybeIndices (vs, maybeIndices) $ calculateNormals vs
                 else (vs, maybeIndices)
 
-    let geo = addVerticesToGeometry newGeometry vs' GL.GL_STATIC_READ
+    let geo = addVerticesToGeometry emptyGeometry vs' GL.GL_STATIC_READ
         geo' = onJust maybeIndices' geo (setIndexBufferSourceUInt geo)
 
     return geo'

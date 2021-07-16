@@ -39,13 +39,12 @@ main =
     init w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        let (geometry, _) = Hree.createBoxGeometry 0.5 0.5 0.5
-            geometry' = Hree.addVerticesToGeometry geometry vs GL.GL_STATIC_READ
+        let geometry = Hree.addVerticesToGeometry (Hree.boxGeometry 0.5 0.5 0.5) vs GL.GL_STATIC_READ
         texture <- mkTexture scene
         let material = (Hree.basicMaterial (V3 0.5 (-1) (-1)))
                 { Hree.materialTextures = pure (Hree.BaseColorMapping, texture)
                 }
-            mesh = Hree.Mesh geometry' material Nothing
+            mesh = Hree.Mesh geometry material Nothing
         meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
         _ <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } True
         camera <- Hree.newCamera proj la

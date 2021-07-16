@@ -58,7 +58,7 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip, Elem(..),
                                         addSampler, addTexture,
                                         addVerticesToGeometry,
                                         modifyUniformBlock, newNode,
-                                        newSpriteGeometry, singleVariationClip,
+                                        singleVariationClip, spriteGeometry,
                                         updateMeshVertexBuffer)
 import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial, SpriteMaterialBlock(..),
                                                                 SpriteTile(..),
@@ -280,7 +280,7 @@ loadLayer scene cd config map _ _ layerIndex (LayerImageLayer (ImageLayer _ imag
         uv = V2 0 (fromIntegral iheight / fromIntegral theight)
         uvSize = V2 (fromIntegral iwidth / fromIntegral twidth) (- fromIntegral iheight / fromIntegral theight)
         vertex = Hree.SpriteVertex (V3 x y z) (V3 width height 0) (V3 0 0 0) 0 uv uvSize 0 0
-    let geometry = Hree.addVerticesToGeometry (fst Hree.newSpriteGeometry) (SV.singleton vertex) GL.GL_STATIC_READ
+    let geometry = Hree.addVerticesToGeometry Hree.spriteGeometry (SV.singleton vertex) GL.GL_STATIC_READ
         mesh = Hree.Mesh geometry material (Just 1)
     Hree.AddedMesh meshId _ <- Hree.addMesh scene mesh
     nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
@@ -377,7 +377,7 @@ createGeometryFromTiles config map layerData origin z tilesetInfo useTileAnimati
         vertexAndGids = BV.mapMaybe mkVertex orderedIndices
         vertices = SV.generate (BV.length vertexAndGids) (fst . (vertexAndGids BV.!))
         gids = UV.generate (BV.length vertexAndGids) (snd . (vertexAndGids BV.!))
-        geometry = Hree.addVerticesToGeometry (fst Hree.newSpriteGeometry) vertices GL.GL_STATIC_READ
+        geometry = Hree.addVerticesToGeometry Hree.spriteGeometry vertices GL.GL_STATIC_READ
     return (geometry, gids)
     where
     columns = mapWidth map
@@ -608,7 +608,7 @@ loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTil
     go Nothing = return Nothing
 
     loadRegion vertex material = do
-        let geometry = Hree.addVerticesToGeometry (fst Hree.newSpriteGeometry) (SV.singleton vertex) GL.GL_STATIC_READ
+        let geometry = Hree.addVerticesToGeometry Hree.spriteGeometry (SV.singleton vertex) GL.GL_STATIC_READ
         Hree.AddedMesh meshId _ <- Hree.addMesh scene (Hree.Mesh geometry material (Just 1))
         nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
         return (RegionLoadInfo nodeId mempty)

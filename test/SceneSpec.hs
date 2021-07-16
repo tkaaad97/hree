@@ -46,7 +46,7 @@ spec = do
     describe "addMesh" $ do
         runOnOSMesaContext width height . it "change scene state" $ do
             scene <- Hree.newScene
-            let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+            let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh = Hree.Mesh geometry material Nothing
             meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             meshId `shouldBe` Hree.MeshId 1
@@ -57,7 +57,7 @@ spec = do
 
         runOnOSMesaContext width height . specify "use same geometry twice" $ do
             scene <- Hree.newScene
-            let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+            let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh = Hree.Mesh geometry material Nothing
             meshId1 <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             meshId1 `shouldBe` Hree.MeshId 1
@@ -73,7 +73,7 @@ spec = do
     describe "removeMesh" $ do
         runOnOSMesaContext width height . it "remove mesh" $ do
             scene <- Hree.newScene
-            let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+            let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh = Hree.Mesh geometry material Nothing
             meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             assertBufferAlive (GLW.Buffer 1)
@@ -104,8 +104,8 @@ spec = do
     describe "deleteScene" $ do
         runOnOSMesaContext width height . it "delete meshes" $ do
             scene <- Hree.newScene
-            let geometry1 = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
-                geometry2 = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+            let geometry1 = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
+                geometry2 = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh1 = Hree.Mesh geometry1 material Nothing
                 mesh2 = Hree.Mesh geometry2 material Nothing
             _ <- Hree.addMesh scene mesh1

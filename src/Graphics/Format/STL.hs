@@ -16,8 +16,8 @@ import qualified Data.Vector as Vector
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word16, Word32, Word8)
 import qualified Graphics.GL as GL
-import Graphics.Hree.GL.Vertex (BasicVertex(..))
 import Graphics.Hree.Geometry
+import Graphics.Hree.GL.Vertex (BasicVertex(..))
 import Graphics.Hree.Types (Scene)
 import Linear (V2(..), V3(..), V4(..))
 
@@ -86,7 +86,7 @@ createGeometryFromSTL :: STL -> IO (Geometry, SV.Vector BasicVertex)
 createGeometryFromSTL stl = do
     let len = fromIntegral (stlTriangleNum stl) * 3
         vs = SV.generate len f
-        geo = addVerticesToGeometry newGeometry vs GL.GL_STATIC_READ
+        geo = addVerticesToGeometry emptyGeometry vs GL.GL_STATIC_READ
     return (geo, vs)
     where
     f i =

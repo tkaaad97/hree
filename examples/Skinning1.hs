@@ -115,7 +115,7 @@ main =
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
 
-        let geometry = Hree.addVerticesToGeometry Hree.newGeometry vs GL.GL_STREAM_DRAW
+        let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                         `Hree.setIndexBufferSourceUInt` indices
 
         nodeId2 <- Hree.addNode scene Hree.newNode { Hree.nodeRotation = Quaternion 1 (V3 0 0 0) } False

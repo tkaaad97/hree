@@ -1,18 +1,21 @@
 module Graphics.Hree.Geometry.Box
-    ( createBoxGeometry
+    ( boxGeometry
+    , boxGeometryVertices
     ) where
 
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import qualified Graphics.GL as GL
-import Graphics.Hree.Geometry (Geometry, addVerticesToGeometry, newGeometry)
+import Graphics.Hree.Geometry (Geometry, addVerticesToGeometry, emptyGeometry)
 import Graphics.Hree.GL.Vertex (PositionAndNormal(..))
 import Linear (V3(..))
 
-createBoxGeometry :: Float -> Float -> Float -> (Geometry, Vector PositionAndNormal)
-createBoxGeometry width height depth =
-    let geo = addVerticesToGeometry newGeometry vs GL.GL_STATIC_READ
-    in (geo, vs)
+boxGeometry :: Float -> Float -> Float -> Geometry
+boxGeometry width height depth =
+    addVerticesToGeometry emptyGeometry (boxGeometryVertices width height depth) GL.GL_STATIC_READ
+
+boxGeometryVertices :: Float -> Float -> Float -> Vector PositionAndNormal
+boxGeometryVertices width height depth = vs
     where
     x = width
     y = height

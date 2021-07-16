@@ -3,8 +3,9 @@ module Graphics.Hree.Geometry
     ( Geometry(..)
     , addAttribBindings
     , addVerticesToGeometry
-    , newGeometry
-    , newSpriteGeometry
+    , emptyGeometry
+    , spriteGeometry
+    , spriteGeometryVertices
     , setIndexBufferSource
     , setIndexBufferSourceUByte
     , setIndexBufferSourceUShort
@@ -26,8 +27,8 @@ import Graphics.Hree.GL.Vertex
 import Graphics.Hree.Types
 import Linear (V2(..), V3(..))
 
-newGeometry :: Geometry
-newGeometry = Geometry Map.empty IntMap.empty Nothing 0
+emptyGeometry :: Geometry
+emptyGeometry = Geometry Map.empty IntMap.empty Nothing 0
 
 addAttribBindings :: Geometry -> Map ByteString AttributeFormat -> (BufferSource, BindBufferSetting) -> Geometry
 addAttribBindings geo xs b = geo'
@@ -85,15 +86,15 @@ setIndexBufferSourceUInt geo v = setIndexBufferSource geo indexBufferSource
     l = fromIntegral (Vector.length v)
     indexBufferSource = IndexBufferSource s GL.GL_UNSIGNED_INT l 0
 
-newSpriteGeometry :: (Geometry, Vector SpriteOffset)
-newSpriteGeometry = (geo, offsets)
-    where
-    geo = addVerticesToGeometry newGeometry offsets GL.GL_STATIC_READ
-    offsets = Vector.fromList
-        [ SpriteOffset (V3 0 0 0) (V2 0 0)
-        , SpriteOffset (V3 1 0 0) (V2 1 0)
-        , SpriteOffset (V3 0 1 0) (V2 0 1)
-        , SpriteOffset (V3 1 1 0) (V2 1 1)
-        , SpriteOffset (V3 0 1 0) (V2 0 1)
-        , SpriteOffset (V3 1 0 0) (V2 1 0)
-        ]
+spriteGeometry :: Geometry
+spriteGeometry = addVerticesToGeometry emptyGeometry spriteGeometryVertices GL.GL_STATIC_READ
+
+spriteGeometryVertices :: Vector SpriteOffset
+spriteGeometryVertices = Vector.fromList
+    [ SpriteOffset (V3 0 0 0) (V2 0 0)
+    , SpriteOffset (V3 1 0 0) (V2 1 0)
+    , SpriteOffset (V3 0 1 0) (V2 0 1)
+    , SpriteOffset (V3 1 1 0) (V2 1 1)
+    , SpriteOffset (V3 0 1 0) (V2 0 1)
+    , SpriteOffset (V3 1 0 0) (V2 1 0)
+    ]

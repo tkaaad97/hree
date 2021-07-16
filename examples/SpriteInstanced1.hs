@@ -38,7 +38,7 @@ main =
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
 
-        let geo' = Hree.addVerticesToGeometry (fst Hree.newSpriteGeometry) spriteVertices GL.GL_STATIC_READ
+        let geo' = Hree.addVerticesToGeometry Hree.spriteGeometry spriteVertices GL.GL_STATIC_READ
         texture <- mkTexture scene
         let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, texture) }
             mesh = Hree.Mesh geo' material (Just . Vector.length $ spriteVertices)

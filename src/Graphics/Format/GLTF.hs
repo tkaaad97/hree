@@ -97,11 +97,11 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip(..),
                                         addAttribBindings, addMesh, addNode,
                                         addRootNodes, addSampler, addSkin,
                                         addSkinnedMesh, addTexture,
-                                        animationClipTransform,
+                                        animationClipTransform, emptyGeometry,
                                         flatColorMaterial, matrixToTransform,
-                                        mkDefaultTextureIfNotExists,
-                                        newGeometry, newNode, standardMaterial,
-                                        standardMaterialBlock, updateNode)
+                                        mkDefaultTextureIfNotExists, newNode,
+                                        standardMaterial, standardMaterialBlock,
+                                        updateNode)
 import qualified Graphics.Hree.GL as Hree (attribFormat, attribIFormat)
 import qualified Graphics.Hree.Material.StandardMaterial as StandardMaterial (StandardMaterialBlock(..))
 import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
@@ -848,7 +848,7 @@ createMeshFromPrimitive bufferByteStrings bufferSources bufferViews accessors ma
 createGeometry :: BV.Vector Hree.BufferSource -> BV.Vector BufferView -> BV.Vector Accessor -> Primitive -> IO Hree.Geometry
 createGeometry bufferSources bufferViews accessors primitive = do
     attributes <- either (throwIO . userError) return . mapM f . Map.toList . primitiveAttributes $ primitive
-    let geometry = foldl addAttribBinding Hree.newGeometry attributes
+    let geometry = foldl addAttribBinding Hree.emptyGeometry attributes
         verticesCount = minimum . map (accessorCount . snd . snd) $ attributes
         geometry1 = geometry { Hree.geometryVerticesCount = verticesCount }
 
@@ -1366,7 +1366,7 @@ createGeometryDraco bufferSources bufferViews accessors attributes extension = d
                         ok <- Draco.ok status
                         unless ok $
                             throwIO . userError =<< Foreign.peekCString =<< Draco.errorMsg status
-                        geometry <- foldM (addAttribBinding pc) Hree.newGeometry attrs
+                        geometry <- foldM (addAttribBinding pc) Hree.emptyGeometry attrs
                         return geometry
                   | n == Draco.encodedGeometryTypeTriangularMesh ->
                     withMesh $ \mesh -> do
@@ -1375,7 +1375,7 @@ createGeometryDraco bufferSources bufferViews accessors attributes extension = d
                         unless ok $
                             throwIO . userError =<< Foreign.peekCString =<< Draco.errorMsg status
                         pc <- Draco.castMeshToPointCloud mesh
-                        geometry <- foldM (addAttribBinding pc) Hree.newGeometry attrs
+                        geometry <- foldM (addAttribBinding pc) Hree.emptyGeometry attrs
                         indexBufferSource <- mkIndexBufferSource mesh
                         return $ geometry { Hree.geometryIndexBufferSource = Just indexBufferSource }
 
