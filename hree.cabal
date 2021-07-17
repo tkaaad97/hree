@@ -40,7 +40,7 @@ flag enable_draco
 
 flag examples
   manual: True
-  default: False
+  default: True
 
 library
   exposed-modules:
