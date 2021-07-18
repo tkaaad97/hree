@@ -105,12 +105,12 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip(..),
                                         updateNode)
 import qualified Graphics.Hree.GL as Hree (attribFormat, attribIFormat)
 import qualified Graphics.Hree.Material.StandardMaterial as StandardMaterial (StandardMaterialBlock(..))
-import qualified Graphics.Hree.Sampler as Hree.Sampler (glTextureMagFilter,
+import qualified Graphics.Hree.GL.Sampler as Hree.Sampler (glTextureMagFilter,
                                                         glTextureMinFilter,
                                                         glTextureWrapS,
                                                         glTextureWrapT,
                                                         setSamplerParameter)
-import qualified Graphics.Hree.Texture as Hree (TextureSettings(..),
+import qualified Graphics.Hree.GL.Texture as Hree (TextureSettings(..),
                                                 TextureSourceData(..))
 import qualified Linear (Quaternion(..), V3(..), V4(..), transpose, zero)
 import Numeric (showHex)

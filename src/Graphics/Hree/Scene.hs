@@ -82,7 +82,7 @@ import Graphics.Hree.Material (defaultRenderOption, textureMappingUniformName)
 import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
-import Graphics.Hree.Texture
+import Graphics.Hree.GL.Texture
 import Graphics.Hree.Types
 import Linear (V4(..), (!*!), (^+^))
 import qualified Linear

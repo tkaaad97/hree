@@ -66,7 +66,7 @@ import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial,
                                                                 SpriteTile(..),
                                                                 maxSpriteTileCount,
                                                                 spriteMaterial)
-import qualified Graphics.Hree.Sampler as Hree (glTextureMagFilter,
+import qualified Graphics.Hree.GL.Sampler as Hree (glTextureMagFilter,
                                                 glTextureMinFilter,
                                                 setSamplerParameter)
 import Linear (V2(..), V3(..), (^-^))

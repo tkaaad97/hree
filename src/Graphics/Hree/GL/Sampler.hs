@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs     #-}
-module Graphics.Hree.Sampler
-    ( SamplerSettings(..)
-    , SamplerParam(..)
-    , defaultSamplerSettings
+{-# LANGUAGE DataKinds                 #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE GADTs                     #-}
+module Graphics.Hree.GL.Sampler
+    ( SamplerParam(..)
+    , SamplerParamValue
     , glTextureBorderColor
     , glTextureBorderColorIi
     , glTextureBorderColorIui
@@ -19,6 +20,7 @@ module Graphics.Hree.Sampler
     , glTextureWrapS
     , glTextureWrapT
     , setSamplerParameter
+    , setSamplerParamValue
     , getSamplerParameter
     ) where
 
@@ -37,32 +39,7 @@ data SamplerParam a where
     SamplerParamInternalGLintv4 :: GL.GLenum -> SamplerParam (V4 GL.GLint)
     SamplerParamInternalGLuintv4 :: GL.GLenum -> SamplerParam (V4 GL.GLuint)
 
-data SamplerSettings = SamplerSettings
-    { minFilter   :: !GL.GLint
-    , magFilter   :: !GL.GLint
-    , minLod      :: !GL.GLfloat
-    , maxLod      :: !GL.GLfloat
-    , wrapS       :: !GL.GLint
-    , wrapT       :: !GL.GLint
-    , wrapR       :: !GL.GLint
-    , borderColor :: !(V4 GL.GLfloat)
-    , compareMode :: !GL.GLint
-    , compareFunc :: !GL.GLint
-    } deriving (Show, Eq)
-
-defaultSamplerSettings :: SamplerSettings
-defaultSamplerSettings = SamplerSettings
-    { minFilter = GL.GL_NEAREST_MIPMAP_LINEAR
-    , magFilter = GL.GL_LINEAR
-    , minLod = -1000.0
-    , maxLod = 1000.0
-    , wrapS = GL.GL_REPEAT
-    , wrapT = GL.GL_REPEAT
-    , wrapR = GL.GL_REPEAT
-    , borderColor = V4 0 0 0 0
-    , compareMode = GL.GL_NONE
-    , compareFunc = GL.GL_LEQUAL
-    }
+data SamplerParamValue = forall a. SamplerParamValue !(SamplerParam a) !a
 
 glTextureWrapS :: SamplerParam GL.GLint
 glTextureWrapS = SamplerParamGLint GL.GL_TEXTURE_WRAP_S
@@ -117,6 +94,9 @@ setSamplerParameter sampler (SamplerParamInternalGLintv4 pname) a =
     Foreign.with a (GL.glSamplerParameterIiv (coerce sampler) pname . Foreign.castPtr)
 setSamplerParameter sampler (SamplerParamInternalGLuintv4 pname) a =
     Foreign.with a (GL.glSamplerParameterIuiv (coerce sampler) pname . Foreign.castPtr)
+
+setSamplerParamValue :: GLW.Sampler -> SamplerParamValue -> IO ()
+setSamplerParamValue sampler (SamplerParamValue p a) = setSamplerParameter sampler p a
 
 getSamplerParameter :: GLW.Sampler -> SamplerParam a -> IO a
 getSamplerParameter sampler (SamplerParamGLint pname) =

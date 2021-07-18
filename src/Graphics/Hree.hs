@@ -10,11 +10,11 @@ module Graphics.Hree
     , module Graphics.Hree.Light
     , module Graphics.Hree.Material
     , module Graphics.Hree.Math
-    , module Graphics.Hree.Sampler
+    , module Graphics.Hree.GL.Sampler
     , module Graphics.Hree.Scene
     , module Graphics.Hree.SceneTask
     , module Graphics.Hree.Skin
-    , module Graphics.Hree.Texture
+    , module Graphics.Hree.GL.Texture
     , module Graphics.Hree.Types
     ) where
 
@@ -31,11 +31,11 @@ import Graphics.Hree.GL.Vertex (BasicVertex(..), PositionAndNormal(..),
 import Graphics.Hree.Light
 import Graphics.Hree.Material
 import Graphics.Hree.Math
-import Graphics.Hree.Sampler
+import Graphics.Hree.GL.Sampler
 import Graphics.Hree.Scene
 import Graphics.Hree.SceneTask
 import Graphics.Hree.Skin
-import Graphics.Hree.Texture (TextureParam(..), TextureSettings(..),
+import Graphics.Hree.GL.Texture (TextureParam(..), TextureSettings(..),
                               TextureSourceData(..))
 import Graphics.Hree.Types (ClearOption(..), LightId, Material(..),
                             MatricesBlockBinder, Mesh(..), MeshId, Node(..),

@@ -21,7 +21,7 @@ import qualified Graphics.Hree.GL.Vertex as Hree
 import qualified Graphics.Hree.Material.TestMaterial as Hree
 import qualified Graphics.Hree.Mesh as Hree (Mesh(..))
 import qualified Graphics.Hree.Scene as Hree
-import qualified Graphics.Hree.Texture as Hree
+import qualified Graphics.Hree.GL.Texture as Hree
 import qualified Graphics.Hree.Types as Hree
 import Linear (V2(..), V3(..), V4(..))
 import Test.Hspec

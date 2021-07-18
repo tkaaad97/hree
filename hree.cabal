@@ -62,6 +62,8 @@ library
       Graphics.Hree.Geometry.Box
       Graphics.Hree.GL
       Graphics.Hree.GL.Block
+      Graphics.Hree.GL.Sampler
+      Graphics.Hree.GL.Texture
       Graphics.Hree.GL.Types
       Graphics.Hree.GL.UniformBlock
       Graphics.Hree.GL.Vertex
@@ -76,12 +78,10 @@ library
       Graphics.Hree.Math
       Graphics.Hree.Mesh
       Graphics.Hree.Program
-      Graphics.Hree.Sampler
       Graphics.Hree.Scene
       Graphics.Hree.SceneTask
       Graphics.Hree.Skin
       Graphics.Hree.Text
-      Graphics.Hree.Texture
       Graphics.Hree.Types
   hs-source-dirs:
       src

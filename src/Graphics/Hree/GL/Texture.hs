@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs     #-}
-module Graphics.Hree.Texture
+module Graphics.Hree.GL.Texture
     ( TextureSettings(..)
     , TextureSourceData(..)
     , TextureParam(..)
