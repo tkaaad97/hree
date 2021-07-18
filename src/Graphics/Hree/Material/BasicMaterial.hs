@@ -32,7 +32,7 @@ instance Block BasicMaterialBlock where
 basicMaterial :: V3 GL.GLfloat -> Material BasicMaterialBlock
 basicMaterial l = Material
     { materialUniformBlock = BasicMaterialBlock l
-    , materialTextures = mempty
+    , materialMappings = mempty
     , materialRenderOption = mempty
     , materialProgramOption = mempty
     , materialProgramSpec = EmbeddedProgram BasicProgram

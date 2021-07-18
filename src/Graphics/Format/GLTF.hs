@@ -90,7 +90,8 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip(..),
                                         Material(..), Mesh(..), MeshId,
                                         Node(..), NodeId, Quaternion, Scene,
                                         SkinId, StandardMaterial,
-                                        StandardMaterialBlock, Texture(..),
+                                        StandardMaterialBlock,
+                                        TextureAndSampler(..),
                                         TextureMappingType(..), Transform(..),
                                         TransformChannel(..),
                                         TransformTrack(..), Vec3, Vec4,
@@ -1255,17 +1256,17 @@ createSampler scene sampler = do
 createSamplers :: Hree.Scene -> BV.Vector Sampler -> IO (BV.Vector GLW.Sampler)
 createSamplers scene = BV.mapM (createSampler scene)
 
-createTexture :: BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler) -> BV.Vector GLW.Sampler -> Texture -> Maybe Hree.Texture
+createTexture :: BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler) -> BV.Vector GLW.Sampler -> Texture -> Maybe Hree.TextureAndSampler
 createTexture sources samplers texture = do
     sourceIndex <- textureSource texture
     (source, sourceSampler) <- sources BV.!? sourceIndex
     let sampler = fromMaybe sourceSampler $ (samplers BV.!?) =<< textureSampler texture
-    return (Hree.Texture (source, sampler))
+    return (Hree.TextureAndSampler source sampler)
 
-createTextures :: Hree.Texture -> BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler) -> BV.Vector GLW.Sampler -> BV.Vector Texture -> BV.Vector Hree.Texture
+createTextures :: Hree.TextureAndSampler -> BV.Vector (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler) -> BV.Vector GLW.Sampler -> BV.Vector Texture -> BV.Vector Hree.TextureAndSampler
 createTextures defaultTexture sources samplers = BV.map (fromMaybe defaultTexture . createTexture sources samplers)
 
-createMaterial :: BV.Vector Hree.Texture -> Material -> Hree.StandardMaterial
+createMaterial :: BV.Vector Hree.TextureAndSampler -> Material -> Hree.StandardMaterial
 createMaterial textures m =
     Hree.standardMaterial Hree.standardMaterialBlock
         & setWhenJust setPbrMetallicRoughness (materialPbrMetallicRoughness m)
@@ -1295,7 +1296,7 @@ createMaterial textures m =
 
     appendTexture a mappingType textureIndex = fromMaybe a $ do
         texture <- textures BV.!? textureIndex
-        return $ a { Hree.materialTextures = Hree.materialTextures a `mappend` pure (mappingType, texture) }
+        return $ a { Hree.materialMappings = Hree.materialMappings a `mappend` pure (mappingType, texture) }
 
     setEmissiveFactor a emissiveFactor =
         let block = Hree.materialUniformBlock a
@@ -1312,7 +1313,7 @@ createMaterial textures m =
             block' = block { StandardMaterial.occlusionStrength = occlusionStrength }
         in a { Hree.materialUniformBlock = block' }
 
-createMaterials :: BV.Vector Hree.Texture -> BV.Vector Material -> BV.Vector Hree.StandardMaterial
+createMaterials :: BV.Vector Hree.TextureAndSampler -> BV.Vector Material -> BV.Vector Hree.StandardMaterial
 createMaterials textures = BV.map (createMaterial textures)
 
 unmarshalSamplerFilterParameter :: Int -> Maybe GL.GLint

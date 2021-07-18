@@ -81,11 +81,11 @@ defaultFaceStencilOption = FaceStencilOption
     }
 
 materialHasTextureMapping :: Material b -> TextureMappingType -> Bool
-materialHasTextureMapping material textureMappingType = isJust . BV.find ((== textureMappingType) . fst) $ materialTextures material
+materialHasTextureMapping material textureMappingType = isJust . BV.find ((== textureMappingType) . fst) $ materialMappings material
 
 textureMappingUniformName :: TextureMappingType -> ByteString
-textureMappingUniformName BaseColorMapping         = "baseColorTexture"
-textureMappingUniformName NormalMapping            = "normalTexture"
-textureMappingUniformName EmissiveMapping          = "emissiveTexture"
-textureMappingUniformName MetallicRoughnessMapping = "metallicRoughnessTexture"
-textureMappingUniformName OcclusionMapping         = "occlusionTexture"
+textureMappingUniformName BaseColorMapping         = "baseColorMapping"
+textureMappingUniformName NormalMapping            = "normalMapping"
+textureMappingUniformName EmissiveMapping          = "emissiveMapping"
+textureMappingUniformName MetallicRoughnessMapping = "metallicRoughnessMapping"
+textureMappingUniformName OcclusionMapping         = "occlusionMapping"

@@ -134,7 +134,7 @@ main =
                 { Hree.materialUniformBlock = (Hree.materialUniformBlock Hree.spriteMaterial)
                     { Material.uvOffset = off
                     }
-                , Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler))
+                , Hree.materialMappings = pure (Hree.BaseColorMapping, Hree.TextureAndSampler texture sampler)
                 }
         return material
 

@@ -31,7 +31,7 @@ instance Block FlatColorMaterialBlock where
 flatColorMaterial :: V4 GL.GLfloat -> Material FlatColorMaterialBlock
 flatColorMaterial c = Material
     { materialUniformBlock = FlatColorMaterialBlock c
-    , materialTextures = mempty
+    , materialMappings = mempty
     , materialRenderOption = mempty
     , materialProgramOption = mempty
     , materialProgramSpec = EmbeddedProgram FlatColorProgram

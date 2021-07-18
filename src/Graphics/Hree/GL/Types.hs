@@ -32,7 +32,7 @@ module Graphics.Hree.GL.Types
     , Uniform(..)
     , UniformInfo(..)
     , UniformBlockInfo(..)
-    , Texture(..)
+    , TextureAndSampler(..)
     , BVec2
     , BVec3
     , BVec4
@@ -274,7 +274,7 @@ data RenderInfo = RenderInfo
     , riVertexArray   :: !GLW.VertexArray
     , riUniforms      :: !(BV.Vector (GLW.UniformLocation, Uniform))
     , riUniformBlocks :: !(BV.Vector (UniformBufferBindingIndex, GLW.Buffer))
-    , riTextures      :: !(BV.Vector Texture)
+    , riTextures      :: !(BV.Vector TextureAndSampler)
     , riRenderOption  :: !RenderOption
     }
 
@@ -306,9 +306,8 @@ data AttribBinding = AttribBinding
     , attribBindingAttributeFormat :: !AttributeFormat
     } deriving (Show, Eq)
 
-newtype Texture = Texture
-    { unTexture :: (GLW.Texture 'GLW.GL_TEXTURE_2D, GLW.Sampler)
-    } deriving (Show, Eq)
+data TextureAndSampler = TextureAndSampler !(GLW.Texture 'GLW.GL_TEXTURE_2D) !GLW.Sampler
+    deriving (Show, Eq)
 
 data IndexBuffer = IndexBuffer
     { ibBuffer     :: !GLW.Buffer

@@ -41,11 +41,11 @@ layout(std140) uniform MaterialBlock {
     float occlusionStrength;
 } materialBlock;
 
-uniform sampler2D baseColorTexture;
-uniform sampler2D normalTexture;
-uniform sampler2D metallicRoughnessTexture;
-uniform sampler2D emissiveTexture;
-uniform sampler2D occlusionTexture;
+uniform sampler2D baseColorMapping;
+uniform sampler2D normalMapping;
+uniform sampler2D metallicRoughnessMapping;
+uniform sampler2D emissiveMapping;
+uniform sampler2D occlusionMapping;
 
 const float pi = 3.141592653589793;
 const float epsilon = 1.19209e-07;
@@ -77,7 +77,7 @@ vec3 getNormal() {
 #endif
 
 #ifdef HAS_NORMAL_MAP
-    vec3 n = texture2D(normalTexture, uv).rgb;
+    vec3 n = texture2D(normalMapping, uv).rgb;
     n = normalize(tbn * ((2.0 * n - 1.0) * vec3(materialBlock.normalScale, materialBlock.normalScale, 1.0)));
 #else
     vec3 n = normalize(tbn[2].xyz);
@@ -170,14 +170,14 @@ void main() {
     float roughness = clamp(materialBlock.roughnessFactor, minRoughness, 1.0);
     vec3 view = cameraBlock.viewPosition - fragmentPosition;
     vec3 normal = getNormal();
-    vec4 color = sRGBToLinear(texture2D(baseColorTexture, fragmentUv)) * materialBlock.baseColorFactor;
+    vec4 color = sRGBToLinear(texture2D(baseColorMapping, fragmentUv)) * materialBlock.baseColorFactor;
 
 #ifdef HAS_VERTEX_COLOR
     color *= fragmentColor;
 #endif
 
 #ifdef HAS_METALLIC_ROUGHNESS_MAP
-    vec4 mrSample = texture2D(metallicRoughnessTexture, fragmentUv);
+    vec4 mrSample = texture2D(metallicRoughnessMapping, fragmentUv);
     metallic = mrSample.b * materialBlock.metallicFactor;
     roughness = clamp(mrSample.g * materialBlock.roughnessFactor, minRoughness, 1.0);
 #endif
@@ -186,12 +186,12 @@ void main() {
     acc += applyLights(normal, view, color.rgb, metallic, roughness);
 
 #ifdef HAS_EMISSIVE_MAP
-    vec3 emissive = sRGBToLinear(texture(emissiveTexture, fragmentUv)).rgb * materialBlock.emissiveFactor;
+    vec3 emissive = sRGBToLinear(texture(emissiveMapping, fragmentUv)).rgb * materialBlock.emissiveFactor;
     acc += emissive;
 #endif
 
 #ifdef HAS_OCCLUSION_MAP
-    float ao = texture(occlusionTexture, fragmentUv).r;
+    float ao = texture(occlusionMapping, fragmentUv).r;
     acc = mix(acc, acc * ao, materialBlock.occlusionStrength);
 #endif
 

@@ -52,8 +52,8 @@ import qualified Data.ByteString.Char8 as ByteString (pack)
 import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
 import qualified Data.Component as Component
-import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import qualified Data.IntMap.Strict as IntMap
 import Data.List (nubBy)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, isJust)
@@ -236,7 +236,7 @@ nodeToRenderInfos renderer scene state =
         let renderInfo = toRenderInfo program defaultTexture meshInfo vao maybeSkin matrix (nodeInfoUniformBlocks node)
         return renderInfo
 
-toRenderInfo :: ProgramInfo -> Texture -> MeshInfo -> GLW.VertexArray -> Maybe Skin -> Mat4 -> [(UniformBufferBindingIndex, GLW.Buffer)] -> RenderInfo
+toRenderInfo :: ProgramInfo -> TextureAndSampler -> MeshInfo -> GLW.VertexArray -> Maybe Skin -> Mat4 -> [(UniformBufferBindingIndex, GLW.Buffer)] -> RenderInfo
 toRenderInfo program defaultTexture meshInfo vao skin matrix nodeUbs =
     let uniforms = BV.mapMaybe toUniformEntry $ ("modelMatrix", Uniform matrix) `BV.cons` textureUniforms
         renderInfo = RenderInfo program dm vao uniforms ubs textures roption
@@ -249,7 +249,7 @@ toRenderInfo program defaultTexture meshInfo vao skin matrix nodeUbs =
     toUniformEntry (uniformName, uniform) = do
         uniformLocation <- Map.lookup uniformName uniformLocations
         return (uniformLocation, uniform)
-    mtextures = materialInfoTextures material
+    mtextures = materialInfoMappings material
     mtextureUnits = BV.map snd mtextures
     textureUniforms = BV.imap (\i (a, _) -> (a, Uniform (fromIntegral i :: GL.GLint))) mtextures
     textures = if BV.null mtextures
@@ -315,7 +315,7 @@ addMesh_ scene mesh maybeSkinId = do
         in (newState, minfo)
 
     mkMaterialInfo poption = do
-        let textures = BV.map (\(ttype, texture) -> (textureMappingUniformName ttype, texture)) $ materialTextures material
+        let textures = BV.map (\(ttype, texture) -> (textureMappingUniformName ttype, texture)) $ materialMappings material
             block = materialUniformBlock material
             roption = applyPartialRenderOption defaultRenderOption $ materialRenderOption material
             pspec = materialProgramSpec material
@@ -709,19 +709,19 @@ mkProgramAndInsert renderer pspec poption pname = do
             newState = state { rendererStatePrograms = programs }
         in (newState, ())
 
-mkDefaultTextureIfNotExists :: Scene -> IO Texture
+mkDefaultTextureIfNotExists :: Scene -> IO TextureAndSampler
 mkDefaultTextureIfNotExists scene = do
     maybeDefaultTexture <- ssDefaultTexture <$> (readIORef . sceneState $ scene)
     maybe (mkDefaultTexture scene) return maybeDefaultTexture
 
-mkDefaultTexture :: Scene -> IO Texture
+mkDefaultTexture :: Scene -> IO TextureAndSampler
 mkDefaultTexture scene = Foreign.withArray [255, 255, 255, 255] $ \p -> do
     let settings = TextureSettings 1 GL.GL_RGBA8 1 1 False
         source = TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
     (_, texture) <- addTexture scene defaultTextureName settings source
     (_, sampler) <- addSampler scene defaultSamplerName
-    atomicModifyIORef' (sceneState scene) (setDefaultTexture (Texture (texture, sampler)))
-    return $ Texture (texture, sampler)
+    atomicModifyIORef' (sceneState scene) (setDefaultTexture (TextureAndSampler texture sampler))
+    return $ TextureAndSampler texture sampler
 
     where
     defaultTextureName = "default_texture"

@@ -79,7 +79,7 @@ data UvInfo = UvInfo
     , uvInfoUvSize        :: !(V2 Float)
     } deriving (Show ,Eq)
 
-data MaterialInfo = MaterialInfo !Hree.SpriteMaterial !Hree.Texture
+data MaterialInfo = MaterialInfo !Hree.SpriteMaterial !Hree.TextureAndSampler
 
 data GlyphInfo = GlyphInfo
     { glyphInfoCharcode :: !Char
@@ -411,14 +411,14 @@ loadCharactersIntoFont_ (Font scene (FontFace freeType face) fontOption sizeInfo
 
                 (tname, texture) <- Hree.addTexture scene "textmesh" settings sourceData
                 (_, sampler) <- Hree.addSampler scene tname
-                let texture' = Hree.Texture (texture, sampler)
-                    material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, texture') }
+                let texture' = Hree.TextureAndSampler texture sampler
+                    material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, texture') }
                     materialInfo = MaterialInfo material texture'
                 return materialInfo
             else return (materials BV.! materialIndex)
 
         when (materialIndex >= BV.length materials - 1) $ do
-            let MaterialInfo _ (Hree.Texture (texture, _)) = materialInfo
+            let MaterialInfo _ (Hree.TextureAndSampler texture _) = materialInfo
                 addedLayouts = filter ((>= startGlyphIndex) . layoutIndex) layouts
 
             Foreign.allocaArray (pixelSizeX * pixelSizeY * 4) $ \p ->

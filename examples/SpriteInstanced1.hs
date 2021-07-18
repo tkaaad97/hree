@@ -40,7 +40,7 @@ main =
 
         let geo' = Hree.addVerticesToGeometry Hree.spriteGeometry spriteVertices GL.GL_STATIC_READ
         texture <- mkTexture scene
-        let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, texture) }
+        let material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, texture) }
             mesh = Hree.Mesh geo' material (Just . Vector.length $ spriteVertices)
         meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
         _ <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } True
@@ -60,7 +60,7 @@ main =
             Hree.renderScene r s c
             GLFW.swapBuffers w
 
-    mkTexture :: Hree.Scene -> IO Hree.Texture
+    mkTexture :: Hree.Scene -> IO Hree.TextureAndSampler
     mkTexture scene = do
         let size = 1024
             settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral size) (fromIntegral size) False
@@ -69,4 +69,4 @@ main =
             let source = Hree.TextureSourceData (fromIntegral size) (fromIntegral size) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr (V4 Word8)))
             (_, texture) <- Hree.addTexture scene "color" settings source
             (_, sampler) <- Hree.addSampler scene "sampler"
-            return $ Hree.Texture (texture, sampler)
+            return $ Hree.TextureAndSampler texture sampler

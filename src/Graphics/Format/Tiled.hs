@@ -51,7 +51,8 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip, Elem(..),
                                         KeyFrames(..), LimitedVector(..),
                                         Material(..), Mesh(..), Node(..),
                                         NodeId, Scene, SpriteVertex(..),
-                                        Texture(..), TextureMappingType(..),
+                                        TextureAndSampler(..),
+                                        TextureMappingType(..),
                                         TextureSettings(..),
                                         TextureSourceData(..),
                                         VariationTrack(..), addMesh, addNode,
@@ -60,7 +61,8 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip, Elem(..),
                                         modifyUniformBlock, newNode,
                                         singleVariationClip, spriteGeometry,
                                         updateMeshVertexBuffer)
-import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial, SpriteMaterialBlock(..),
+import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial,
+                                                                SpriteMaterialBlock(..),
                                                                 SpriteTile(..),
                                                                 maxSpriteTileCount,
                                                                 spriteMaterial)
@@ -673,7 +675,7 @@ createMaterialFromImage scene cd (Image sourcePath maybeWidth maybeHeight) = do
     (_, sampler) <- Hree.addSampler scene sname
     Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
     Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
-    let material = Hree.spriteMaterial { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler)) }
+    let material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, Hree.TextureAndSampler texture sampler) }
     return (material, V2 width height, V2 twidth theight)
     where
     nextPow2 = nextPow2_ 1

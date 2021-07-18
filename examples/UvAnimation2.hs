@@ -102,7 +102,7 @@ main =
         Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
         Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
         let material = Hree.spriteMaterial
-                { Hree.materialTextures = pure (Hree.BaseColorMapping, Hree.Texture (texture, sampler))
+                { Hree.materialMappings = pure (Hree.BaseColorMapping, Hree.TextureAndSampler texture sampler)
                 }
         return material
 

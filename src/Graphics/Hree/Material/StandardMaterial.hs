@@ -48,7 +48,7 @@ instance Block StandardMaterialBlock where
 standardMaterial :: StandardMaterialBlock -> Material StandardMaterialBlock
 standardMaterial block = Material
     { materialUniformBlock = block
-    , materialTextures = mempty
+    , materialMappings = mempty
     , materialRenderOption = mempty
     , materialProgramOption = mempty
     , materialProgramSpec = EmbeddedProgram StandardProgram

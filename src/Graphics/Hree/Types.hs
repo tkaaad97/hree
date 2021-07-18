@@ -76,7 +76,7 @@ data TextureMappingType =
 
 data Material a = Material
     { materialUniformBlock  :: !a
-    , materialTextures      :: !(BV.Vector (TextureMappingType, Texture))
+    , materialMappings      :: !(BV.Vector (TextureMappingType, TextureAndSampler))
     , materialRenderOption  :: !PartialRenderOption
     , materialProgramOption :: !PartialProgramOption
     , materialProgramSpec   :: !ProgramSpec
@@ -84,7 +84,7 @@ data Material a = Material
 
 data MaterialInfo = MaterialInfo
     { materialInfoUniformBlock  :: !GLW.Buffer
-    , materialInfoTextures      :: !(BV.Vector (ByteString, Texture))
+    , materialInfoMappings      :: !(BV.Vector (ByteString, TextureAndSampler))
     , materialInfoRenderOption  :: !RenderOption
     , materialInfoProgramOption :: !ProgramOption
     , materialInfoProgramSpec   :: !ProgramSpec
@@ -164,7 +164,7 @@ data SceneState = SceneState
     , ssBuffers           :: ![GLW.Buffer]
     , ssTextures          :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
     , ssSamplers          :: !(Map ByteString GLW.Sampler)
-    , ssDefaultTexture    :: !(Maybe Texture)
+    , ssDefaultTexture    :: !(Maybe TextureAndSampler)
     , ssCameraBlockBinder :: !(Maybe (UniformBlockBinder CameraBlock))
     , ssLightBlockBinder  :: !(Maybe (UniformBlockBinder LightBlock))
     } deriving (Show)

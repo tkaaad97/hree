@@ -12,7 +12,7 @@ import Graphics.Hree.Types (Material(..))
 userMaterial :: a -> ShaderSource -> ShaderSource -> BV.Vector (ByteString, UniformBufferBindingIndex) -> Material a
 userMaterial block vshader fshader bindingPoints = Material
     { materialUniformBlock = block
-    , materialTextures = mempty
+    , materialMappings = mempty
     , materialRenderOption = mempty
     , materialProgramOption = mempty
     , materialProgramSpec = UserProgram vshader fshader bindingPoints

@@ -58,7 +58,7 @@ render commons a cur = do
     GLW.glBindVertexArray (riVertexArray a)
     bindUniformBlockBuffers (riUniformBlocks a)
     bindUniforms uniforms
-    bindTextures textures
+    bindTextureAndSamplers textures
     drawWith method
     return . Just $ (program, renderOption)
     where
@@ -96,14 +96,14 @@ bindUniformBlockBuffers = mapM_ bindUniformBlockBuffer
     bindUniformBlockBuffer (UniformBufferBindingIndex bindingIndex, buffer) =
         GLW.glBindBufferBase GL.GL_UNIFORM_BUFFER bindingIndex buffer
 
-bindTextures :: BV.Vector Texture -> IO ()
-bindTextures xs = do
+bindTextureAndSamplers :: BV.Vector TextureAndSampler -> IO ()
+bindTextureAndSamplers xs = do
     Foreign.withArray textures $ GLW.glBindTextures 0 (fromIntegral len)
     Foreign.withArray samplers $ GLW.glBindSamplers 0 (fromIntegral len)
     where
     len = BV.length xs
-    textures = BV.toList . BV.map (\(Texture (texture, _)) -> texture) $ xs
-    samplers = BV.toList . BV.map (\(Texture (_, sampler)) -> sampler) $ xs
+    textures = BV.toList . BV.map (\(TextureAndSampler texture _) -> texture) $ xs
+    samplers = BV.toList . BV.map (\(TextureAndSampler _ sampler) -> sampler) $ xs
 
 renderMany :: Foldable t => BV.Vector (ByteString, UniformBufferBindingIndex) -> t RenderInfo -> IO ()
 renderMany common = void . foldrM (render common) Nothing

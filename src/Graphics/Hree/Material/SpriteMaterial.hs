@@ -106,7 +106,7 @@ spriteMaterialBlockByteSize = 64 + sizeOfStd140 (Proxy :: Proxy (LimitedVector M
 spriteMaterial :: Material SpriteMaterialBlock
 spriteMaterial = Material
     { materialUniformBlock = block
-    , materialTextures = mempty
+    , materialMappings = mempty
     , materialRenderOption = renderOption
     , materialProgramOption = programOption
     , materialProgramSpec = EmbeddedProgram SpriteProgram

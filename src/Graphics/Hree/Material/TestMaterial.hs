@@ -9,7 +9,7 @@ import Graphics.Hree.Types (Material(..))
 testMaterial :: Material ()
 testMaterial = Material
     { materialUniformBlock = ()
-    , materialTextures = mempty
+    , materialMappings = mempty
     , materialRenderOption = mempty
     , materialProgramOption = mempty
     , materialProgramSpec = EmbeddedProgram TestProgram
