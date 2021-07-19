@@ -37,8 +37,8 @@ import Chronos (Time)
 import Data.ByteString (ByteString)
 import qualified Data.Component as Component
 import Data.Hashable (Hashable(..), hashUsing)
-import Data.IntMap.Strict (IntMap)
 import Data.IORef (IORef)
+import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Vector as BV
@@ -125,7 +125,8 @@ data MaterialInfo = MaterialInfo
     } deriving (Show, Eq)
 
 data MeshMaterial = MeshMaterial
-    { meshMaterialUniformBlock  :: !GLW.Buffer
+    { meshMaterialMaterialId    :: !(MaterialId ())
+    , meshMaterialUniformBlock  :: !GLW.Buffer
     , meshMaterialMappings      :: !(Map ByteString TextureAndSampler)
     , meshMaterialRenderOption  :: !RenderOption
     , meshMaterialProgramOption :: !ProgramOption

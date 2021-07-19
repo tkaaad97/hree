@@ -23,6 +23,7 @@ module Graphics.Hree.Scene
     , readNode
     , readNodeTransform
     , removeLight
+    , removeMaterialIfUnused
     , removeMesh
     , removeNode
     , renderScene
@@ -317,6 +318,20 @@ updateMaterialMappingSubImage scene materialId mappingType (V2 x y) (V2 width he
     where
     throwNotFound = throwIO . userError $ "material not found. materialId: " ++ show materialId
 
+removeMaterialIfUnused :: Scene -> MaterialId b -> IO ()
+removeMaterialIfUnused scene materialId = do
+    maybeMaterialInfo <- Component.readComponent materialStore materialId'
+    flip (maybe (return ())) maybeMaterialInfo $ \materialInfo -> do
+        meshes <- BV.freeze =<< Component.getComponentSlice (sceneMeshStore scene)
+        let usingMaterial = BV.any ((== materialId') . meshMaterialMaterialId . meshInfoMaterial) meshes
+        unless usingMaterial $ do
+            let mappings = Map.elems . materialInfoMappings $ materialInfo
+            mapM_ (\(TextureAndSampler texture sampler) -> GLW.deleteObject sampler >> GLW.deleteObject texture) mappings
+            void $ Component.removeComponent materialStore materialId'
+    where
+    materialId' = castMaterialId materialId
+    materialStore = sceneMaterialStore scene
+
 addMesh :: Block b => Scene -> Mesh b -> IO (AddedMesh b)
 addMesh scene mesh = addMesh_ scene mesh Nothing
 
@@ -359,7 +374,7 @@ addMesh_ scene mesh maybeSkinId = do
             block = unStd140 . SV.head . SV.unsafeCast . materialInfoUniformBlock $ materialInfo
         buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
         ubb <- newUniformBlockBinder buffer block
-        return (MeshMaterial buffer mappings roption poption pspec pname, ubb)
+        return (MeshMaterial materialId buffer mappings roption poption pspec pname, ubb)
 
 instantiateGeometry :: Geometry -> IO GeometryInfo
 instantiateGeometry geo = do
@@ -769,11 +784,23 @@ initialSceneState =
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
-    meshes <- Component.getComponentSlice (sceneMeshStore scene)
+    -- delete meshes
+    meshes <- Component.getComponentSlice meshStore
     BV.mapM_ (removeMesh scene . meshInfoId) =<< BV.freeze meshes
-    buffers <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
-    GLW.deleteObjects buffers
     Component.cleanComponentStore meshStore defaultPreserveSize
+
+    -- delete buffers
+    (buffers, maybeDefaultTexture) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
+    GLW.deleteObjects buffers
+
+    -- delete default texture
+    flip (maybe (return ())) maybeDefaultTexture $
+        \(TextureAndSampler texture sampler) -> GLW.deleteObject sampler >> GLW.deleteObject texture
+
+    -- delete materials
+    materialInfos <- Component.getComponentSlice materialStore
+    BV.mapM_ (removeMaterialIfUnused scene . materialInfoId) =<< BV.freeze materialInfos
+
     Component.cleanComponentStore nodeStore defaultPreserveSize
     Component.cleanComponentStore transformStore defaultPreserveSize
     Component.cleanComponentStore matrixStore defaultPreserveSize
@@ -782,6 +809,7 @@ deleteScene scene = do
     Component.cleanComponentStore skinStore defaultPreserveSize
 
     where
+    materialStore = sceneMaterialStore scene
     meshStore = sceneMeshStore scene
     nodeStore = sceneNodeStore scene
     transformStore = sceneNodeTransformStore scene
@@ -791,7 +819,7 @@ deleteScene scene = do
     skinStore = sceneSkinStore scene
     deleteSceneFunc state =
         let buffers = ssBuffers state
-        in (initialSceneState, buffers)
+        in (initialSceneState, (buffers, ssDefaultTexture state))
 
 defaultRendererOption :: RendererOption
 defaultRendererOption = RendererOption autoClearOption
