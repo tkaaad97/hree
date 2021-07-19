@@ -12,8 +12,6 @@ module Graphics.Hree.Material
     ) where
 
 import Data.ByteString (ByteString)
-import qualified Data.List as List (find)
-import Data.Maybe (isJust)
 import qualified GLW.Groups.CullFaceMode as CullFaceMode
 import qualified GLW.Groups.DepthFunction as DepthFunction
 import qualified GLW.Groups.StencilFunction as StencilFunction
@@ -24,7 +22,7 @@ import Graphics.Hree.GL.Types (BlendingOption(..), BlendingSeparateOption(..),
                                RenderOption, RenderOption_(..),
                                StencilFuncArgs(..), StencilOpArgs(..),
                                StencilOption(..))
-import Graphics.Hree.Types (Material(..), TextureMappingType(..))
+import Graphics.Hree.Types (TextureMappingType(..))
 import Linear (V4(..))
 
 import Graphics.Hree.Material.BasicMaterial (BasicMaterial, BasicMaterialBlock,
@@ -44,10 +42,10 @@ import Graphics.Hree.Material.UserMaterial (userMaterial)
 defaultRenderOption :: RenderOption
 defaultRenderOption = RenderOption
     { renderOptionCullFace = pure $ Just CullFaceMode.glBack
-    , renderOptionFlipSided = pure $ False
-    , renderOptionDepth = pure $ defaultDepthOption
-    , renderOptionBlending = pure $ defaultBlendingOption
-    , renderOptionStencil = pure $ defaultStencilOption
+    , renderOptionFlipSided = pure False
+    , renderOptionDepth = pure defaultDepthOption
+    , renderOptionBlending = pure defaultBlendingOption
+    , renderOptionStencil = pure defaultStencilOption
     , renderOptionColorMask = pure $ V4 GL.GL_TRUE GL.GL_TRUE GL.GL_TRUE GL.GL_TRUE
     }
 

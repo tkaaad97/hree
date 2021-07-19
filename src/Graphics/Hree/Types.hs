@@ -37,8 +37,8 @@ import Chronos (Time)
 import Data.ByteString (ByteString)
 import qualified Data.Component as Component
 import Data.Hashable (Hashable(..), hashUsing)
-import Data.IORef (IORef)
 import Data.IntMap.Strict (IntMap)
+import Data.IORef (IORef)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Vector as BV
@@ -210,8 +210,6 @@ data SceneState = SceneState
     , ssSkinCounter       :: !SkinId
     , ssRootNodes         :: !(BV.Vector NodeId)
     , ssBuffers           :: ![GLW.Buffer]
-    , ssTextures          :: !(Map ByteString (GLW.Texture 'GLW.GL_TEXTURE_2D))
-    , ssSamplers          :: !(Map ByteString GLW.Sampler)
     , ssDefaultTexture    :: !(Maybe TextureAndSampler)
     , ssCameraBlockBinder :: !(Maybe (UniformBlockBinder CameraBlock))
     , ssLightBlockBinder  :: !(Maybe (UniformBlockBinder LightBlock))

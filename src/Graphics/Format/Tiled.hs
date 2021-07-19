@@ -26,7 +26,6 @@ import Data.Bits (complement, (.&.))
 import Data.Function ((&))
 import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Text as Text (unpack)
-import qualified Data.Text.Encoding as Text (encodeUtf8)
 import qualified Data.Vector as BV (Vector, concatMap, findIndex, freeze,
                                     fromList, generate, ifoldM', imapM,
                                     imapMaybe, length, map, mapM, mapMaybe,

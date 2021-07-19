@@ -47,9 +47,6 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Data.Bits ((.|.))
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString (index, length)
-import qualified Data.ByteString.Char8 as ByteString (pack)
-import qualified Data.ByteString.Internal as ByteString (create)
 import Data.Coerce (coerce)
 import qualified Data.Component as Component
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
@@ -63,8 +60,8 @@ import qualified Data.Vector.Generic as GV (imapM_)
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word8)
 import Foreign (Ptr)
-import qualified Foreign (castPtr, copyArray, newArray, newForeignPtr_, nullPtr,
-                          plusPtr, withForeignPtr)
+import qualified Foreign (castPtr, newArray, newForeignPtr_, nullPtr, plusPtr,
+                          withForeignPtr)
 import GHC.TypeNats (KnownNat)
 import qualified GLW
 import qualified GLW.Groups.ClearBufferMask as ClearBufferMask
@@ -87,8 +84,6 @@ import Graphics.Hree.Program
 import Graphics.Hree.Types
 import Linear (V2(..), V4(..), (!*!), (^+^))
 import qualified Linear
-import qualified System.Random.MWC as Random (asGenIO, uniformR,
-                                              withSystemRandom)
 
 data AddedMesh b = AddedMesh
     { addedMeshId                         :: !MeshId
@@ -767,20 +762,17 @@ initialSceneState =
         skinCounter = SkinId 1
         rootNodes = BV.empty
         buffers = mempty
-        textures = mempty
-        samplers = mempty
         defaultTexture = Nothing
         cameraBlockBinder = Nothing
         lightBlockBinder = Nothing
-    in SceneState materialCounter meshCounter nodeCounter lightCounter skinCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder
+    in SceneState materialCounter meshCounter nodeCounter lightCounter skinCounter rootNodes buffers defaultTexture cameraBlockBinder lightBlockBinder
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
     meshes <- Component.getComponentSlice (sceneMeshStore scene)
     BV.mapM_ (removeMesh scene . meshInfoId) =<< BV.freeze meshes
-    (buffers, textures) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
+    buffers <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
     GLW.deleteObjects buffers
-    GLW.deleteObjects textures
     Component.cleanComponentStore meshStore defaultPreserveSize
     Component.cleanComponentStore nodeStore defaultPreserveSize
     Component.cleanComponentStore transformStore defaultPreserveSize
@@ -799,8 +791,7 @@ deleteScene scene = do
     skinStore = sceneSkinStore scene
     deleteSceneFunc state =
         let buffers = ssBuffers state
-            textures = Map.elems . ssTextures $ state
-        in (initialSceneState, (buffers, textures))
+        in (initialSceneState, buffers)
 
 defaultRendererOption :: RendererOption
 defaultRendererOption = RendererOption autoClearOption
@@ -823,17 +814,3 @@ deleteRenderer :: Renderer -> IO ()
 deleteRenderer renderer = do
     programs <- fmap rendererStatePrograms . readIORef . rendererState $ renderer
     GLW.deleteObjects . map programInfoProgram . Map.elems $ programs
-
-genRandomName :: ByteString -> Int -> IO ByteString
-genRandomName prefix len = do
-        v <- SV.generateM len (const randomCharacter)
-        a <- SV.unsafeWith v $ \source ->
-            ByteString.create len $ \dest -> Foreign.copyArray dest source len
-        return (prefix `mappend` a)
-    where
-    charsLen = ByteString.length charactersForRandomName
-    randomCharacter = Random.withSystemRandom . Random.asGenIO $
-        fmap (ByteString.index charactersForRandomName) . Random.uniformR (0, charsLen - 1)
-
-charactersForRandomName :: ByteString
-charactersForRandomName = ByteString.pack $ ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']

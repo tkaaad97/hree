@@ -27,7 +27,7 @@ import Data.Char (ord)
 import Data.Functor.Identity (Identity(..))
 import qualified Data.HashTable.IO as HT
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import qualified Data.List as List (delete, find, partition, sort)
+import qualified Data.List as List (find, partition, sort)
 import Data.Maybe (fromMaybe)
 import Data.Monoid (Last(..))
 import Data.Semigroup (Semigroup(..))
@@ -45,7 +45,6 @@ import Data.Word (Word8)
 import qualified Foreign (allocaArray, castPtr, newForeignPtr_, nullPtr, peek,
                           peekElemOff, pokeElemOff, with)
 import qualified FreeType
-import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
