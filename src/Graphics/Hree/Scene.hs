@@ -26,6 +26,7 @@ module Graphics.Hree.Scene
     , removeMaterialIfUnused
     , removeMesh
     , removeNode
+    , removeSkinIfUnused
     , renderScene
     , rotateNode
     , translateNode
@@ -487,7 +488,7 @@ removeNode scene nodeId = do
             void $ Component.removeComponent (sceneNodeGlobalTransformMatrixStore scene) nodeId
 
             -- remove node uniform buffers
-            mapM_ (removeBufferResource scene . snd) (nodeInfoUniformBlocks nodeInfo)
+            mapM_ (GLW.deleteObject . snd) (nodeInfoUniformBlocks nodeInfo)
 
             -- remove from root node list
             isRoot <- BV.elem nodeId . ssRootNodes <$> readIORef (sceneState scene)
@@ -565,26 +566,6 @@ updateMeshVertexBuffer scene meshId bindingIndex f = do
     where
     meshStore = sceneMeshStore scene
 
-addBufferResource :: Scene -> GLW.Buffer -> IO ()
-addBufferResource scene buffer = addBufferResources scene [buffer]
-
-addBufferResources :: Scene -> [GLW.Buffer] -> IO ()
-addBufferResources scene buffers =
-    atomicModifyIORef' (sceneState scene) addBuffersFunc
-    where
-    addBuffersFunc state =
-        let stateBuffers = ssBuffers state
-        in (state { ssBuffers = buffers ++ stateBuffers }, ())
-
-removeBufferResource :: Scene -> GLW.Buffer -> IO ()
-removeBufferResource scene buffer = do
-    GLW.deleteObject buffer
-    atomicModifyIORef' (sceneState scene) removeBufferFunc
-    where
-    removeBufferFunc state =
-        let buffers = filter (/= buffer) (ssBuffers state)
-        in (state { ssBuffers = buffers }, ())
-
 instantiateMapping :: MappingSource -> IO TextureAndSampler
 instantiateMapping (MappingSource settings textureSource samplerParamValues) =
     bracketOnError
@@ -637,7 +618,7 @@ updateLight scene lightId f =
 
 addSkin :: Scene -> NodeId -> SV.Vector NodeId -> SV.Vector Mat4 -> IO SkinId
 addSkin scene nodeId joints inverseBindMatrices = do
-    skinId <- atomicModifyIORef' (sceneState scene) addSkinFunc
+    skinId' <- atomicModifyIORef' (sceneState scene) addSkinFunc
     let len = SV.length joints
         invLen = SV.length inverseBindMatrices
         jointMats = SV.replicate len (Elem Linear.identity)
@@ -647,16 +628,27 @@ addSkin scene nodeId joints inverseBindMatrices = do
                 else SV.map Elem . SV.slice 0 len $ inverseBindMatrices
     jointMatBinder <- mkMatricesBlockBinder scene jointMats
     invMatBinder <- mkMatricesBlockBinder scene invMats
-    let skin = Skin nodeId inverseBindMatrices joints jointMatBinder invMatBinder
-    Component.addComponent (sceneSkinStore scene) skinId skin
-    return skinId
+    let skin = Skin skinId' nodeId inverseBindMatrices joints jointMatBinder invMatBinder
+    Component.addComponent (sceneSkinStore scene) skinId' skin
+    return skinId'
 
     where
     addSkinFunc state =
-        let skinId = ssSkinCounter state
-            skinIdNext = skinId + 1
+        let skinId' = ssSkinCounter state
+            skinIdNext = skinId' + 1
             newState = state { ssSkinCounter = skinIdNext }
-        in (newState, skinId)
+        in (newState, skinId')
+
+removeSkinIfUnused :: Scene -> SkinId -> IO ()
+removeSkinIfUnused scene skinId' = do
+    maybeSkinInfo <- Component.readComponent (sceneSkinStore scene) skinId'
+    flip (maybe (return ())) maybeSkinInfo $ \(Skin _ _ _ _ (MatricesBlockBinder block1) (MatricesBlockBinder block2))  -> do
+        meshes <- BV.freeze =<< Component.getComponentSlice (sceneMeshStore scene)
+        let usingSkin = BV.any ((== Just skinId') . meshInfoSkin) meshes
+        unless usingSkin $ do
+            GLW.deleteObject . uniformBlockBinderBuffer $ block1
+            GLW.deleteObject . uniformBlockBinderBuffer $ block2
+            void $ Component.removeComponent (sceneSkinStore scene) skinId'
 
 updateSkinJoints :: Scene -> Skin -> IO ()
 updateSkinJoints scene skin = go . skinJointMatricesBinder $ skin
@@ -714,7 +706,6 @@ mkDefaultTexture scene = do
 mkBlockBinder :: Block a => Scene -> a -> IO (UniformBlockBinder a)
 mkBlockBinder scene block = do
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
-    addBufferResource scene buffer
     newUniformBlockBinder buffer block
 
 mkCameraBlockBinder :: Scene -> CameraBlock -> IO (UniformBlockBinder CameraBlock)
@@ -738,7 +729,6 @@ mkLightBlockBinder scene block = do
 mkMatricesBlockBinder :: Scene -> SV.Vector (Elem Mat4) -> IO MatricesBlockBinder
 mkMatricesBlockBinder scene mats = do
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
-    addBufferResource scene buffer
     go buffer
 
     where
@@ -776,24 +766,25 @@ initialSceneState =
         lightCounter = LightId 1
         skinCounter = SkinId 1
         rootNodes = BV.empty
-        buffers = mempty
         defaultTexture = Nothing
         cameraBlockBinder = Nothing
         lightBlockBinder = Nothing
-    in SceneState materialCounter meshCounter nodeCounter lightCounter skinCounter rootNodes buffers defaultTexture cameraBlockBinder lightBlockBinder
+    in SceneState materialCounter meshCounter nodeCounter lightCounter skinCounter rootNodes defaultTexture cameraBlockBinder lightBlockBinder
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do
     -- delete meshes
-    meshes <- Component.getComponentSlice meshStore
-    BV.mapM_ (removeMesh scene . meshInfoId) =<< BV.freeze meshes
+    meshes <- BV.freeze =<< Component.getComponentSlice meshStore
+    BV.mapM_ (removeMesh scene . meshInfoId) meshes
     Component.cleanComponentStore meshStore defaultPreserveSize
 
-    -- delete buffers
-    (buffers, maybeDefaultTexture) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
-    GLW.deleteObjects buffers
+    -- delete skins
+    skins <- BV.freeze =<< Component.getComponentSlice skinStore
+    BV.mapM_ (removeSkinIfUnused scene . skinId) skins
 
-    -- delete default texture
+    -- delete default texture and buffers
+    (maybeDefaultTexture, buffers) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
+    mapM_ GLW.deleteObject buffers
     flip (maybe (return ())) maybeDefaultTexture $
         \(TextureAndSampler texture sampler) -> GLW.deleteObject sampler >> GLW.deleteObject texture
 
@@ -818,8 +809,10 @@ deleteScene scene = do
     lightStore = sceneLightStore scene
     skinStore = sceneSkinStore scene
     deleteSceneFunc state =
-        let buffers = ssBuffers state
-        in (initialSceneState, (buffers, ssDefaultTexture state))
+        let maybeCameraBuffer = uniformBlockBinderBuffer <$> ssCameraBlockBinder state
+            maybeLightBuffer = uniformBlockBinderBuffer <$> ssLightBlockBinder state
+            buffers = catMaybes [ maybeCameraBuffer, maybeLightBuffer ]
+        in (initialSceneState, (ssDefaultTexture state, buffers))
 
 defaultRendererOption :: RendererOption
 defaultRendererOption = RendererOption autoClearOption

@@ -210,7 +210,6 @@ data SceneState = SceneState
     , ssLightCounter      :: !LightId
     , ssSkinCounter       :: !SkinId
     , ssRootNodes         :: !(BV.Vector NodeId)
-    , ssBuffers           :: ![GLW.Buffer]
     , ssDefaultTexture    :: !(Maybe TextureAndSampler)
     , ssCameraBlockBinder :: !(Maybe (UniformBlockBinder CameraBlock))
     , ssLightBlockBinder  :: !(Maybe (UniformBlockBinder LightBlock))
@@ -240,7 +239,8 @@ data MatricesBlockBinder = forall n. KnownNat n => MatricesBlockBinder
     }
 
 data Skin = Skin
-    { skinSkeleton                   :: !NodeId
+    { skinId                         :: !SkinId
+    , skinSkeleton                   :: !NodeId
     , skinInverseBindMatrices        :: !(SV.Vector Mat4)
     , skinJoints                     :: !(SV.Vector NodeId)
     , skinJointMatricesBinder        :: !MatricesBlockBinder
