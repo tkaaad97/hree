@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
 module SceneSpec
     ( spec
@@ -10,18 +11,16 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word8)
 import Foreign (Ptr)
-import qualified Foreign (alloca, castPtr, withArray)
+import qualified Foreign
 import GLContext
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
-import qualified GLW.Internal.Objects as GLW (Buffer(..))
+import qualified GLW.Internal.Objects as GLW (Buffer(..), Texture(..))
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree.Geometry as Hree
+import qualified Graphics.Hree as Hree
 import qualified Graphics.Hree.GL.Texture as Hree
 import qualified Graphics.Hree.GL.Vertex as Hree
 import qualified Graphics.Hree.Material.TestMaterial as Hree
-import qualified Graphics.Hree.Mesh as Hree (Mesh(..))
-import qualified Graphics.Hree.Scene as Hree
 import qualified Graphics.Hree.Types as Hree
 import Linear (V2(..), V3(..), V4(..))
 import Test.Hspec
@@ -41,8 +40,62 @@ assertBufferDead buffer = do
     Foreign.alloca $ GLW.glGetNamedBufferParameteriv buffer GL.GL_BUFFER_USAGE
     GL.glGetError >>= (`shouldBe` GL.GL_INVALID_OPERATION)
 
+assertTextureAlive :: GLW.Texture 'GLW.GL_TEXTURE_2D -> IO ()
+assertTextureAlive texture = do
+    GL.glGetError >>= (`shouldBe` GL.GL_NO_ERROR)
+    _ <- Hree.getTextureParameter texture Hree.glTextureBaseLevel
+    GL.glGetError >>= (`shouldBe` GL.GL_NO_ERROR)
+
+assertTextureDead :: GLW.Texture 'GLW.GL_TEXTURE_2D -> IO ()
+assertTextureDead texture = do
+    GL.glGetError >>= (`shouldBe` GL.GL_NO_ERROR)
+    _ <- Hree.getTextureParameter texture Hree.glTextureBaseLevel
+    GL.glGetError >>= (`shouldBe` GL.GL_INVALID_OPERATION)
+
 spec :: Spec
 spec = do
+    describe "addMaterial" $ do
+        runOnOSMesaContext width height . it "change scene state" $ do
+            scene <- Hree.newScene
+            materialId <- Hree.addMaterial scene material
+            materialId `shouldBe` Hree.MaterialId 1
+            counter <- getSceneProp scene Hree.ssMaterialCounter
+            counter `shouldBe` 2
+
+        runOnOSMesaContext width height . specify "allocate texture if mapping exists" $ do
+            scene <- Hree.newScene
+            mapping <- mkMapping
+            materialId <- Hree.addMaterial scene material { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping) }
+            assertTextureAlive (GLW.Texture 1)
+
+            Hree.removeMaterialIfUnused scene materialId
+            assertTextureDead (GLW.Texture 1)
+
+    describe "deleteMaterialIfUnused" $ do
+        runOnOSMesaContext width height . it "should not delete if used" $ do
+            scene <- Hree.newScene
+            mapping <- mkMapping
+            materialId <- Hree.addMaterial scene material { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping) }
+            materialSize <- Component.componentSize $ Hree.sceneMaterialStore scene
+            materialSize `shouldBe` 1
+            let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
+                mesh = Hree.Mesh geometry materialId Nothing
+            meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+
+            -- should not be deleted at here
+            Hree.removeMaterialIfUnused scene materialId
+            materialSize <- Component.componentSize $ Hree.sceneMaterialStore scene
+            materialSize `shouldBe` 1
+            assertTextureAlive (GLW.Texture 1)
+
+            Hree.removeMesh scene meshId
+            Hree.removeMaterialIfUnused scene materialId
+
+            -- should be deleted at here
+            materialSize <- Component.componentSize $ Hree.sceneMaterialStore scene
+            materialSize `shouldBe` 0
+            assertTextureDead (GLW.Texture 1)
+
     describe "addMesh" $ do
         runOnOSMesaContext width height . it "change scene state" $ do
             scene <- Hree.newScene
@@ -86,9 +139,16 @@ spec = do
             assertBufferDead (GLW.Buffer 2)
 
     describe "deleteScene" $ do
-        runOnOSMesaContext width height . it "delete meshes" $ do
+        runOnOSMesaContext width height . it "delete meshes and materials and default texture" $ do
             scene <- Hree.newScene
-            materialId <- Hree.addMaterial scene material
+            _ <- Hree.mkDefaultTextureIfNotExists scene
+            assertTextureAlive (GLW.Texture 1)
+            mapping <- mkMapping
+            materialId <- Hree.addMaterial scene material { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping) }
+            assertTextureAlive (GLW.Texture 2)
+            materialSize <- Component.componentSize $ Hree.sceneMaterialStore scene
+            materialSize `shouldBe` 1
+
             let geometry1 = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 geometry2 = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh1 = Hree.Mesh geometry1 materialId Nothing
@@ -101,13 +161,21 @@ spec = do
             assertBufferAlive (GLW.Buffer 2)
             assertBufferAlive (GLW.Buffer 3)
             assertBufferAlive (GLW.Buffer 4)
+
             Hree.deleteScene scene
+
+            materialSizeAfter <- Component.componentSize $ Hree.sceneMaterialStore scene
+            materialSizeAfter `shouldBe` 0
             meshSizeAfter <- Component.componentSize $ Hree.sceneMeshStore scene
             meshSizeAfter `shouldBe` 0
+
             assertBufferDead (GLW.Buffer 1)
             assertBufferDead (GLW.Buffer 2)
             assertBufferDead (GLW.Buffer 3)
             assertBufferDead (GLW.Buffer 4)
+
+            assertTextureDead (GLW.Texture 1)
+            assertTextureDead (GLW.Texture 2)
 
     describe "addNode" $ do
         runOnOSMesaContext width height . it "add node" $ do
@@ -148,3 +216,10 @@ spec = do
         ]
 
     material = Hree.testMaterial
+
+    mkMapping = do
+        p <- Foreign.newArray [255, 255, 255, 255]
+        pixels <- Foreign.newForeignPtr_ $ Foreign.castPtr (p :: Ptr Word8)
+        let settings = Hree.TextureSettings 1 GL.GL_RGBA8 1 1 False
+            sourceData = Hree.TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE pixels
+        return (Hree.MappingSource settings sourceData [])
