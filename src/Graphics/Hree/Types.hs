@@ -7,12 +7,15 @@ module Graphics.Hree.Types
     , GeometryInfo(..)
     , LightId(..)
     , LightStore
+    , MappingSource(..)
     , Material(..)
+    , MaterialId(..)
     , MaterialInfo(..)
     , MatricesBlockBinder(..)
     , Mesh(..)
     , MeshId(..)
     , MeshInfo(..)
+    , MeshMaterial(..)
     , NodeId(..)
     , Node(..)
     , NodeInfo(..)
@@ -23,14 +26,17 @@ module Graphics.Hree.Types
     , SceneState(..)
     , Skin(..)
     , SkinId(..)
+    , SamplerParamValue(..)
     , TextureMappingType(..)
+    , TextureSettings(..)
+    , TextureSourceData(..)
     , TransformInfo(..)
     ) where
 
 import Chronos (Time)
 import Data.ByteString (ByteString)
 import qualified Data.Component as Component
-import Data.Hashable (Hashable(..))
+import Data.Hashable (Hashable(..), hashUsing)
 import Data.IORef (IORef)
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
@@ -39,12 +45,14 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Mutable as MBV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
-import Foreign (Storable(..), castPtr, plusPtr)
+import Data.Word (Word8)
+import Foreign (ForeignPtr, Storable(..), castPtr, plusPtr)
 import GHC.TypeNats (KnownNat)
 import qualified GLW
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.GL.Block (Elem)
+import Graphics.Hree.GL.Sampler (SamplerParamValue(..))
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
@@ -72,23 +80,62 @@ data TextureMappingType =
     EmissiveMapping |
     MetallicRoughnessMapping |
     OcclusionMapping
-    deriving (Show, Eq, Enum)
+    deriving (Show, Eq, Enum, Ord)
+
+instance Hashable TextureMappingType where
+    hashWithSalt = hashUsing fromEnum
+
+data TextureSettings = TextureSettings
+    { textureLevels         :: !GL.GLint
+    , textureInternalFormat :: !GL.GLenum
+    , textureWidth          :: !GL.GLsizei
+    , textureHeight         :: !GL.GLsizei
+    , textureGenerateMipmap :: !Bool
+    } deriving (Show, Eq)
+
+data TextureSourceData = TextureSourceData
+    { sourceWidth    :: !GL.GLsizei
+    , sourceHeight   :: !GL.GLsizei
+    , sourceFormat   :: !GLW.PixelFormat
+    , sourceDataType :: !GL.GLenum
+    , sourcePixels   :: !(ForeignPtr ())
+    }
+
+data MappingSource = MappingSource
+    { mappingSourceTextureSettings    :: !TextureSettings
+    , mappingSourceTextoureSourceData :: !TextureSourceData
+    , mappingSourceSamplerParamValues :: ![SamplerParamValue]
+    }
 
 data Material a = Material
     { materialUniformBlock  :: !a
-    , materialMappings      :: !(BV.Vector (TextureMappingType, TextureAndSampler))
+    , materialMappings      :: ![(TextureMappingType, MappingSource)]
     , materialRenderOption  :: !PartialRenderOption
     , materialProgramOption :: !PartialProgramOption
     , materialProgramSpec   :: !ProgramSpec
-    } deriving (Show, Eq)
+    }
 
 data MaterialInfo = MaterialInfo
-    { materialInfoUniformBlock  :: !GLW.Buffer
-    , materialInfoMappings      :: !(BV.Vector (ByteString, TextureAndSampler))
+    { materialInfoId            :: !(MaterialId ())
+    , materialInfoUniformBlock  :: !(SV.Vector Word8)
+    , materialInfoMappings      :: !(Map TextureMappingType TextureAndSampler)
     , materialInfoRenderOption  :: !RenderOption
-    , materialInfoProgramOption :: !ProgramOption
+    , materialInfoProgramOption :: !PartialProgramOption
     , materialInfoProgramSpec   :: !ProgramSpec
     } deriving (Show, Eq)
+
+data MeshMaterial = MeshMaterial
+    { meshMaterialUniformBlock  :: !GLW.Buffer
+    , meshMaterialMappings      :: !(Map ByteString TextureAndSampler)
+    , meshMaterialRenderOption  :: !RenderOption
+    , meshMaterialProgramOption :: !ProgramOption
+    , meshMaterialProgramSpec   :: !ProgramSpec
+    , meshMaterialProgramName   :: !ProgramName
+    } deriving (Show, Eq)
+
+newtype MaterialId a = MaterialId
+    { unMaterialId :: Int
+    } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
 
 newtype LightId = LightId
     { unLightId :: Int
@@ -100,17 +147,16 @@ newtype MeshId = MeshId
 
 data Mesh b = Mesh
     { meshGeometry      :: !Geometry
-    , meshMaterial      :: !(Material b)
+    , meshMaterialId    :: !(MaterialId b)
     , meshInstanceCount :: !(Maybe Int)
     } deriving (Show)
 
 data MeshInfo = MeshInfo
     { meshInfoId            :: !MeshId
     , meshInfoGeometry      :: !GeometryInfo
-    , meshInfoMaterial      :: !MaterialInfo
+    , meshInfoMaterial      :: !MeshMaterial
     , meshInfoInstanceCount :: !(Maybe Int)
     , meshInfoSkin          :: !(Maybe SkinId)
-    , meshInfoProgram       :: !ProgramName
     , meshInfoVertexArray   :: !(Maybe GLW.VertexArray)
     } deriving (Show)
 
@@ -146,6 +192,7 @@ data TransformInfo = TransformInfo
 
 data Scene = Scene
     { sceneState                          :: !(IORef SceneState)
+    , sceneMaterialStore                  :: !(Component.ComponentStore MBV.MVector (MaterialId ()) MaterialInfo)
     , sceneMeshStore                      :: !(Component.ComponentStore MBV.MVector MeshId MeshInfo)
     , sceneNodeStore                      :: !(Component.ComponentStore MBV.MVector NodeId NodeInfo)
     , sceneNodeTransformStore             :: !(Component.ComponentStore MSV.MVector NodeId TransformInfo)
@@ -156,7 +203,8 @@ data Scene = Scene
     }
 
 data SceneState = SceneState
-    { ssMeshCounter       :: !MeshId
+    { ssMaterialCounter   :: !(MaterialId ())
+    , ssMeshCounter       :: !MeshId
     , ssNodeCounter       :: !NodeId
     , ssLightCounter      :: !LightId
     , ssSkinCounter       :: !SkinId

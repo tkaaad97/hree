@@ -41,34 +41,35 @@ import qualified Data.Vector.Unboxed as UV (Vector, findIndex, findIndices,
                                             map, mapM_, scanl, (!))
 import qualified Data.Vector.Unboxed.Mutable as MUV (new, slice, write)
 import Data.Word (Word32)
-import qualified Foreign (Ptr, castPtr, copyArray, peekElemOff, plusPtr,
-                          pokeElemOff, sizeOf)
+import qualified Foreign (Ptr, castPtr, copyArray, copyBytes,
+                          mallocForeignPtrBytes, peekElemOff, plusPtr,
+                          pokeElemOff, sizeOf, withForeignPtr)
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import Graphics.Format.Tiled.Types
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip, Elem(..),
                                         Geometry, Interpolation(..),
                                         KeyFrames(..), LimitedVector(..),
-                                        Material(..), Mesh(..), Node(..),
-                                        NodeId, Scene, SpriteVertex(..),
-                                        TextureAndSampler(..),
+                                        MappingSource(..), Material(..),
+                                        MaterialId, Mesh(..), Node(..), NodeId,
+                                        SamplerParamValue(..), Scene,
+                                        SpriteVertex(..),
                                         TextureMappingType(..),
                                         TextureSettings(..),
                                         TextureSourceData(..),
-                                        VariationTrack(..), addMesh, addNode,
-                                        addSampler, addTexture,
-                                        addVerticesToGeometry,
+                                        VariationTrack(..), addMaterial,
+                                        addMesh, addNode, addVerticesToGeometry,
                                         modifyUniformBlock, newNode,
                                         singleVariationClip, spriteGeometry,
-                                        updateMeshVertexBuffer)
+                                        updateMeshVertexBuffer,
+                                        updateUniformBlock_)
+import qualified Graphics.Hree.GL.Sampler as Hree (glTextureMagFilter,
+                                                   glTextureMinFilter)
 import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial,
                                                                 SpriteMaterialBlock(..),
                                                                 SpriteTile(..),
                                                                 maxSpriteTileCount,
                                                                 spriteMaterial)
-import qualified Graphics.Hree.GL.Sampler as Hree (glTextureMagFilter,
-                                                glTextureMinFilter,
-                                                setSamplerParameter)
 import Linear (V2(..), V3(..), (^-^))
 import Prelude hiding (map)
 import System.Directory (canonicalizePath)
@@ -82,15 +83,15 @@ data Rect = Rect
 data TilesetInfo = TilesetInfo
     { tilesetInfoIndex           :: !Int
     , tilesetInfoTileset         :: !Tileset
-    , tilesetInfoMaterial        :: !(Maybe Hree.SpriteMaterial)
+    , tilesetInfoMaterial        :: !(Maybe (Hree.MaterialId Hree.SpriteMaterialBlock))
     , tilesetInfoTextureSize     :: !(V2 Int)
     , tilesetInfoGidRange        :: !(V2 Gid)
     , tilesetInfoAnimationGids   :: !(UV.Vector Gid)
     , tilesetInfoAnimationFrames :: !(BV.Vector (BV.Vector Frame))
     , tilesetInfoImageGids       :: !(UV.Vector Gid)
     , tilesetInfoImageSources    :: !(BV.Vector Image)
-    , tilesetInfoImageMaterials  :: !(BV.Vector (Hree.SpriteMaterial, V2 Int, V2 Int))
-    } deriving (Show)
+    , tilesetInfoImageMaterials  :: !(BV.Vector (Hree.MaterialId Hree.SpriteMaterialBlock, V2 Int, V2 Int))
+    }
 
 data TiledConfig = TiledConfig
     { tiledConfigUnitLength  :: !Int
@@ -116,13 +117,11 @@ data RegionLoadInfo = RegionLoadInfo
     , regionLoadInfoAnimations :: !(BV.Vector Hree.AnimationClip)
     } deriving (Show)
 
-data TileMaterial = TileMaterial !TilesetInfo !Hree.SpriteMaterial
-    deriving (Show)
+data TileMaterial = TileMaterial !TilesetInfo !(Hree.MaterialId Hree.SpriteMaterialBlock)
 
 data ObjectMaterial =
-    ObjectMaterialTileset !TilesetInfo !Hree.SpriteMaterial |
-    ObjectMaterialTileImage !(Hree.SpriteMaterial, V2 Int, V2 Int)
-    deriving (Show)
+    ObjectMaterialTileset !TilesetInfo !(Hree.MaterialId Hree.SpriteMaterialBlock, Hree.SpriteMaterialBlock) |
+    ObjectMaterialTileImage !(Hree.MaterialId Hree.SpriteMaterialBlock, Hree.SpriteMaterialBlock) !(V2 Int) !(V2 Int)
 
 instance Eq TileMaterial where
     (==) (TileMaterial tilesetInfo0 _)
@@ -170,8 +169,8 @@ resolveTileset :: BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Gid -> Maybe Ti
 resolveTileset tilesets gidRanges gid = do
     index <- BV.findIndex (\(V2 firstGid nextGid) -> firstGid <= gid && gid < nextGid) gidRanges
     tileset <- tilesets BV.!? index
-    material <- tilesetInfoMaterial tileset
-    return (TileMaterial tileset material)
+    materialId <- tilesetInfoMaterial tileset
+    return (TileMaterial tileset materialId)
 
 renderOrderIndex :: Orientation -> RenderOrder -> StaggerAxis -> StaggerIndex -> V2 Int -> Int -> Int
 renderOrderIndex OrientationOrthogonal renderOrder _ _ size index = nostaggeredRenderOrderIndex renderOrder size index
@@ -313,9 +312,9 @@ loadRegions scene config map tilesetInfos gidRanges layerIndex tileLayer = BV.ma
     z = tiledConfigStartZ config + tiledConfigLayerDeltaZ config * fromIntegral layerIndex
 
 loadRegionFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 Int -> Float -> TileMaterial -> V2 Int -> IO RegionLoadInfo
-loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInfo material) tiles @ (V2 _ n) = do
+loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInfo materialId) tiles @ (V2 _ n) = do
     (geometry, geometryGids) <- createGeometryFromTiles config map layerData origin z tilesetInfo useTileAnimation tiles
-    let mesh = Hree.Mesh geometry material (Just n)
+    let mesh = Hree.Mesh geometry materialId (Just n)
     Hree.AddedMesh meshId binder <- Hree.addMesh scene mesh
     nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
     let animations = BV.imapMaybe (createTileAnimation meshId binder geometryGids) (tilesetInfoAnimationFrames tilesetInfo)
@@ -595,7 +594,7 @@ loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTil
         region <- loadRegion vertex material
         return (Just region)
 
-    go (Just (ObjectMaterialTileImage (material, V2 iwidth iheight, V2 twidth theight))) = do
+    go (Just (ObjectMaterialTileImage material (V2 iwidth iheight) (V2 twidth theight))) = do
         let uvw = fromIntegral iwidth / fromIntegral twidth
             uvh = fromIntegral iheight / fromIntegral theight
             uv = V2 0 uvh
@@ -609,10 +608,11 @@ loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTil
 
     go Nothing = return Nothing
 
-    loadRegion vertex material = do
+    loadRegion vertex (materialId, block) = do
         let geometry = Hree.addVerticesToGeometry Hree.spriteGeometry (SV.singleton vertex) GL.GL_STATIC_READ
-        Hree.AddedMesh meshId _ <- Hree.addMesh scene (Hree.Mesh geometry material (Just 1))
+        Hree.AddedMesh meshId binder <- Hree.addMesh scene (Hree.Mesh geometry materialId (Just 1))
         nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
+        Hree.updateUniformBlock_ binder block
         return (RegionLoadInfo nodeId mempty)
 
 loadObject _ _ _ _ _ _ _ _ = return Nothing
@@ -623,25 +623,22 @@ resolveObjectMaterial opacityFactor tilesets gidRanges gid = do
     tileset <- tilesets BV.!? tilesetIndex
     let imageGids = tilesetInfoImageGids tileset
         imageMaterials = tilesetInfoImageMaterials tileset
+        block = (Hree.materialUniformBlock Hree.spriteMaterial) { Hree.opacityFactor =  opacityFactor }
     case (UV.findIndex (== gid) imageGids, tilesetInfoMaterial tileset) of
         (Just imageIndex, _) ->
-            let (material, imageSize, textureSize) = imageMaterials BV.! imageIndex
-                block = Hree.materialUniformBlock material
-                material' = material { Hree.materialUniformBlock = block { Hree.opacityFactor = opacityFactor } }
-            in Just $ ObjectMaterialTileImage (material', imageSize, textureSize)
-        (Nothing, Just material) ->
-            let block = Hree.materialUniformBlock material
-                material' = material { Hree.materialUniformBlock = block { Hree.opacityFactor = opacityFactor } }
-            in Just $ ObjectMaterialTileset tileset material'
+            let (materialId, imageSize, textureSize) = imageMaterials BV.! imageIndex
+            in Just $ ObjectMaterialTileImage (materialId, block) imageSize textureSize
+        (Nothing, Just materialId) ->
+            Just $ ObjectMaterialTileset tileset (materialId, block)
         _ -> Nothing
 
 createTilesetInfo :: Hree.Scene -> FilePath -> Int -> (Tileset, V2 Gid) -> IO TilesetInfo
 createTilesetInfo scene cd index (tileset, gidRange) = go (tilesetImage tileset)
     where
     go (Just image) = do
-        (material, _, textureSize) <- createMaterialFromImage scene cd image
+        (materialId, _, textureSize) <- createMaterialFromImage scene cd image
         imageMaterials <- BV.mapM (createMaterialFromImage scene cd) imageSources
-        return $ TilesetInfo index tileset (Just material) textureSize gidRange animationGids animationFrames imageGids imageSources imageMaterials
+        return $ TilesetInfo index tileset (Just materialId) textureSize gidRange animationGids animationFrames imageGids imageSources imageMaterials
     go Nothing =
         TilesetInfo index tileset Nothing (V2 0 0) gidRange animationGids animationFrames imageGids imageSources
             <$> BV.mapM (createMaterialFromImage scene cd) imageSources
@@ -657,30 +654,38 @@ createTilesetInfo scene cd index (tileset, gidRange) = go (tilesetImage tileset)
     imageGids = UV.generate (BV.length imageTiles) (fst . (imageTiles BV.! ))
     imageSources = BV.map snd imageTiles
 
-createMaterialFromImage :: Hree.Scene -> FilePath -> Image -> IO (Hree.SpriteMaterial, V2 Int, V2 Int)
+createMaterialFromImage :: Hree.Scene -> FilePath -> Image -> IO (Hree.MaterialId Hree.SpriteMaterialBlock, V2 Int, V2 Int)
 createMaterialFromImage scene cd (Image sourcePath maybeWidth maybeHeight) = do
     path <- canonicalizePath $ cd </> Text.unpack sourcePath
     image <- either (throwIO . userError) (return . Picture.convertRGBA8) =<< Picture.readImage path
     let width = fromMaybe (Picture.imageWidth image) maybeWidth
         height = fromMaybe (Picture.imageHeight image) maybeHeight
-    resizedImage <- resizeImage width height image
-    let name = Text.encodeUtf8 sourcePath
         twidth = nextPow2 width
         theight = nextPow2 height
-        settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
-    (_, texture) <- SV.unsafeWith (Picture.imageData resizedImage) $ \ptr -> do
-        let sourceData = Hree.TextureSourceData (fromIntegral width) (fromIntegral height) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr ptr)
-        Hree.addTexture scene name settings sourceData
-    let sname = Text.encodeUtf8 sourcePath
-    (_, sampler) <- Hree.addSampler scene sname
-    Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
-    Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
-    let material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, Hree.TextureAndSampler texture sampler) }
-    return (material, V2 width height, V2 twidth theight)
+    resizedImage <- resizeImage width height image
+    mapping <- mkMappingSource resizedImage (V2 width height) (V2 twidth theight)
+    let material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping) }
+    materialId <- Hree.addMaterial scene material
+    return (materialId, V2 width height, V2 twidth theight)
     where
     nextPow2 = nextPow2_ 1
     nextPow2_ a x | a >= x = a
                   | otherwise = nextPow2_ (a * 2) x
+
+    mkMappingSource :: Picture.Image Picture.PixelRGBA8 -> V2 Int -> V2 Int -> IO Hree.MappingSource
+    mkMappingSource image (V2 width height) (V2 twidth theight) = do
+        let byteSize = width * height * 4
+            settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
+        pixels <- Foreign.mallocForeignPtrBytes byteSize
+        let sourceData = Hree.TextureSourceData (fromIntegral width) (fromIntegral height) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE pixels
+            samplerParamValues =
+                [ Hree.SamplerParamValue Hree.glTextureMinFilter GL.GL_NEAREST
+                , Hree.SamplerParamValue Hree.glTextureMagFilter GL.GL_NEAREST
+                ]
+        Foreign.withForeignPtr pixels $ \dest ->
+            SV.unsafeWith (Picture.imageData image) $ \p -> do
+                Foreign.copyBytes (Foreign.castPtr dest) p byteSize
+        return (Hree.MappingSource settings sourceData samplerParamValues)
 
 resizeImage :: Int -> Int -> Picture.Image Picture.PixelRGBA8 -> IO (Picture.Image Picture.PixelRGBA8)
 resizeImage width height source =

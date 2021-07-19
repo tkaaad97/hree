@@ -3,7 +3,8 @@
 module UvAnimation2 where
 
 import qualified Chronos as Time (now)
-import qualified Codec.Picture as Picture (Image(..), convertRGBA8, readImage)
+import qualified Codec.Picture as Picture (Image(..), PixelRGBA8, convertRGBA8,
+                                           readImage)
 import Control.Concurrent (threadDelay)
 import Control.Exception (throwIO)
 import qualified Data.Aeson as DA (eitherDecodeStrict')
@@ -14,7 +15,7 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 import Example
-import qualified Foreign (castPtr)
+import qualified Foreign
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
@@ -61,8 +62,8 @@ main =
     init w = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
-        material <- createMaterial scene
-        Hree.AddedMesh meshId uniformBlockBinder <- createMesh scene material
+        materialId <- createMaterial scene
+        Hree.AddedMesh meshId uniformBlockBinder <- createMesh scene materialId
         sprites <- either (throwIO . userError) return . DA.eitherDecodeStrict' =<< ByteString.readFile "examples/walksprite.json"
         let animation = createUvAnimation uniformBlockBinder sprites
             node = Hree.newNode { Hree.nodeMesh = Just meshId }
@@ -94,17 +95,26 @@ main =
 
     createMaterial scene = do
         image <- either (throwIO . userError) (return . Picture.convertRGBA8) =<< Picture.readImage imagePath
-        let settings = Hree.TextureSettings 1 GL.GL_RGBA8 twidth theight False
-        (_, texture) <- SV.unsafeWith (Picture.imageData image) $ \ptr -> do
-            let sourceData = Hree.TextureSourceData twidth theight PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr ptr)
-            Hree.addTexture scene "material1" settings sourceData
-        (_, sampler) <- Hree.addSampler scene "material1"
-        Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
-        Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
+        mapping <- mkMappingSource image
         let material = Hree.spriteMaterial
-                { Hree.materialMappings = pure (Hree.BaseColorMapping, Hree.TextureAndSampler texture sampler)
+                { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping)
                 }
-        return material
+        Hree.addMaterial scene material
+
+    mkMappingSource :: Picture.Image Picture.PixelRGBA8 -> IO Hree.MappingSource
+    mkMappingSource image = do
+        let settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
+            byteSize = twidth * theight * 4
+            samplerParamValues =
+                [ Hree.SamplerParamValue Hree.glTextureMinFilter GL.GL_NEAREST
+                , Hree.SamplerParamValue Hree.glTextureMagFilter GL.GL_NEAREST
+                ]
+        pixels <- Foreign.mallocForeignPtrBytes byteSize
+        let textureSource = Hree.TextureSourceData (fromIntegral twidth) (fromIntegral theight) PixelFormat.glRgba GL.GL_UNSIGNED_BYTE pixels
+        Foreign.withForeignPtr pixels $ \dest ->
+            SV.unsafeWith (Picture.imageData image) $ \ptr -> do
+                Foreign.copyBytes (Foreign.castPtr dest) ptr byteSize
+        return (Hree.MappingSource settings textureSource samplerParamValues)
 
     createMesh scene material = do
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 1 1 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1) GL.GL_FALSE 0

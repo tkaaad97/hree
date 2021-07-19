@@ -42,8 +42,8 @@ import qualified Data.Vector.Unboxed as UV (Vector, filter, filterM, foldl',
                                             last, length, mapM, null, scanl',
                                             thaw, uniq, zip, (!))
 import Data.Word (Word8)
-import qualified Foreign (allocaArray, castPtr, nullPtr, peek, peekElemOff,
-                          pokeElemOff, with)
+import qualified Foreign (allocaArray, castPtr, newForeignPtr_, nullPtr, peek,
+                          peekElemOff, pokeElemOff, with)
 import qualified FreeType
 import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
@@ -79,7 +79,7 @@ data UvInfo = UvInfo
     , uvInfoUvSize        :: !(V2 Float)
     } deriving (Show ,Eq)
 
-data MaterialInfo = MaterialInfo !Hree.SpriteMaterial !Hree.TextureAndSampler
+newtype MaterialInfo = MaterialInfo (Hree.MaterialId Hree.SpriteMaterialBlock)
 
 data GlyphInfo = GlyphInfo
     { glyphInfoCharcode :: !Char
@@ -319,7 +319,7 @@ createTextWithOption font text partialTextOption = do
     relocateOrigin _ OriginLocationFirstBaseLine (V2 ox oy) = V2 ox oy
     relocateOrigin bottom OriginLocationLastBaseLine (V2 ox oy) = V2 ox (oy + bottom)
 
-    createMesh fontState charPosVec materialIndex (MaterialInfo material _) = do
+    createMesh fontState charPosVec materialIndex (MaterialInfo materialId) = do
         let FontState _ _ glyphVec charUvMap _ _ = fontState
         xs <- fmap (UV.filter ((>= 0) . fst)) . flip UV.mapM charPosVec $ \(char, pos) -> do
             maybeUvInfo <- HT.lookup charUvMap char
@@ -336,7 +336,7 @@ createTextWithOption font text partialTextOption = do
             vs = SV.generate (UV.length xs) (toSpriteVertex origin glyphVec . (xs UV.!))
 
         let geo = Hree.addVerticesToGeometry Hree.spriteGeometry vs GL.GL_STATIC_READ
-        let mesh = Hree.Mesh geo material . Just . SV.length $ vs
+        let mesh = Hree.Mesh geo materialId . Just . SV.length $ vs
         Hree.addMesh scene mesh
 
 setFontPixelSize :: FontFace -> Int -> Int -> IO ()
@@ -404,25 +404,23 @@ loadCharactersIntoFont_ (Font scene (FontFace freeType face) fontOption sizeInfo
         return (GlyphInfo charcode (V2 w h) (V2 bx by) advance)
 
     createOrUpdateMaterial charUvMap materials glyphVec startGlyphIndex materialIndex (Packed layouts _) = do
+        pixels <- Foreign.newForeignPtr_ Foreign.nullPtr
         materialInfo <- if materialIndex >= BV.length materials
             then do
                 let settings = Hree.TextureSettings 1 GL.GL_RGBA8 (fromIntegral twidth) (fromIntegral theight) False
-                    sourceData = Hree.TextureSourceData 0 0 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE Foreign.nullPtr
-
-                (tname, texture) <- Hree.addTexture scene "textmesh" settings sourceData
-                (_, sampler) <- Hree.addSampler scene tname
-                let texture' = Hree.TextureAndSampler texture sampler
-                    material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, texture') }
-                    materialInfo = MaterialInfo material texture'
-                return materialInfo
+                    sourceData = Hree.TextureSourceData 0 0 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE pixels
+                    mapping = Hree.MappingSource settings sourceData []
+                let material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping) }
+                materialId <- Hree.addMaterial scene material
+                return (MaterialInfo materialId)
             else return (materials BV.! materialIndex)
 
         when (materialIndex >= BV.length materials - 1) $ do
-            let MaterialInfo _ (Hree.TextureAndSampler texture _) = materialInfo
+            let MaterialInfo materialId = materialInfo
                 addedLayouts = filter ((>= startGlyphIndex) . layoutIndex) layouts
 
             Foreign.allocaArray (pixelSizeX * pixelSizeY * 4) $ \p ->
-                mapM_ (renderBitmap p texture glyphVec) addedLayouts
+                mapM_ (renderBitmap p materialId glyphVec) addedLayouts
 
             mapM_ (insertCharUvMap charUvMap glyphVec materialIndex) addedLayouts
 
@@ -434,7 +432,7 @@ loadCharactersIntoFont_ (Font scene (FontFace freeType face) fontOption sizeInfo
             uvInfo = toUvInfo materialIndex (glyphInfoSize glyph) (Layout index p)
         HT.insert charUvMap char uvInfo
 
-    renderBitmap p texture glyphs (Layout index (V2 x y)) =
+    renderBitmap p materialId glyphs (Layout index (V2 x y)) =
         FreeType.ft_Bitmap_With freeType $ \convertBitmap -> do
             let charcode = glyphInfoCharcode $ glyphs BV.! index
             FreeType.ft_Load_Char face (fromIntegral $ ord charcode) FreeType.FT_LOAD_RENDER
@@ -457,7 +455,7 @@ loadCharactersIntoFont_ (Font scene (FontFace freeType face) fontOption sizeInfo
                     let (py, px) = divMod i (fromIntegral width)
                     color <- Foreign.peekElemOff buffer (py * fromIntegral pitch + px)
                     Foreign.pokeElemOff p i (V4 (255 - color) (255 - color) (255 - color) color)
-                GLW.glTextureSubImage2D texture 0 (fromIntegral x) (fromIntegral y) (fromIntegral width) (fromIntegral height) GL.GL_RGBA GL.GL_UNSIGNED_BYTE (Foreign.castPtr p)
+                Hree.updateMaterialMappingSubImage scene materialId Hree.BaseColorMapping (V2 x y) (V2 (fromIntegral width) (fromIntegral height)) (Foreign.castPtr p)
 
 findNewCharacters :: HT.BasicHashTable Char UvInfo -> String -> IO (UV.Vector Char)
 findNewCharacters charMap str = do

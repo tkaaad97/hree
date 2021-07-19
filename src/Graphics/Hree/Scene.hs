@@ -4,14 +4,13 @@
 module Graphics.Hree.Scene
     ( AddedMesh(..)
     , addLight
+    , addMaterial
     , addMesh
     , addNode
     , addNodeUniformBlock
     , addRootNodes
-    , addSampler
     , addSkin
     , addSkinnedMesh
-    , addTexture
     , applyTransformToNode
     , defaultRendererOption
     , deleteRenderer
@@ -30,6 +29,7 @@ module Graphics.Hree.Scene
     , rotateNode
     , translateNode
     , updateLight
+    , updateMaterialMappingSubImage
     , updateMeshInstanceCount
     , updateMeshVertexBuffer
     , updateNode
@@ -63,7 +63,8 @@ import qualified Data.Vector.Generic as GV (imapM_)
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word8)
 import Foreign (Ptr)
-import qualified Foreign (castPtr, copyArray, nullPtr, plusPtr, withArray)
+import qualified Foreign (castPtr, copyArray, newArray, newForeignPtr_, nullPtr,
+                          plusPtr, withForeignPtr)
 import GHC.TypeNats (KnownNat)
 import qualified GLW
 import qualified GLW.Groups.ClearBufferMask as ClearBufferMask
@@ -74,7 +75,8 @@ import qualified GLW.Internal.Groups as GLW (ClearBufferMask(..),
 import qualified Graphics.GL as GL
 import Graphics.Hree.Camera
 import Graphics.Hree.GL
-import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..))
+import Graphics.Hree.GL.Block (Block(..), Elem(..), Element(..), Std140(..))
+import Graphics.Hree.GL.Sampler (setSamplerParamValue)
 import Graphics.Hree.GL.Types
 import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
@@ -82,9 +84,8 @@ import Graphics.Hree.Material (defaultRenderOption, textureMappingUniformName)
 import Graphics.Hree.Math
 import Graphics.Hree.Mesh
 import Graphics.Hree.Program
-import Graphics.Hree.GL.Texture
 import Graphics.Hree.Types
-import Linear (V4(..), (!*!), (^+^))
+import Linear (V2(..), V4(..), (!*!), (^+^))
 import qualified Linear
 import qualified System.Random.MWC as Random (asGenIO, uniformR,
                                               withSystemRandom)
@@ -221,10 +222,10 @@ nodeToRenderInfos renderer scene state =
             inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
         meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
         meshInfo <- MaybeT $ Component.readComponent meshStore meshId
-        let pname = meshInfoProgram meshInfo
-            material = meshInfoMaterial meshInfo
-            pspec = materialInfoProgramSpec material
-            poption = materialInfoProgramOption material
+        let meshMaterial = meshInfoMaterial meshInfo
+            pname = meshMaterialProgramName meshMaterial
+            pspec = meshMaterialProgramSpec meshMaterial
+            poption = meshMaterialProgramOption meshMaterial
             maybeVao = meshInfoVertexArray meshInfo
             maybeSkinId = meshInfoSkin meshInfo
         (program, _) <- lift $ mkProgramIfNotExists renderer pspec poption pname
@@ -242,18 +243,18 @@ toRenderInfo program defaultTexture meshInfo vao skin matrix nodeUbs =
         renderInfo = RenderInfo program dm vao uniforms ubs textures roption
     in renderInfo
     where
-    material = meshInfoMaterial meshInfo
-    roption = materialInfoRenderOption material
+    meshMaterial = meshInfoMaterial meshInfo
+    roption = meshMaterialRenderOption meshMaterial
     dm = resolveDrawMethod meshInfo
     uniformLocations = programInfoUniformLocations program
     toUniformEntry (uniformName, uniform) = do
         uniformLocation <- Map.lookup uniformName uniformLocations
         return (uniformLocation, uniform)
-    mtextures = materialInfoMappings material
-    mtextureUnits = BV.map snd mtextures
-    textureUniforms = BV.imap (\i (a, _) -> (a, Uniform (fromIntegral i :: GL.GLint))) mtextures
-    textures = if BV.null mtextures
-        then BV.singleton defaultTexture
+    mappings = meshMaterialMappings meshMaterial
+    mtextureUnits = BV.fromList . Map.elems $ mappings
+    textureUniforms = BV.fromList (map (\(i, a) -> (a, Uniform (i :: GL.GLint))) ([0..] `zip` Map.keys mappings))
+    textures = if null mappings
+        then pure defaultTexture
         else mtextureUnits
     skinUbs Nothing = []
     skinUbs (Just x) =
@@ -261,7 +262,7 @@ toRenderInfo program defaultTexture meshInfo vao skin matrix nodeUbs =
             inv = (skinJointInverseMatricesBlockBindingIndex, getMatricesBlockBinderBuffer . skinJointInverseMatricesBinder $ x)
         in [joint, inv]
     ubs = BV.fromList . nubBy (\a b -> fst a == fst b)
-            $ nodeUbs ++ (materialBlockBindingIndex, materialInfoUniformBlock material) : skinUbs skin
+            $ nodeUbs ++ (materialBlockBindingIndex, meshMaterialUniformBlock meshMaterial) : skinUbs skin
     getMatricesBlockBinderBuffer (MatricesBlockBinder binder) = uniformBlockBinderBuffer binder
 
 resolveDrawMethod :: MeshInfo -> DrawMethod
@@ -281,6 +282,46 @@ resolveDrawMethod mesh =
     resolve _ (Just (IndexBuffer _ dt indicesCount offset)) (Just instanceCount) =
         DrawElementsInstanced PrimitiveType.glTriangles indicesCount dt (Foreign.nullPtr `Foreign.plusPtr` offset) instanceCount
 
+castMaterialId :: MaterialId a -> MaterialId b
+castMaterialId (MaterialId a) = MaterialId a
+
+addMaterial :: Block b => Scene -> Material b -> IO (MaterialId b)
+addMaterial scene material = do
+    let mappingSources = materialMappings material
+    mappings <- Map.fromList <$> mapM (\(k, v) -> (,) k <$> instantiateMapping v) mappingSources
+    materialInfo <- atomicModifyIORef' (sceneState scene) (addMaterialFunc mappings)
+    let materialId = materialInfoId materialInfo
+    Component.addComponent (sceneMaterialStore scene) materialId materialInfo
+    return . castMaterialId $ materialId
+
+    where
+    uniformBlockData = SV.unsafeCast . SV.singleton . Std140 . materialUniformBlock $ material
+    addMaterialFunc mappings state =
+        let materialId = ssMaterialCounter state
+            materialIdNext = materialId + 1
+            roption = applyPartialRenderOption defaultRenderOption $ materialRenderOption material
+            materialInfo = MaterialInfo
+                { materialInfoId = materialId
+                , materialInfoUniformBlock = uniformBlockData
+                , materialInfoMappings = mappings
+                , materialInfoRenderOption = roption
+                , materialInfoProgramOption = materialProgramOption material
+                , materialInfoProgramSpec = materialProgramSpec material
+                }
+            newState = state
+                { ssMaterialCounter = materialIdNext
+                }
+        in (newState, materialInfo)
+
+updateMaterialMappingSubImage :: Scene -> MaterialId a -> TextureMappingType  -> V2 Int -> V2 Int -> (Ptr ()) -> IO ()
+updateMaterialMappingSubImage scene materialId mappingType (V2 x y) (V2 width height) sourceData = do
+    materialInfo <- maybe throwNotFound return
+        =<< Component.readComponent (sceneMaterialStore scene) (castMaterialId materialId)
+    TextureAndSampler texture _ <- maybe throwNotFound return $ Map.lookup mappingType (materialInfoMappings materialInfo)
+    GLW.glTextureSubImage2D texture 0 (fromIntegral x) (fromIntegral y) (fromIntegral width) (fromIntegral height) GL.GL_RGBA GL.GL_UNSIGNED_BYTE (Foreign.castPtr sourceData)
+    where
+    throwNotFound = throwIO . userError $ "material not found. materialId: " ++ show materialId
+
 addMesh :: Block b => Scene -> Mesh b -> IO (AddedMesh b)
 addMesh scene mesh = addMesh_ scene mesh Nothing
 
@@ -290,38 +331,40 @@ addSkinnedMesh scene mesh skin = addMesh_ scene mesh (Just skin)
 addMesh_ :: Block b => Scene -> Mesh b -> Maybe SkinId -> IO (AddedMesh b)
 addMesh_ scene mesh maybeSkinId = do
     maybeSkin <- maybe (return Nothing) (Component.readComponent (sceneSkinStore scene)) maybeSkinId
-    let pspec = materialProgramSpec material
-        poption = resolveProgramOption mesh maybeSkin
-        pname = getProgramName pspec poption
-    (materialInfo, ubb) <- mkMaterialInfo poption
+    materialInfo <- maybe
+        (throwIO . userError $ "material not found. materialId: " ++ show materialId) return
+        =<< Component.readComponent (sceneMaterialStore scene) materialId
+    let roption = materialInfoRenderOption materialInfo
+        poption = meshProgramOption mesh materialInfo maybeSkin
+        pname = getProgramName (materialInfoProgramSpec materialInfo) poption
+    (meshMaterial, ubb) <- createMeshMaterialInfo materialInfo roption poption pname
     geoInfo <- instantiateGeometry geo
-    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc materialInfo geoInfo pname)
+    minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc meshMaterial geoInfo)
     let meshId = meshInfoId minfo
     Component.addComponent (sceneMeshStore scene) meshId minfo
     return $ AddedMesh meshId ubb
 
     where
-    material = meshMaterial mesh
+    materialId = castMaterialId . meshMaterialId $ mesh
     geo = meshGeometry mesh
     instanceCount = meshInstanceCount mesh
 
-    addMeshFunc materialInfo geoInfo p state =
+    addMeshFunc meshMaterial geoInfo state =
         let meshId = ssMeshCounter state
             meshIdNext = meshId + 1
-            minfo = MeshInfo meshId geoInfo materialInfo instanceCount maybeSkinId p Nothing
+            minfo = MeshInfo meshId geoInfo meshMaterial instanceCount maybeSkinId Nothing
             newState = state
                 { ssMeshCounter = meshIdNext
                 }
         in (newState, minfo)
 
-    mkMaterialInfo poption = do
-        let textures = BV.map (\(ttype, texture) -> (textureMappingUniformName ttype, texture)) $ materialMappings material
-            block = materialUniformBlock material
-            roption = applyPartialRenderOption defaultRenderOption $ materialRenderOption material
-            pspec = materialProgramSpec material
+    createMeshMaterialInfo materialInfo roption poption pname = do
+        let mappings = Map.fromList . map (\(ttype, mapping) -> (textureMappingUniformName ttype, mapping)) . Map.toList $ materialInfoMappings materialInfo
+            pspec = materialInfoProgramSpec materialInfo
+            block = unStd140 . SV.head . SV.unsafeCast . materialInfoUniformBlock $ materialInfo
         buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
         ubb <- newUniformBlockBinder buffer block
-        return (MaterialInfo buffer textures roption poption pspec, ubb)
+        return (MeshMaterial buffer mappings roption poption pspec pname, ubb)
 
 instantiateGeometry :: Geometry -> IO GeometryInfo
 instantiateGeometry geo = do
@@ -359,8 +402,8 @@ removeMesh scene meshId = do
         return =<< Component.readComponent (sceneMeshStore scene) meshId
     let vao = meshInfoVertexArray meshInfo
         geo = meshInfoGeometry meshInfo
-        material = meshInfoMaterial meshInfo
-        uniformBuffer = materialInfoUniformBlock material
+        meshMaterial = meshInfoMaterial meshInfo
+        uniformBuffer = meshMaterialUniformBlock meshMaterial
     maybe (return ()) GLW.deleteObject vao
     deleteGeometryBuffers geo
     GLW.deleteObject uniformBuffer
@@ -532,16 +575,12 @@ removeBufferResource scene buffer = do
         let buffers = filter (/= buffer) (ssBuffers state)
         in (state { ssBuffers = buffers }, ())
 
-addTexture :: Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D)
-addTexture scene name settings source =
-    maybe (throwIO . userError $ "addTextureInternal returned Nothing unexpectedly") return =<< addTextureInternal True scene name settings source
-
-addTextureInternal :: Bool -> Scene -> ByteString -> TextureSettings -> TextureSourceData -> IO (Maybe (ByteString, GLW.Texture 'GLW.GL_TEXTURE_2D))
-addTextureInternal renameOnConflict scene name settings source =
+instantiateMapping :: MappingSource -> IO TextureAndSampler
+instantiateMapping (MappingSource settings textureSource samplerParamValues) =
     bracketOnError
-        (GLW.createObject Proxy)
-        GLW.deleteObject
-        (addTextureAction renameOnConflict)
+        ((,) <$> GLW.createObject Proxy <*> GLW.createObject Proxy)
+        (\(a, b) -> GLW.deleteObject b >> GLW.deleteObject a)
+        initialize
 
     where
     levels = textureLevels settings
@@ -549,85 +588,19 @@ addTextureInternal renameOnConflict scene name settings source =
     width = textureWidth settings
     height = textureHeight settings
     generateMipmap = textureGenerateMipmap settings
-    swidth = sourceWidth source
-    sheight = sourceHeight source
-    format = coerce $ sourceFormat source
-    dataType = sourceDataType source
-    pixels = sourcePixels source
+    swidth = sourceWidth textureSource
+    sheight = sourceHeight textureSource
+    format = coerce $ sourceFormat textureSource
+    dataType = sourceDataType textureSource
+    pixels = sourcePixels textureSource
 
-    tryCount :: Int
-    tryCount = 10
-
-    addTextureAction True texture = do
-        r <- atomicModifyIORef' (sceneState scene) (addTextureFunc name texture)
-        name' <- maybe (tryAddTexture name texture tryCount) return r
-        _ <- initializeTexture texture
-        return $ Just (name', texture)
-
-    addTextureAction False texture = do
-        r <- atomicModifyIORef' (sceneState scene) (addTextureFunc name texture)
-        maybe (return Nothing) (\_ -> initializeTexture texture >> return (Just (name, texture))) r
-
-    initializeTexture texture = do
+    initialize (texture, sampler) = do
         GLW.glTextureStorage2D texture levels internalFormat width height
-        when (pixels /= Foreign.nullPtr) $ GLW.glTextureSubImage2D texture 0 0 0 swidth sheight format dataType pixels
+        Foreign.withForeignPtr pixels $ \ptr ->
+            when (ptr /= Foreign.nullPtr) $ GLW.glTextureSubImage2D texture 0 0 0 swidth sheight format dataType ptr
         when (levels > 1 && generateMipmap) $ GLW.glGenerateTextureMipmap texture
-        return texture
-
-    addTextureFunc name' texture state =
-        let (maybeHit, textures') = Map.insertLookupWithKey (\_ _ a -> a) name' texture (ssTextures state)
-        in maybe
-            (state { ssTextures = textures' }, Just name')
-            (const (state, Nothing))
-            maybeHit
-
-    randomLen = 8
-
-    tryAddTexture prefix texture count
-        | count == 0 = throwIO . userError $ "failed to addTexture"
-        | otherwise = do
-            name' <- genRandomName prefix randomLen
-            r <- atomicModifyIORef' (sceneState scene) (addTextureFunc name' texture)
-            maybe (tryAddTexture prefix texture (count - 1)) return r
-
-addSampler :: Scene -> ByteString -> IO (ByteString, GLW.Sampler)
-addSampler scene name =
-    maybe (throwIO . userError $ "addSamplerInternal returned Nothing unexpectedly") return =<< addSamplerInternal True scene name
-
-addSamplerInternal :: Bool -> Scene -> ByteString -> IO (Maybe (ByteString, GLW.Sampler))
-addSamplerInternal renameOnConflict scene name =
-    bracketOnError
-        (GLW.createObject Proxy)
-        GLW.deleteObject
-        (addSamplerAction renameOnConflict)
-
-    where
-    tryCount :: Int
-    tryCount = 10
-    addSamplerAction True sampler = do
-        r <- atomicModifyIORef' (sceneState scene) (addSamplerFunc name sampler)
-        name' <- maybe (tryAddSampler name sampler tryCount) return r
-        return $ Just (name', sampler)
-
-    addSamplerAction False sampler = do
-        r <- atomicModifyIORef' (sceneState scene) (addSamplerFunc name sampler)
-        maybe (return Nothing) (\name' -> return (Just (name', sampler))) r
-
-    addSamplerFunc name' sampler state =
-        let (maybeHit, samplers') = Map.insertLookupWithKey (\_ _ a -> a) name' sampler (ssSamplers state)
-        in maybe
-            (state { ssSamplers = samplers' }, Just name')
-            (const (state, Nothing))
-            maybeHit
-
-    randomLen = 8
-
-    tryAddSampler prefix sampler count
-        | count == 0 = throwIO . userError $ "failed to addSampler"
-        | otherwise = do
-            name' <- genRandomName prefix randomLen
-            r <- atomicModifyIORef' (sceneState scene) (addSamplerFunc name' sampler)
-            maybe (tryAddSampler prefix sampler (count - 1)) return r
+        mapM_ (setSamplerParamValue sampler) samplerParamValues
+        return (TextureAndSampler texture sampler)
 
 addLight :: Scene -> Light -> IO LightId
 addLight scene light = do
@@ -715,17 +688,16 @@ mkDefaultTextureIfNotExists scene = do
     maybe (mkDefaultTexture scene) return maybeDefaultTexture
 
 mkDefaultTexture :: Scene -> IO TextureAndSampler
-mkDefaultTexture scene = Foreign.withArray [255, 255, 255, 255] $ \p -> do
+mkDefaultTexture scene = do
+    p <- Foreign.newArray [255, 255, 255, 255]
+    pixels <- Foreign.newForeignPtr_ $ Foreign.castPtr (p :: Ptr Word8)
     let settings = TextureSettings 1 GL.GL_RGBA8 1 1 False
-        source = TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
-    (_, texture) <- addTexture scene defaultTextureName settings source
-    (_, sampler) <- addSampler scene defaultSamplerName
-    atomicModifyIORef' (sceneState scene) (setDefaultTexture (TextureAndSampler texture sampler))
-    return $ TextureAndSampler texture sampler
+        source = TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE pixels
+    defaultTexture <- instantiateMapping (MappingSource settings source [])
+    atomicModifyIORef' (sceneState scene) (setDefaultTexture defaultTexture)
+    return defaultTexture
 
     where
-    defaultTextureName = "default_texture"
-    defaultSamplerName = "default_sampler"
     setDefaultTexture a s =
         (s { ssDefaultTexture = Just a }, ())
 
@@ -773,6 +745,7 @@ mkMatricesBlockBinder scene mats = do
 newScene :: IO Scene
 newScene = do
     ref <- newIORef initialSceneState
+    materials <- Component.newComponentStore defaultPreserveSize Proxy
     meshes <- Component.newComponentStore defaultPreserveSize Proxy
     nodes <- Component.newComponentStore defaultPreserveSize Proxy
     transforms <- Component.newComponentStore defaultPreserveSize Proxy
@@ -780,14 +753,15 @@ newScene = do
     globalMatrices <- Component.newComponentStore defaultPreserveSize Proxy
     lights <- Component.newComponentStore maxLightCount Proxy
     skins <- Component.newComponentStore defaultPreserveSize Proxy
-    return $ Scene ref meshes nodes transforms matrices globalMatrices lights skins
+    return $ Scene ref materials meshes nodes transforms matrices globalMatrices lights skins
 
 defaultPreserveSize :: Int
 defaultPreserveSize = 10
 
 initialSceneState :: SceneState
 initialSceneState =
-    let meshCounter = MeshId 1
+    let materialCounter = MaterialId 1
+        meshCounter = MeshId 1
         nodeCounter = NodeId 1
         lightCounter = LightId 1
         skinCounter = SkinId 1
@@ -798,7 +772,7 @@ initialSceneState =
         defaultTexture = Nothing
         cameraBlockBinder = Nothing
         lightBlockBinder = Nothing
-    in SceneState meshCounter nodeCounter lightCounter skinCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder
+    in SceneState materialCounter meshCounter nodeCounter lightCounter skinCounter rootNodes buffers textures samplers defaultTexture cameraBlockBinder lightBlockBinder
 
 deleteScene :: Scene -> IO ()
 deleteScene scene = do

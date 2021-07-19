@@ -130,7 +130,8 @@ main =
                     , Material.roughnessFactor = 0
                     , Material.baseColorFactor = V4 0.1 0.1 0.8 1.0
                     }
-            mesh = Hree.Mesh geometry material Nothing
+        materialId <- Hree.addMaterial scene material
+        let mesh = Hree.Mesh geometry materialId Nothing
         meshId <- Hree.addedMeshId <$> Hree.addSkinnedMesh scene mesh skinId
 
         _ <- Hree.updateNode scene nodeId0 (\n -> n { Hree.nodeMesh = Just meshId })

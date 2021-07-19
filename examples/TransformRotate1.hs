@@ -26,7 +26,8 @@ main =
         scene <- Hree.newScene
         let geometry = Hree.boxGeometry 0.5 0.5 0.5
             material = Material.flatColorMaterial (V4 0.2 0.4 0.6 1)
-            mesh = Hree.Mesh geometry material Nothing
+        materialId <- Hree.addMaterial scene material
+        let mesh = Hree.Mesh geometry materialId Nothing
         meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
         nodeId <- Hree.addNode scene Hree.newNode{ Hree.nodeMesh = Just meshId } True
         camera <- Hree.newCamera proj la

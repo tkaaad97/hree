@@ -4,7 +4,7 @@
 {-# LANGUAGE GADTs                     #-}
 module Graphics.Hree.GL.Sampler
     ( SamplerParam(..)
-    , SamplerParamValue
+    , SamplerParamValue(..)
     , glTextureBorderColor
     , glTextureBorderColorIi
     , glTextureBorderColorIui

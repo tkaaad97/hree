@@ -1,9 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs     #-}
 module Graphics.Hree.GL.Texture
-    ( TextureSettings(..)
-    , TextureSourceData(..)
-    , TextureParam(..)
+    ( TextureParam(..)
     , glDepthStencilTextureMode
     , glTextureBaseLevel
     , glTextureCompareFunc
@@ -31,28 +29,11 @@ module Graphics.Hree.GL.Texture
     ) where
 
 import Data.Coerce (coerce)
-import Foreign (Ptr)
 import qualified Foreign (alloca, castPtr, peek, with)
 import qualified GLW
 import qualified GLW.Internal.Objects (Texture(..))
 import qualified Graphics.GL as GL
 import Linear (V4)
-
-data TextureSettings = TextureSettings
-    { textureLevels         :: !GL.GLint
-    , textureInternalFormat :: !GL.GLenum
-    , textureWidth          :: !GL.GLsizei
-    , textureHeight         :: !GL.GLsizei
-    , textureGenerateMipmap :: !Bool
-    } deriving (Show, Eq)
-
-data TextureSourceData = TextureSourceData
-    { sourceWidth    :: !GL.GLsizei
-    , sourceHeight   :: !GL.GLsizei
-    , sourceFormat   :: !GLW.PixelFormat
-    , sourceDataType :: !GL.GLenum
-    , sourcePixels   :: !(Ptr ())
-    }
 
 data TextureParam a where
     TextureParamGLint :: GL.GLenum -> TextureParam GL.GLint

@@ -2,14 +2,15 @@
 module NodeMeshAnimation1 where
 
 import qualified Chronos as Time (now)
-import qualified Codec.Picture as Picture (Image(..), convertRGBA8, readImage)
+import qualified Codec.Picture as Picture (Image(..), PixelRGBA8, convertRGBA8,
+                                           readImage)
 import Control.Concurrent (threadDelay)
 import Control.Exception (throwIO)
 import Data.Int (Int64)
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 import Example
-import qualified Foreign (castPtr)
+import qualified Foreign
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree as Hree
@@ -88,18 +89,18 @@ main =
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
 
-        material <- createMaterial scene
+        materialId <- createMaterial scene
 
-        stillFront <- createMesh scene material $ SV.head walkFrontUVs
-        stillBack <- createMesh scene material $ SV.head walkBackUVs
-        stillLeft <- createMesh scene material $ SV.head walkLeftUVs
-        stillRight <- createMesh scene material $ SV.head walkRightUVs
+        stillFront <- createMesh scene materialId $ SV.head walkFrontUVs
+        stillBack <- createMesh scene materialId $ SV.head walkBackUVs
+        stillLeft <- createMesh scene materialId $ SV.head walkLeftUVs
+        stillRight <- createMesh scene materialId $ SV.head walkRightUVs
         let node = Hree.newNode { Hree.nodeMesh = Just stillFront }
         nodeId <- Hree.addNode scene node True
-        walkFront <- createNodeMeshAnimation scene material nodeId walkFrontUVs
-        walkBack <- createNodeMeshAnimation scene material nodeId walkBackUVs
-        walkLeft <- createNodeMeshAnimation scene material nodeId walkLeftUVs
-        walkRight <- createNodeMeshAnimation scene material nodeId walkRightUVs
+        walkFront <- createNodeMeshAnimation scene materialId nodeId walkFrontUVs
+        walkBack <- createNodeMeshAnimation scene materialId nodeId walkBackUVs
+        walkLeft <- createNodeMeshAnimation scene materialId nodeId walkLeftUVs
+        walkRight <- createNodeMeshAnimation scene materialId nodeId walkRightUVs
         let characterInfo = CharacterInfo stillFront stillBack stillLeft stillRight walkFront walkBack walkLeft walkRight
 
         taskBoard <- Hree.newSceneTaskBoard scene
@@ -131,25 +132,34 @@ main =
 
     createMaterial scene = do
         image <- either (throwIO . userError) (return . Picture.convertRGBA8) =<< Picture.readImage imagePath
-        let settings = Hree.TextureSettings 1 GL.GL_RGBA8 twidth theight False
-        (_, texture) <- SV.unsafeWith (Picture.imageData image) $ \ptr -> do
-            let sourceData = Hree.TextureSourceData twidth theight PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr ptr)
-            Hree.addTexture scene "material1" settings sourceData
-        (_, sampler) <- Hree.addSampler scene "material1"
-        Hree.setSamplerParameter sampler Hree.glTextureMinFilter GL.GL_NEAREST
-        Hree.setSamplerParameter sampler Hree.glTextureMagFilter GL.GL_NEAREST
-        let material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, Hree.TextureAndSampler texture sampler) }
-        return material
+        mapping <- mkMappingSource image
+        let material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping) }
+        Hree.addMaterial scene material
 
-    createMesh scene material (V2 (V2 x y) (V2 w h)) = do
+    mkMappingSource :: Picture.Image Picture.PixelRGBA8 -> IO Hree.MappingSource
+    mkMappingSource image = do
+        let settings = Hree.TextureSettings 1 GL.GL_RGBA8 twidth theight False
+            byteSize = twidth * theight * 4
+            samplerParamValues =
+                [ Hree.SamplerParamValue Hree.glTextureMinFilter GL.GL_NEAREST
+                , Hree.SamplerParamValue Hree.glTextureMagFilter GL.GL_NEAREST
+                ]
+        pixels <- Foreign.mallocForeignPtrBytes (fromIntegral byteSize)
+        let textureSource = Hree.TextureSourceData twidth theight PixelFormat.glRgba GL.GL_UNSIGNED_BYTE pixels
+        Foreign.withForeignPtr pixels $ \dest ->
+            SV.unsafeWith (Picture.imageData image) $ \ptr -> do
+                Foreign.copyBytes (Foreign.castPtr dest) ptr (fromIntegral byteSize)
+        return (Hree.MappingSource settings textureSource samplerParamValues)
+
+    createMesh scene materialId (V2 (V2 x y) (V2 w h)) = do
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 (x / twidth') (y / theight')) (V2 (w / twidth') (h / theight')) GL.GL_FALSE 0
             geo' = Hree.addVerticesToGeometry Hree.spriteGeometry vs GL.GL_STATIC_READ
-        fmap Hree.addedMeshId . Hree.addMesh scene $ Hree.Mesh geo' material (Just 1)
+        fmap Hree.addedMeshId . Hree.addMesh scene $ Hree.Mesh geo' materialId (Just 1)
 
-    createMeshes scene material uvs = SV.mapM (createMesh scene material) uvs
+    createMeshes scene materialId uvs = SV.mapM (createMesh scene materialId) uvs
 
-    createNodeMeshAnimation scene material nodeId uvs = do
-        meshIds <- createMeshes scene material uvs
+    createNodeMeshAnimation scene materialId nodeId uvs = do
+        meshIds <- createMeshes scene materialId uvs
         return $ Hree.stepMesh scene nodeId timepoints meshIds
 
     keyCallback _ _ characterInfo taskBoard taskId _ key _ GLFW.KeyState'Pressed _ =

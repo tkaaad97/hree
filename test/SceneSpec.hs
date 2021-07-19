@@ -17,11 +17,11 @@ import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Internal.Objects as GLW (Buffer(..))
 import qualified Graphics.GL as GL
 import qualified Graphics.Hree.Geometry as Hree
+import qualified Graphics.Hree.GL.Texture as Hree
 import qualified Graphics.Hree.GL.Vertex as Hree
 import qualified Graphics.Hree.Material.TestMaterial as Hree
 import qualified Graphics.Hree.Mesh as Hree (Mesh(..))
 import qualified Graphics.Hree.Scene as Hree
-import qualified Graphics.Hree.GL.Texture as Hree
 import qualified Graphics.Hree.Types as Hree
 import Linear (V2(..), V3(..), V4(..))
 import Test.Hspec
@@ -46,8 +46,9 @@ spec = do
     describe "addMesh" $ do
         runOnOSMesaContext width height . it "change scene state" $ do
             scene <- Hree.newScene
+            materialId <- Hree.addMaterial scene material
             let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
-                mesh = Hree.Mesh geometry material Nothing
+                mesh = Hree.Mesh geometry materialId Nothing
             meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             meshId `shouldBe` Hree.MeshId 1
             counter <- getSceneProp scene Hree.ssMeshCounter
@@ -57,8 +58,9 @@ spec = do
 
         runOnOSMesaContext width height . specify "use same geometry twice" $ do
             scene <- Hree.newScene
+            materialId <- Hree.addMaterial scene material
             let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
-                mesh = Hree.Mesh geometry material Nothing
+                mesh = Hree.Mesh geometry materialId Nothing
             meshId1 <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             meshId1 `shouldBe` Hree.MeshId 1
             meshId2 <- Hree.addedMeshId <$> Hree.addMesh scene mesh
@@ -73,8 +75,9 @@ spec = do
     describe "removeMesh" $ do
         runOnOSMesaContext width height . it "remove mesh" $ do
             scene <- Hree.newScene
+            materialId <- Hree.addMaterial scene material
             let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
-                mesh = Hree.Mesh geometry material Nothing
+                mesh = Hree.Mesh geometry materialId Nothing
             meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
             assertBufferAlive (GLW.Buffer 1)
             assertBufferAlive (GLW.Buffer 2)
@@ -82,32 +85,14 @@ spec = do
             assertBufferDead (GLW.Buffer 1)
             assertBufferDead (GLW.Buffer 2)
 
-    describe "addTexture" $ do
-        runOnOSMesaContext width height . it "change scene state" . Foreign.withArray [0, 0, 0, 0] $ \p -> do
-            scene <- Hree.newScene
-            let textureSettings = Hree.TextureSettings 0 GL.GL_RGBA8 1 1 False
-                source = Hree.TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
-            r <- Hree.addTexture scene "texture1" textureSettings source
-            textures <- getSceneProp scene Hree.ssTextures
-            textures `shouldBe` Map.fromList [r]
-
-        runOnOSMesaContext width height . it "use a random name on name conflict" . Foreign.withArray [0, 0, 0, 0] $ \p -> do
-            scene <- Hree.newScene
-            let textureSettings = Hree.TextureSettings 0 GL.GL_RGBA8 1 1 False
-                source = Hree.TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
-            r1 <- Hree.addTexture scene "texture" textureSettings source
-            r2 <- Hree.addTexture scene "texture" textureSettings source
-            textures <- getSceneProp scene Hree.ssTextures
-            Map.size textures `shouldBe` 2
-            textures `shouldBe` Map.fromList [r1, r2]
-
     describe "deleteScene" $ do
         runOnOSMesaContext width height . it "delete meshes" $ do
             scene <- Hree.newScene
+            materialId <- Hree.addMaterial scene material
             let geometry1 = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 geometry2 = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
-                mesh1 = Hree.Mesh geometry1 material Nothing
-                mesh2 = Hree.Mesh geometry2 material Nothing
+                mesh1 = Hree.Mesh geometry1 materialId Nothing
+                mesh2 = Hree.Mesh geometry2 materialId Nothing
             _ <- Hree.addMesh scene mesh1
             _ <- Hree.addMesh scene mesh2
             meshSize <- Component.componentSize $ Hree.sceneMeshStore scene
@@ -123,15 +108,6 @@ spec = do
             assertBufferDead (GLW.Buffer 2)
             assertBufferDead (GLW.Buffer 3)
             assertBufferDead (GLW.Buffer 4)
-
-        runOnOSMesaContext width height . it "delete textures" . Foreign.withArray [0, 0, 0, 0] $ \p -> do
-            scene <- Hree.newScene
-            let textureSettings = Hree.TextureSettings 0 GL.GL_RGBA8 1 1 False
-                source = Hree.TextureSourceData 1 1 PixelFormat.glRgba GL.GL_UNSIGNED_BYTE (Foreign.castPtr (p :: Ptr Word8))
-            r <- Hree.addTexture scene "texture1" textureSettings source
-            (`shouldBe` Map.fromList [r]) =<< getSceneProp scene Hree.ssTextures
-            Hree.deleteScene scene
-            (`shouldBe` Map.empty) =<< getSceneProp scene Hree.ssTextures
 
     describe "addNode" $ do
         runOnOSMesaContext width height . it "add node" $ do

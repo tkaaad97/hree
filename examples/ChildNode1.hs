@@ -32,8 +32,10 @@ main =
         let geometry = Hree.boxGeometry 0.5 0.1 0.1
             material = Material.flatColorMaterial (V4 0.1 0.1 0.95 1)
             childMaterial = Material.flatColorMaterial (V4 0.95 0.1 0.1 1)
-            childMesh = Hree.Mesh geometry childMaterial Nothing
-            mesh = Hree.Mesh geometry material Nothing
+        materialId <- Hree.addMaterial scene material
+        childMaterialId <- Hree.addMaterial scene childMaterial
+        let childMesh = Hree.Mesh geometry childMaterialId Nothing
+            mesh = Hree.Mesh geometry materialId Nothing
         childMeshId <- Hree.addedMeshId <$> Hree.addMesh scene childMesh
         meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
 

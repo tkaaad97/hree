@@ -40,7 +40,8 @@ main = do
                     { Material.metallicFactor = metalness
                     , Material.roughnessFactor = roughness
                     }
-            mesh = Hree.Mesh geometry material Nothing
+        materialId <- Hree.addMaterial scene material
+        let mesh = Hree.Mesh geometry materialId Nothing
             light = Hree.directionalLight (V3 (-1) 0 (-5)) (V3 1 1 1) 1
         meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
         _ <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } True

@@ -8,13 +8,12 @@ module Graphics.Hree.Material
     , module Graphics.Hree.Material.StandardMaterial
     , module Graphics.Hree.Material.UserMaterial
     , defaultRenderOption
-    , materialHasTextureMapping
     , textureMappingUniformName
     ) where
 
 import Data.ByteString (ByteString)
+import qualified Data.List as List (find)
 import Data.Maybe (isJust)
-import qualified Data.Vector as BV (find)
 import qualified GLW.Groups.CullFaceMode as CullFaceMode
 import qualified GLW.Groups.DepthFunction as DepthFunction
 import qualified GLW.Groups.StencilFunction as StencilFunction
@@ -79,9 +78,6 @@ defaultFaceStencilOption = FaceStencilOption
     , faceStencilOptionStencilOp = StencilOpArgs StencilOp.glKeep StencilOp.glKeep StencilOp.glKeep
     , faceStencilOptionStencilMask = 0xFF
     }
-
-materialHasTextureMapping :: Material b -> TextureMappingType -> Bool
-materialHasTextureMapping material textureMappingType = isJust . BV.find ((== textureMappingType) . fst) $ materialMappings material
 
 textureMappingUniformName :: TextureMappingType -> ByteString
 textureMappingUniformName BaseColorMapping         = "baseColorMapping"
