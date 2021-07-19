@@ -81,7 +81,7 @@ fromBoolean = fromIntegral
 
 instance Block () where
     alignmentStd140 _ = 1
-    sizeOfStd140 _ = 0
+    sizeOfStd140 _ = 1
     peekByteOffStd140 _ _ = return ()
     pokeByteOffStd140 _ _ _ = return ()
 
