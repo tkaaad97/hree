@@ -43,8 +43,8 @@ main = do
         materialId <- Hree.addMaterial scene material
         let mesh = Hree.Mesh geometry materialId Nothing
             light = Hree.directionalLight (V3 (-1) 0 (-5)) (V3 1 1 1) 1
-        meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
-        _ <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } True
+        meshId <- Hree.addMesh scene mesh
+        _ <- Hree.addNode scene Hree.newNode (Just meshId) True
         _ <- Hree.addLight scene light
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera

@@ -19,14 +19,14 @@ import Linear (V2(..), V3(..))
 import Prelude hiding (init)
 
 data CharacterInfo = CharacterInfo
-    { meshStillFront     :: Hree.MeshId
-    , meshStillBack      :: Hree.MeshId
-    , meshStillLeft      :: Hree.MeshId
-    , meshStillRight     :: Hree.MeshId
-    , animationWalkFront :: Hree.AnimationClip
-    , animationWalkBack  :: Hree.AnimationClip
-    , animationWalkLeft  :: Hree.AnimationClip
-    , animationWalkRight :: Hree.AnimationClip
+    { meshStillFront     :: !(Hree.MeshId Hree.SpriteMaterialBlock)
+    , meshStillBack      :: !(Hree.MeshId Hree.SpriteMaterialBlock)
+    , meshStillLeft      :: !(Hree.MeshId Hree.SpriteMaterialBlock)
+    , meshStillRight     :: !(Hree.MeshId Hree.SpriteMaterialBlock)
+    , animationWalkFront :: !Hree.AnimationClip
+    , animationWalkBack  :: !Hree.AnimationClip
+    , animationWalkLeft  :: !Hree.AnimationClip
+    , animationWalkRight :: !Hree.AnimationClip
     } deriving (Show)
 
 main :: IO ()
@@ -95,8 +95,7 @@ main =
         stillBack <- createMesh scene materialId $ SV.head walkBackUVs
         stillLeft <- createMesh scene materialId $ SV.head walkLeftUVs
         stillRight <- createMesh scene materialId $ SV.head walkRightUVs
-        let node = Hree.newNode { Hree.nodeMesh = Just stillFront }
-        nodeId <- Hree.addNode scene node True
+        nodeId <- Hree.addNode scene Hree.newNode (Just stillFront) True
         walkFront <- createNodeMeshAnimation scene materialId nodeId walkFrontUVs
         walkBack <- createNodeMeshAnimation scene materialId nodeId walkBackUVs
         walkLeft <- createNodeMeshAnimation scene materialId nodeId walkLeftUVs
@@ -154,7 +153,7 @@ main =
     createMesh scene materialId (V2 (V2 x y) (V2 w h)) = do
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 (x / twidth') (y / theight')) (V2 (w / twidth') (h / theight')) GL.GL_FALSE 0
             geo' = Hree.addVerticesToGeometry Hree.spriteGeometry vs GL.GL_STATIC_READ
-        fmap Hree.addedMeshId . Hree.addMesh scene $ Hree.Mesh geo' materialId (Just 1)
+        Hree.addMesh scene $ Hree.Mesh geo' materialId (Just 1)
 
     createMeshes scene materialId uvs = SV.mapM (createMesh scene materialId) uvs
 
@@ -173,7 +172,7 @@ main =
         case resolveStillMesh characterInfo key of
             Just mesh -> do
                 Hree.modifySceneTask taskBoard (const Hree.Nop) taskId
-                _ <- Hree.updateNode scene nodeId (\node -> node { Hree.nodeMesh = Just mesh })
+                _ <- Hree.updateNodeMesh scene nodeId (Just mesh)
                 return ()
             Nothing -> return ()
 

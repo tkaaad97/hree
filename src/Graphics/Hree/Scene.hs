@@ -2,8 +2,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.Hree.Scene
-    ( AddedMesh(..)
-    , addLight
+    ( addLight
     , addMaterial
     , addMesh
     , addNode
@@ -33,8 +32,10 @@ module Graphics.Hree.Scene
     , updateLight
     , updateMaterialMappingSubImage
     , updateMeshInstanceCount
+    , updateMeshMaterialUniformBlock
     , updateMeshVertexBuffer
     , updateNode
+    , updateNodeMesh
     , materialBlockBindingIndex
     , cameraBlockBindingIndex
     , lightBlockBindingIndex
@@ -51,8 +52,8 @@ import Data.Bits ((.|.))
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import qualified Data.Component as Component
-import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import qualified Data.IntMap.Strict as IntMap
+import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.List (nubBy)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, isJust)
@@ -62,8 +63,7 @@ import qualified Data.Vector.Generic as GV (imapM_)
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word8)
 import Foreign (Ptr)
-import qualified Foreign (castPtr, newArray, newForeignPtr_, nullPtr, plusPtr,
-                          withForeignPtr)
+import qualified Foreign
 import GHC.TypeNats (KnownNat)
 import qualified GLW
 import qualified GLW.Groups.ClearBufferMask as ClearBufferMask
@@ -86,11 +86,6 @@ import Graphics.Hree.Program
 import Graphics.Hree.Types
 import Linear (V2(..), V4(..), (!*!), (^+^))
 import qualified Linear
-
-data AddedMesh b = AddedMesh
-    { addedMeshId                         :: !MeshId
-    , addedMeshMaterialUniformBlockBinder :: !(UniformBlockBinder b)
-    }
 
 renderScene :: Renderer -> Scene -> Camera -> IO ()
 renderScene renderer scene camera = do
@@ -217,7 +212,7 @@ nodeToRenderInfos renderer scene state =
     f node = do
         let nodeId = nodeInfoId node
             inverseBindMatrix = nodeInverseBindMatrix . nodeInfoNode $ node
-        meshId <- MaybeT . return . nodeMesh . nodeInfoNode $ node
+        meshId <- MaybeT . return . nodeInfoMesh $ node
         meshInfo <- MaybeT $ Component.readComponent meshStore meshId
         let meshMaterial = meshInfoMaterial meshInfo
             pname = meshMaterialProgramName meshMaterial
@@ -259,7 +254,7 @@ toRenderInfo program defaultTexture meshInfo vao skin matrix nodeUbs =
             inv = (skinJointInverseMatricesBlockBindingIndex, getMatricesBlockBinderBuffer . skinJointInverseMatricesBinder $ x)
         in [joint, inv]
     ubs = BV.fromList . nubBy (\a b -> fst a == fst b)
-            $ nodeUbs ++ (materialBlockBindingIndex, meshMaterialUniformBlock meshMaterial) : skinUbs skin
+            $ nodeUbs ++ (materialBlockBindingIndex, snd (meshMaterialUniformBlock meshMaterial)) : skinUbs skin
     getMatricesBlockBinderBuffer (MatricesBlockBinder binder) = uniformBlockBinderBuffer binder
 
 resolveDrawMethod :: MeshInfo -> DrawMethod
@@ -333,13 +328,16 @@ removeMaterialIfUnused scene materialId = do
     materialId' = castMaterialId materialId
     materialStore = sceneMaterialStore scene
 
-addMesh :: Block b => Scene -> Mesh b -> IO (AddedMesh b)
+castMeshId :: MeshId a -> MeshId b
+castMeshId (MeshId a) = MeshId a
+
+addMesh :: Block b => Scene -> Mesh b -> IO (MeshId b)
 addMesh scene mesh = addMesh_ scene mesh Nothing
 
-addSkinnedMesh :: Block b => Scene -> Mesh b -> SkinId -> IO (AddedMesh b)
+addSkinnedMesh :: Block b => Scene -> Mesh b -> SkinId -> IO (MeshId b)
 addSkinnedMesh scene mesh skin = addMesh_ scene mesh (Just skin)
 
-addMesh_ :: Block b => Scene -> Mesh b -> Maybe SkinId -> IO (AddedMesh b)
+addMesh_ :: Block b => Scene -> Mesh b -> Maybe SkinId -> IO (MeshId b)
 addMesh_ scene mesh maybeSkinId = do
     maybeSkin <- maybe (return Nothing) (Component.readComponent (sceneSkinStore scene)) maybeSkinId
     materialInfo <- maybe
@@ -348,12 +346,12 @@ addMesh_ scene mesh maybeSkinId = do
     let roption = materialInfoRenderOption materialInfo
         poption = meshProgramOption mesh materialInfo maybeSkin
         pname = getProgramName (materialInfoProgramSpec materialInfo) poption
-    (meshMaterial, ubb) <- createMeshMaterialInfo materialInfo roption poption pname
+    meshMaterial <- createMeshMaterialInfo materialInfo roption poption pname
     geoInfo <- instantiateGeometry geo
     minfo <- atomicModifyIORef' (sceneState scene) (addMeshFunc meshMaterial geoInfo)
     let meshId = meshInfoId minfo
     Component.addComponent (sceneMeshStore scene) meshId minfo
-    return $ AddedMesh meshId ubb
+    return . castMeshId $ meshId
 
     where
     materialId = castMaterialId . meshMaterialId $ mesh
@@ -373,9 +371,18 @@ addMesh_ scene mesh maybeSkinId = do
         let mappings = Map.fromList . map (\(ttype, mapping) -> (textureMappingUniformName ttype, mapping)) . Map.toList $ materialInfoMappings materialInfo
             pspec = materialInfoProgramSpec materialInfo
             block = unStd140 . SV.head . SV.unsafeCast . materialInfoUniformBlock $ materialInfo
+
+        ptr <- Foreign.mallocForeignPtrBytes (sizeOfStd140 mesh)
+        Foreign.withForeignPtr ptr $ \p -> pokeBlock p mesh block
+
         buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
-        ubb <- newUniformBlockBinder buffer block
-        return (MeshMaterial materialId buffer mappings roption poption pspec pname, ubb)
+        updateBuffer buffer (BufferSourceVector (materialInfoUniformBlock materialInfo) GL.GL_DYNAMIC_DRAW)
+
+        return (MeshMaterial materialId (Foreign.castForeignPtr ptr, buffer) mappings roption poption pspec pname)
+
+    pokeBlock :: Block b => Ptr () -> proxy b -> b -> IO ()
+    pokeBlock ptr _ block = do
+        Foreign.poke (Foreign.castPtr ptr) (Std140 block)
 
 instantiateGeometry :: Geometry -> IO GeometryInfo
 instantiateGeometry geo = do
@@ -406,19 +413,19 @@ mkMeshVertexArray scene meshInfo program =
         void $ Component.modifyComponent meshStore (setVao vao) meshId
         return vao
 
-removeMesh :: Scene -> MeshId -> IO ()
+removeMesh :: Scene -> MeshId b -> IO ()
 removeMesh scene meshId = do
     meshInfo <- maybe
         (throwIO . userError $ "mesh not found. meshId: " ++ show meshId)
-        return =<< Component.readComponent (sceneMeshStore scene) meshId
+        return =<< Component.readComponent (sceneMeshStore scene) (castMeshId meshId)
     let vao = meshInfoVertexArray meshInfo
         geo = meshInfoGeometry meshInfo
         meshMaterial = meshInfoMaterial meshInfo
-        uniformBuffer = meshMaterialUniformBlock meshMaterial
+        uniformBuffer = snd . meshMaterialUniformBlock $ meshMaterial
     maybe (return ()) GLW.deleteObject vao
     deleteGeometryBuffers geo
     GLW.deleteObject uniformBuffer
-    meshRemoved <- Component.removeComponent (sceneMeshStore scene) meshId
+    meshRemoved <- Component.removeComponent (sceneMeshStore scene) (castMeshId meshId)
     unless meshRemoved
         . throwIO . userError $ "failed to remove mesh component. meshId: " ++ show meshId
     where
@@ -426,8 +433,8 @@ removeMesh scene meshId = do
         let buffers = fmap fst . IntMap.elems . geometryInfoBuffers $ geo
         mapM_ GLW.deleteObject buffers
 
-addNode :: Scene -> Node -> Bool -> IO NodeId
-addNode scene node isRoot = do
+addNode :: Scene -> Node -> Maybe (MeshId a) -> Bool -> IO NodeId
+addNode scene node mesh isRoot = do
     nodeInfo <- atomicModifyIORef' (sceneState scene) addNodeFunc
     let nodeId = nodeInfoId nodeInfo
         transform = Transform (nodeTranslation node) (nodeRotation node) (nodeScale node)
@@ -446,7 +453,7 @@ addNode scene node isRoot = do
             rootNodes = if isRoot
                 then BV.snoc (ssRootNodes state) nodeId
                 else ssRootNodes state
-            nodeInfo = NodeInfo nodeId node mempty
+            nodeInfo = NodeInfo nodeId node (castMeshId <$> mesh) mempty
             newState = state
                 { ssNodeCounter = nodeIdNext
                 , ssRootNodes = rootNodes
@@ -455,7 +462,7 @@ addNode scene node isRoot = do
 
 addNodeUniformBlock :: (Block a) => Scene -> NodeId -> UniformBufferBindingIndex -> a -> IO (UniformBlockBinder a)
 addNodeUniformBlock scene nodeId bindingIndex a = do
-    binder <- mkBlockBinder scene a
+    binder <- mkBlockBinder a
     let buffer = uniformBlockBinderBuffer binder
     void $ Component.modifyComponent nodeStore (f buffer) nodeId
     return binder
@@ -511,6 +518,13 @@ updateNode scene nodeId f =
     nodeStore = sceneNodeStore scene
     g a = a { nodeInfoNode = f (nodeInfoNode a) }
 
+updateNodeMesh :: Scene -> NodeId -> (Maybe (MeshId a)) -> IO Bool
+updateNodeMesh scene nodeId mesh =
+    Component.modifyComponent nodeStore g nodeId
+    where
+    nodeStore = sceneNodeStore scene
+    g a = a { nodeInfoMesh = castMeshId <$> mesh }
+
 addRootNodes :: Scene -> BV.Vector NodeId -> IO ()
 addRootNodes scene nodeIds = atomicModifyIORef' (sceneState scene) addRootNodesFunc
     where
@@ -520,7 +534,7 @@ addRootNodes scene nodeIds = atomicModifyIORef' (sceneState scene) addRootNodesF
         in (state', ())
 
 newNode :: Node
-newNode = Node Nothing Nothing BV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1) Linear.identity
+newNode = Node Nothing BV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1) Linear.identity
 
 translateNode :: Scene -> NodeId -> Vec3 -> IO ()
 translateNode scene nodeId v = applyTransformToNode scene nodeId f
@@ -543,18 +557,34 @@ applyTransformToNode scene nodeId f =
     transformStore = sceneNodeTransformStore scene
     g tinfo @ (TransformInfo transform _ _) = tinfo { transformInfoTransform = f transform, transformInfoUpdated = True }
 
-updateMeshInstanceCount :: Scene -> MeshId -> Maybe Int -> IO ()
+updateMeshInstanceCount :: Scene -> MeshId b -> Maybe Int -> IO ()
 updateMeshInstanceCount scene meshId c =
-    void $ Component.modifyComponent meshStore f meshId
+    void $ Component.modifyComponent meshStore f (castMeshId meshId)
     where
     f m = m { meshInfoInstanceCount = c }
     meshStore = sceneMeshStore scene
 
-updateMeshVertexBuffer :: Scene -> MeshId -> Int -> (Ptr () -> IO ()) -> IO ()
+updateMeshMaterialUniformBlock :: (Block b) => Scene -> MeshId b -> (b -> b) -> IO ()
+updateMeshMaterialUniformBlock scene meshId f = do
+    meshInfo <- maybe
+        (throwIO . userError $ "mesh not found. meshId: " ++ show meshId)
+        return =<< Component.readComponent meshStore (castMeshId meshId)
+    let (p, buffer) = meshMaterialUniformBlock . meshInfoMaterial $ meshInfo
+    Foreign.withForeignPtr p $ \ptr -> do
+        updated <- fmap (Std140 . f . unStd140) . Foreign.peek . Foreign.castPtr $ ptr
+        Foreign.poke (Foreign.castPtr ptr) updated
+        updateBuffer' buffer ptr
+    where
+    meshStore = sceneMeshStore scene
+    size = sizeOfStd140 meshId
+    updateBuffer' buffer ptr =
+        GLW.glNamedBufferSubData buffer 0 (fromIntegral size) (Foreign.castPtr ptr)
+
+updateMeshVertexBuffer :: Scene -> MeshId b -> Int -> (Ptr () -> IO ()) -> IO ()
 updateMeshVertexBuffer scene meshId bindingIndex f = do
     meshInfo <- maybe
         (throwIO . userError $ "mesh not found. meshId: " ++ show meshId)
-        return =<< Component.readComponent meshStore meshId
+        return =<< Component.readComponent meshStore (castMeshId meshId)
     let geo = meshInfoGeometry meshInfo
     buffer <- maybe
         (throwIO . userError $ "bindingIndex not found. meshId: " ++ show meshId ++ " bindingIndex: " ++ show bindingIndex)
@@ -626,8 +656,8 @@ addSkin scene nodeId joints inverseBindMatrices = do
             if invLen < len
                 then SV.map Elem inverseBindMatrices `mappend` SV.replicate (len - invLen) (Elem Linear.identity)
                 else SV.map Elem . SV.slice 0 len $ inverseBindMatrices
-    jointMatBinder <- mkMatricesBlockBinder scene jointMats
-    invMatBinder <- mkMatricesBlockBinder scene invMats
+    jointMatBinder <- mkMatricesBlockBinder jointMats
+    invMatBinder <- mkMatricesBlockBinder invMats
     let skin = Skin skinId' nodeId inverseBindMatrices joints jointMatBinder invMatBinder
     Component.addComponent (sceneSkinStore scene) skinId' skin
     return skinId'
@@ -703,14 +733,14 @@ mkDefaultTexture scene = do
     setDefaultTexture a s =
         (s { ssDefaultTexture = Just a }, ())
 
-mkBlockBinder :: Block a => Scene -> a -> IO (UniformBlockBinder a)
-mkBlockBinder scene block = do
+mkBlockBinder :: Block a => a -> IO (UniformBlockBinder a)
+mkBlockBinder block = do
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     newUniformBlockBinder buffer block
 
 mkCameraBlockBinder :: Scene -> CameraBlock -> IO (UniformBlockBinder CameraBlock)
 mkCameraBlockBinder scene block = do
-    ubb <- mkBlockBinder scene block
+    ubb <- mkBlockBinder block
     atomicModifyIORef' (sceneState scene) (setCameraBlockBinder ubb)
     return ubb
     where
@@ -719,15 +749,15 @@ mkCameraBlockBinder scene block = do
 
 mkLightBlockBinder :: Scene -> LightBlock -> IO (UniformBlockBinder LightBlock)
 mkLightBlockBinder scene block = do
-    ubb <- mkBlockBinder scene block
+    ubb <- mkBlockBinder block
     atomicModifyIORef' (sceneState scene) (setLightBlockBinder ubb)
     return ubb
     where
     setLightBlockBinder ubb s =
         (s { ssLightBlockBinder = Just ubb }, ())
 
-mkMatricesBlockBinder :: Scene -> SV.Vector (Elem Mat4) -> IO MatricesBlockBinder
-mkMatricesBlockBinder scene mats = do
+mkMatricesBlockBinder :: SV.Vector (Elem Mat4) -> IO MatricesBlockBinder
+mkMatricesBlockBinder mats = do
     buffer <- GLW.createObject (Proxy :: Proxy GLW.Buffer)
     go buffer
 

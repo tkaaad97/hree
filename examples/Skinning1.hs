@@ -118,9 +118,9 @@ main =
         let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                         `Hree.setIndexBufferSourceUInt` indices
 
-        nodeId2 <- Hree.addNode scene Hree.newNode { Hree.nodeRotation = Quaternion 1 (V3 0 0 0) } False
-        nodeId1 <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.singleton nodeId2, Hree.nodeTranslation = V3 0 1 0 } False
-        nodeId0 <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.singleton nodeId1 } True
+        nodeId2 <- Hree.addNode scene Hree.newNode { Hree.nodeRotation = Quaternion 1 (V3 0 0 0) } Nothing False
+        nodeId1 <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.singleton nodeId2, Hree.nodeTranslation = V3 0 1 0 } Nothing False
+        nodeId0 <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.singleton nodeId1 } Nothing True
 
         skinId <- Hree.addSkin scene nodeId0 (SV.fromList [nodeId1, nodeId2]) invMats
 
@@ -132,9 +132,9 @@ main =
                     }
         materialId <- Hree.addMaterial scene material
         let mesh = Hree.Mesh geometry materialId Nothing
-        meshId <- Hree.addedMeshId <$> Hree.addSkinnedMesh scene mesh skinId
+        meshId <- Hree.addSkinnedMesh scene mesh skinId
 
-        _ <- Hree.updateNode scene nodeId0 (\n -> n { Hree.nodeMesh = Just meshId })
+        _ <- Hree.updateNodeMesh scene nodeId0 (Just meshId)
 
         let track = Hree.linearRotation timePoints rotations
             animation = Hree.singleTransformClip nodeId2 track

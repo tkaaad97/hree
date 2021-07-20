@@ -53,7 +53,7 @@ spec = do
     describe "applyAnimation" $ do
         it "transform a node" $ do
             scene <- Hree.newScene
-            nodeId <- Hree.addNode scene Hree.newNode True
+            nodeId <- Hree.addNode scene Hree.newNode Nothing True
             let timepoints = UV.fromList [0, 10, 20]
                 v1 = V3 0 0 0
                 v2 = V3 10 10 0

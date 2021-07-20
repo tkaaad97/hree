@@ -80,7 +80,7 @@ spec = do
             materialSize `shouldBe` 1
             let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh = Hree.Mesh geometry materialId Nothing
-            meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+            meshId <- Hree.addMesh scene mesh
 
             -- should not be deleted at here
             Hree.removeMaterialIfUnused scene materialId
@@ -102,7 +102,7 @@ spec = do
             materialId <- Hree.addMaterial scene material
             let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh = Hree.Mesh geometry materialId Nothing
-            meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+            meshId <- Hree.addMesh scene mesh
             meshId `shouldBe` Hree.MeshId 1
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 2
@@ -114,9 +114,9 @@ spec = do
             materialId <- Hree.addMaterial scene material
             let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh = Hree.Mesh geometry materialId Nothing
-            meshId1 <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+            meshId1 <- Hree.addMesh scene mesh
             meshId1 `shouldBe` Hree.MeshId 1
-            meshId2 <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+            meshId2 <- Hree.addMesh scene mesh
             meshId2 `shouldBe` Hree.MeshId 2
             counter <- getSceneProp scene Hree.ssMeshCounter
             counter `shouldBe` 3
@@ -131,7 +131,7 @@ spec = do
             materialId <- Hree.addMaterial scene material
             let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh = Hree.Mesh geometry materialId Nothing
-            meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+            meshId <- Hree.addMesh scene mesh
             assertBufferAlive (GLW.Buffer 1)
             assertBufferAlive (GLW.Buffer 2)
             Hree.removeMesh scene meshId
@@ -181,9 +181,9 @@ spec = do
         runOnOSMesaContext width height . it "add node" $ do
             scene <- Hree.newScene
             let node1 = Hree.newNode { Hree.nodeTranslation = V3 0.5 0 0 }
-            node1Id <- Hree.addNode scene node1 False
+            node1Id <- Hree.addNode scene node1 Nothing False
             let node2 = Hree.newNode { Hree.nodeChildren = BV.singleton node1Id }
-            node2Id <- Hree.addNode scene node2 True
+            node2Id <- Hree.addNode scene node2 Nothing True
             (`shouldBe` Just node1) =<< Hree.readNode scene node1Id
             (`shouldBe` Just node2) =<< Hree.readNode scene node2Id
             (`shouldBe` BV.singleton node2Id) =<< getSceneProp scene Hree.ssRootNodes
@@ -192,10 +192,10 @@ spec = do
         runOnOSMesaContext width height . it "remoove node" $ do
             scene <- Hree.newScene
             let node1 = Hree.newNode { Hree.nodeTranslation = V3 0.5 0 0 }
-            node1Id <- Hree.addNode scene node1 False
+            node1Id <- Hree.addNode scene node1 Nothing False
             let node2 = Hree.newNode { Hree.nodeChildren = BV.singleton node1Id }
-            node2Id <- Hree.addNode scene node2 True
-            node3Id <- Hree.addNode scene Hree.newNode True
+            node2Id <- Hree.addNode scene node2 Nothing True
+            node3Id <- Hree.addNode scene Hree.newNode Nothing True
             (`shouldBe` Just node1) =<< Hree.readNode scene node1Id
             (`shouldBe` Just node2) =<< Hree.readNode scene node2Id
             (`shouldBe` BV.fromList [node2Id, node3Id]) =<< getSceneProp scene Hree.ssRootNodes

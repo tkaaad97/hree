@@ -66,8 +66,8 @@ main = do
             let material = Material.basicMaterial $ V3 0.5 (-1) (-0.5)
             materialId <- Hree.addMaterial scene material
             let mesh = Hree.Mesh geometry materialId Nothing
-            meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
-            void $ Hree.addNode scene Hree.newNode{ Hree.nodeMesh = Just meshId } True
+            meshId <- Hree.addMesh scene mesh
+            void $ Hree.addNode scene Hree.newNode (Just meshId) True
             return Nothing
 
     onDisplay (r, s, c, Just taskBoard) w = do

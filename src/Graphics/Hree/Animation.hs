@@ -47,8 +47,8 @@ import qualified Data.Vector.Storable as SV (Vector)
 import qualified Data.Vector.Unboxed as UV (Vector, head, last, length, null,
                                             (!))
 import Graphics.Hree.Math (Quaternion, Transform(..), Vec3)
-import Graphics.Hree.Scene (applyTransformToNode, updateNode)
-import Graphics.Hree.Types (MeshId, Node(nodeMesh), NodeId, Scene)
+import Graphics.Hree.Scene (applyTransformToNode, updateNodeMesh)
+import Graphics.Hree.Types (MeshId, NodeId, Scene)
 import Linear (Additive(..), slerp, (*^), (^/))
 
 data Interpolation =
@@ -174,10 +174,10 @@ animationClipVariation channels =
         duration = channelsDuration channels'
     in AnimationClip channels' duration
 
-stepMesh :: Scene -> NodeId -> UV.Vector Int64 -> SV.Vector MeshId -> AnimationClip
+stepMesh :: Scene -> NodeId -> UV.Vector Int64 -> SV.Vector (MeshId a) -> AnimationClip
 stepMesh scene nodeId times values = AnimationClip (BV.singleton (AnimationChannelVariation $ VariationChannel setter key)) duration
     where
-    setter mesh = void $ updateNode scene nodeId $ \n -> n { nodeMesh = Just mesh }
+    setter mesh = void $ updateNodeMesh scene nodeId (Just mesh)
     key = KeyFrames InterpolationStep times (VariationTrackDiscrete values)
     duration = keyFrameTracksDuration (BV.singleton key)
 

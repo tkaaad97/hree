@@ -36,24 +36,22 @@ main =
         childMaterialId <- Hree.addMaterial scene childMaterial
         let childMesh = Hree.Mesh geometry childMaterialId Nothing
             mesh = Hree.Mesh geometry materialId Nothing
-        childMeshId <- Hree.addedMeshId <$> Hree.addMesh scene childMesh
-        meshId <- Hree.addedMeshId <$> Hree.addMesh scene mesh
+        childMeshId <- Hree.addMesh scene childMesh
+        meshId <- Hree.addMesh scene mesh
 
         let childNode = Hree.newNode
-                { Hree.nodeMesh = Just childMeshId
-                , Hree.nodeTranslation = V3 0.5 0 0
+                { Hree.nodeTranslation = V3 0.5 0 0
                 , Hree.nodeScale = V3 0.5 1 1
                 , Hree.nodeInverseBindMatrix = inverseBindMatrix
                 }
-        childNodeId <- Hree.addNode scene childNode False
+        childNodeId <- Hree.addNode scene childNode (Just childMeshId) False
 
         let node = Hree.newNode
-                { Hree.nodeMesh = Just meshId
-                , Hree.nodeTranslation = V3 0 0 0
+                { Hree.nodeTranslation = V3 0 0 0
                 , Hree.nodeChildren = BV.fromList [childNodeId]
                 , Hree.nodeInverseBindMatrix = inverseBindMatrix
                 }
-        nodeId <- Hree.addNode scene node True
+        nodeId <- Hree.addNode scene node (Just meshId) True
 
         let ms = 1000000
             timepoints = UV.fromList . map (* ms) $ [0, 5000, 10000]

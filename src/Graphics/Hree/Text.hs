@@ -270,10 +270,9 @@ createTextWithOption font text partialTextOption = do
 
     charPosVec <- UV.zip charVec . UV.scanl' (calcCharPos 0) (V2 0 0) <$> UV.mapM (getCharAdvance glyphVec charUvMap) charVec
 
-    meshIds <- BV.map Hree.addedMeshId <$>
-        BV.imapM (createMesh fontState charPosVec) materials
-    childNodeIds <- mapM (\meshId -> Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False) meshIds
-    Hree.addNode scene Hree.newNode { Hree.nodeChildren = childNodeIds } False
+    meshIds <- BV.imapM (createMesh fontState charPosVec) materials
+    childNodeIds <- mapM (\meshId -> Hree.addNode scene Hree.newNode (Just meshId) False) meshIds
+    Hree.addNode scene Hree.newNode { Hree.nodeChildren = childNodeIds } Nothing False
 
     where
     Font scene _ _ sizeInfo _ = font

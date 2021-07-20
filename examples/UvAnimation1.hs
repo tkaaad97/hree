@@ -81,10 +81,9 @@ main =
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         (material, materialId) <- createMaterial scene (uvOffset $ UV.head walkFrontUVs)
-        Hree.AddedMesh meshId _ <- createMesh scene materialId (V2 16 (-16))
+        meshId <- createMesh scene materialId (V2 16 (-16))
 
-        let node = Hree.newNode { Hree.nodeMesh = Just meshId }
-        nodeId <- Hree.addNode scene node True
+        nodeId <- Hree.addNode scene Hree.newNode (Just meshId) True
         uniformBlockBinder <- Hree.addNodeUniformBlock scene nodeId Hree.materialBlockBindingIndex (Hree.materialUniformBlock material)
 
         let walkFront = createUvAnimation uniformBlockBinder walkFrontUVs

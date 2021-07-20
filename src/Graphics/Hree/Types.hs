@@ -126,7 +126,7 @@ data MaterialInfo = MaterialInfo
 
 data MeshMaterial = MeshMaterial
     { meshMaterialMaterialId    :: !(MaterialId ())
-    , meshMaterialUniformBlock  :: !GLW.Buffer
+    , meshMaterialUniformBlock  :: !(ForeignPtr (), GLW.Buffer)
     , meshMaterialMappings      :: !(Map ByteString TextureAndSampler)
     , meshMaterialRenderOption  :: !RenderOption
     , meshMaterialProgramOption :: !ProgramOption
@@ -142,7 +142,7 @@ newtype LightId = LightId
     { unLightId :: Int
     } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
 
-newtype MeshId = MeshId
+newtype MeshId a = MeshId
     { unMeshId :: Int
     } deriving (Show, Eq, Ord, Enum, Hashable, Num, Storable)
 
@@ -153,7 +153,7 @@ data Mesh b = Mesh
     } deriving (Show)
 
 data MeshInfo = MeshInfo
-    { meshInfoId            :: !MeshId
+    { meshInfoId            :: !(MeshId ())
     , meshInfoGeometry      :: !GeometryInfo
     , meshInfoMaterial      :: !MeshMaterial
     , meshInfoInstanceCount :: !(Maybe Int)
@@ -171,7 +171,6 @@ newtype SkinId = SkinId
 
 data Node = Node
     { nodeName              :: !(Maybe Text)
-    , nodeMesh              :: !(Maybe MeshId)
     , nodeChildren          :: !(BV.Vector NodeId)
     , nodeTranslation       :: !Vec3
     , nodeRotation          :: !Quaternion
@@ -182,6 +181,7 @@ data Node = Node
 data NodeInfo = NodeInfo
     { nodeInfoId            :: !NodeId
     , nodeInfoNode          :: !Node
+    , nodeInfoMesh          :: !(Maybe (MeshId ()))
     , nodeInfoUniformBlocks :: ![(UniformBufferBindingIndex, GLW.Buffer)]
     } deriving (Show, Eq)
 
@@ -194,7 +194,7 @@ data TransformInfo = TransformInfo
 data Scene = Scene
     { sceneState                          :: !(IORef SceneState)
     , sceneMaterialStore                  :: !(Component.ComponentStore MBV.MVector (MaterialId ()) MaterialInfo)
-    , sceneMeshStore                      :: !(Component.ComponentStore MBV.MVector MeshId MeshInfo)
+    , sceneMeshStore                      :: !(Component.ComponentStore MBV.MVector (MeshId ()) MeshInfo)
     , sceneNodeStore                      :: !(Component.ComponentStore MBV.MVector NodeId NodeInfo)
     , sceneNodeTransformStore             :: !(Component.ComponentStore MSV.MVector NodeId TransformInfo)
     , sceneNodeTransformMatrixStore       :: !(Component.ComponentStore MSV.MVector NodeId Mat4)
@@ -205,7 +205,7 @@ data Scene = Scene
 
 data SceneState = SceneState
     { ssMaterialCounter   :: !(MaterialId ())
-    , ssMeshCounter       :: !MeshId
+    , ssMeshCounter       :: !(MeshId ())
     , ssNodeCounter       :: !NodeId
     , ssLightCounter      :: !LightId
     , ssSkinCounter       :: !SkinId

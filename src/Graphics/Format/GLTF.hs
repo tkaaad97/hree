@@ -82,8 +82,7 @@ import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.Format.GLTF.Draco as Draco
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip(..),
-                                        AttributeFormat(..),
+import qualified Graphics.Hree as Hree (AnimationClip(..), AttributeFormat(..),
                                         BindBufferSetting(..), BufferSource(..),
                                         FlatColorMaterialBlock, Geometry(..),
                                         IndexBufferSource(..),
@@ -942,7 +941,7 @@ createNodes scene nodes rootNodes = do
 
 createNode :: Hree.Scene -> Node -> IO Hree.NodeId
 createNode scene a = do
-    Hree.addNode scene node False
+    Hree.addNode scene node Nothing False
     where
     Hree.Transform translation rotation scale =
         case nodeMatrix a of
@@ -980,16 +979,16 @@ createMeshNodes scene nodeIds meshsets skinIds i a =
         void . Hree.updateNode scene nodeId $ \node ->
             node { Hree.nodeChildren = Hree.nodeChildren node `mappend` children }
     where
-    addSkinnedMesh skinId (Left mesh) = Hree.addedMeshId <$> Hree.addSkinnedMesh scene mesh skinId
-    addSkinnedMesh skinId (Right mesh) = Hree.addedMeshId <$> Hree.addSkinnedMesh scene mesh skinId
-    addMesh (Left mesh)  = Hree.addedMeshId <$> Hree.addMesh scene mesh
-    addMesh (Right mesh) = Hree.addedMeshId <$> Hree.addMesh scene mesh
+    addSkinnedMesh skinId (Left mesh)  = Left <$> Hree.addSkinnedMesh scene mesh skinId
+    addSkinnedMesh skinId (Right mesh) = Right <$> Hree.addSkinnedMesh scene mesh skinId
+    addMesh (Left mesh)  = Left <$> Hree.addMesh scene mesh
+    addMesh (Right mesh) = Right <$> Hree.addMesh scene mesh
 
-createMeshNode :: Hree.Scene -> Hree.MeshId -> IO Hree.NodeId
-createMeshNode scene meshId =
-    Hree.addNode scene node False
-    where
-    node = Hree.newNode { Hree.nodeMesh = Just meshId }
+createMeshNode :: Hree.Scene -> Either (Hree.MeshId Hree.FlatColorMaterialBlock) (Hree.MeshId Hree.StandardMaterialBlock) -> IO Hree.NodeId
+createMeshNode scene (Left meshId) =
+    Hree.addNode scene Hree.newNode (Just meshId) False
+createMeshNode scene (Right meshId) =
+    Hree.addNode scene Hree.newNode (Just meshId) False
 
 createSkins :: Hree.Scene -> BV.Vector Node -> BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Skin -> IO (BV.Vector Hree.SkinId)
 createSkins scene nodes nodeIds buffers bufferViews accessors =

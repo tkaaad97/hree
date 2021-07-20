@@ -46,13 +46,12 @@ import qualified Foreign (Ptr, castPtr, copyArray, copyBytes,
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import Graphics.Format.Tiled.Types
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip, Elem(..),
-                                        Geometry, Interpolation(..),
-                                        KeyFrames(..), LimitedVector(..),
-                                        MappingSource(..), Material(..),
-                                        MaterialId, Mesh(..), Node(..), NodeId,
-                                        SamplerParamValue(..), Scene,
-                                        SpriteVertex(..),
+import qualified Graphics.Hree as Hree (AnimationClip, Elem(..), Geometry,
+                                        Interpolation(..), KeyFrames(..),
+                                        LimitedVector(..), MappingSource(..),
+                                        Material(..), MaterialId, Mesh(..),
+                                        Node(..), NodeId, SamplerParamValue(..),
+                                        Scene, SpriteVertex(..),
                                         TextureMappingType(..),
                                         TextureSettings(..),
                                         TextureSourceData(..),
@@ -60,12 +59,12 @@ import qualified Graphics.Hree as Hree (AddedMesh(..), AnimationClip, Elem(..),
                                         addMesh, addNode, addVerticesToGeometry,
                                         modifyUniformBlock, newNode,
                                         singleVariationClip, spriteGeometry,
+                                        updateMeshMaterialUniformBlock,
                                         updateMeshVertexBuffer,
                                         updateUniformBlock_)
 import qualified Graphics.Hree.GL.Sampler as Hree (glTextureMagFilter,
                                                    glTextureMinFilter)
-import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial,
-                                                                SpriteMaterialBlock(..),
+import qualified Graphics.Hree.Material.SpriteMaterial as Hree (SpriteMaterial, SpriteMaterialBlock(..),
                                                                 SpriteTile(..),
                                                                 maxSpriteTileCount,
                                                                 spriteMaterial)
@@ -261,12 +260,12 @@ loadLayer :: Hree.Scene -> FilePath -> TiledConfig -> Map -> BV.Vector TilesetIn
 loadLayer scene _ config map tilesetInfos gidRanges layerIndex (LayerTileLayer layer) = do
     regions <- loadRegions scene config map tilesetInfos gidRanges layerIndex layer
     let regionNodeIds = BV.map regionLoadInfoNodeId regions
-    nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = regionNodeIds } False
+    nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = regionNodeIds } Nothing False
     return . Just $ LayerLoadInfo nodeId regions
 loadLayer scene _ config map tilesetInfos gidRanges layerIndex (LayerObjectGroup layer) = do
     regions <- loadObjectGroup scene config map tilesetInfos gidRanges layerIndex layer
     let objectNodeIds = BV.map regionLoadInfoNodeId regions
-    nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = objectNodeIds } False
+    nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = objectNodeIds } Nothing False
     return . Just $ LayerLoadInfo nodeId regions
 loadLayer scene cd config map _ _ layerIndex (LayerImageLayer (ImageLayer _ image offx offy)) = do
     (material, V2 iwidth iheight, V2 twidth theight) <- createMaterialFromImage scene cd image
@@ -282,8 +281,8 @@ loadLayer scene cd config map _ _ layerIndex (LayerImageLayer (ImageLayer _ imag
         vertex = Hree.SpriteVertex (V3 x y z) (V3 width height 0) (V3 0 0 0) 0 uv uvSize 0 0
     let geometry = Hree.addVerticesToGeometry Hree.spriteGeometry (SV.singleton vertex) GL.GL_STATIC_READ
         mesh = Hree.Mesh geometry material (Just 1)
-    Hree.AddedMesh meshId _ <- Hree.addMesh scene mesh
-    nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
+    meshId <- Hree.addMesh scene mesh
+    nodeId <- Hree.addNode scene Hree.newNode (Just meshId) False
     return . Just $ LayerLoadInfo nodeId mempty
 
 loadRegions :: Hree.Scene -> TiledConfig -> Map -> BV.Vector TilesetInfo -> BV.Vector (V2 Gid) -> Int -> TileLayer -> IO (BV.Vector RegionLoadInfo)
@@ -314,10 +313,10 @@ loadRegionFromTiles :: Hree.Scene -> TiledConfig -> Map -> UV.Vector Gid -> V2 I
 loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInfo materialId) tiles @ (V2 _ n) = do
     (geometry, geometryGids) <- createGeometryFromTiles config map layerData origin z tilesetInfo useTileAnimation tiles
     let mesh = Hree.Mesh geometry materialId (Just n)
-    Hree.AddedMesh meshId binder <- Hree.addMesh scene mesh
-    nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
-    let animations = BV.imapMaybe (createTileAnimation meshId binder geometryGids) (tilesetInfoAnimationFrames tilesetInfo)
-    when useTileAnimation $ Hree.modifyUniformBlock setSpriteTileVectorSize binder
+    meshId <- Hree.addMesh scene mesh
+    nodeId <- Hree.addNode scene Hree.newNode (Just meshId) False
+    let animations = BV.imapMaybe (createTileAnimation meshId geometryGids) (tilesetInfoAnimationFrames tilesetInfo)
+    when useTileAnimation $ Hree.updateMeshMaterialUniformBlock scene meshId setSpriteTileVectorSize
     return (RegionLoadInfo nodeId animations)
     where
     animationGids = tilesetInfoAnimationGids tilesetInfo
@@ -334,7 +333,7 @@ loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInf
             spriteTile = Hree.SpriteTile GL.GL_FALSE GL.GL_FALSE uv usSize
         in block { Hree.spriteTiles = Hree.LimitedVector (v SV.// [(index, Hree.Elem spriteTile)]) }
 
-    createTileAnimation meshId binder gids index frames
+    createTileAnimation meshId gids index frames
         | UV.length offsets > 0 && BV.length frames > 0 =
             let durations = UV.generate (BV.length frames) ((* 1000000) . fromIntegral . frameDuration . (frames BV.!))
                 timepoints = UV.scanl (+) 0 durations
@@ -343,7 +342,7 @@ loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInf
                 track = Hree.VariationTrackDiscrete uvs
                 keyFrames = Hree.KeyFrames Hree.InterpolationStep timepoints track
                 setter = if useTileAnimation
-                            then spriteTileSetter binder index
+                            then spriteTileSetter meshId index
                             else vboUvSetter meshId offsets
                 animation = Hree.singleVariationClip setter keyFrames
             in Just animation
@@ -352,7 +351,7 @@ loadRegionFromTiles scene config map layerData origin z (TileMaterial tilesetInf
         animationGid = animationGids UV.! index
         offsets = findOffsetsInRegion gids animationGid
 
-    spriteTileSetter binder index uvRect = Hree.modifyUniformBlock (updateBlockTile index uvRect) binder
+    spriteTileSetter meshId index uvRect = Hree.updateMeshMaterialUniformBlock scene meshId (updateBlockTile index uvRect)
 
     writeVertexUv ptr (V2 uv uvSize) off = do
         vertex <- Foreign.peekElemOff ptr off
@@ -609,9 +608,9 @@ loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTil
 
     loadRegion vertex (materialId, block) = do
         let geometry = Hree.addVerticesToGeometry Hree.spriteGeometry (SV.singleton vertex) GL.GL_STATIC_READ
-        Hree.AddedMesh meshId binder <- Hree.addMesh scene (Hree.Mesh geometry materialId (Just 1))
-        nodeId <- Hree.addNode scene Hree.newNode { Hree.nodeMesh = Just meshId } False
-        Hree.updateUniformBlock_ binder block
+        meshId <- Hree.addMesh scene (Hree.Mesh geometry materialId (Just 1))
+        nodeId <- Hree.addNode scene Hree.newNode (Just meshId) False
+        Hree.updateMeshMaterialUniformBlock scene meshId (const block)
         return (RegionLoadInfo nodeId mempty)
 
 loadObject _ _ _ _ _ _ _ _ = return Nothing

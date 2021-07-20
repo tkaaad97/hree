@@ -63,11 +63,10 @@ main =
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         materialId <- createMaterial scene
-        Hree.AddedMesh meshId uniformBlockBinder <- createMesh scene materialId
+        meshId <- createMesh scene materialId
         sprites <- either (throwIO . userError) return . DA.eitherDecodeStrict' =<< ByteString.readFile "examples/walksprite.json"
-        let animation = createUvAnimation uniformBlockBinder sprites
-            node = Hree.newNode { Hree.nodeMesh = Just meshId }
-        _ <- Hree.addNode scene node True
+        let animation = createUvAnimation scene meshId sprites
+        _ <- Hree.addNode scene Hree.newNode (Just meshId) True
         taskBoard <- Hree.newSceneTaskBoard scene
         st <- Time.now
         _ <- Hree.addSceneTask taskBoard (Hree.AnimationTask st animation (Hree.AnimationTaskOption True False Nothing))
@@ -121,7 +120,7 @@ main =
             geo' = Hree.addVerticesToGeometry Hree.spriteGeometry vs GL.GL_STATIC_READ
         Hree.addMesh scene $ Hree.Mesh geo' material (Just 1)
 
-    createUvAnimation ubb sprites =
+    createUvAnimation scene meshId sprites =
         let updateMaterialBlock x a = a
                 { Material.positionOffset = frameDataPositionOffset x
                 , Material.sizeFactor = frameDataSizeFactor x
@@ -131,7 +130,7 @@ main =
             frames = BV.map toFrameData sprites
             timepoints = UV.generate (BV.length sprites) (fromIntegral . (* 50000000))
             keyFrames = Hree.KeyFrames Hree.InterpolationStep timepoints (Hree.VariationTrackDiscrete frames)
-            animation = Hree.singleVariationClip (\sprite -> Hree.modifyUniformBlock (updateMaterialBlock sprite) ubb) keyFrames
+            animation = Hree.singleVariationClip (Hree.updateMeshMaterialUniformBlock scene meshId . updateMaterialBlock) keyFrames
         in animation
 
     toFrameData sp =
