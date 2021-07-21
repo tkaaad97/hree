@@ -39,9 +39,9 @@ main =
         scene <- Hree.newScene
         materialId <- Hree.addMaterial scene material
         let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
-            mesh = Hree.Mesh geometry materialId Nothing
+            mesh = Hree.mesh geometry materialId
         meshId <- Hree.addMesh scene mesh
-        _ <- Hree.addNode scene Hree.newNode (Just meshId) True
+        _ <- Hree.addNode scene Hree.node (Just meshId) True
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
         return (renderer, scene, camera)

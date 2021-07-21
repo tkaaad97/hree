@@ -44,7 +44,7 @@ main = do
     load scene board path = do
         t <- Time.now
         Tiled.LoadInfo _ nodeIds animations _ <- Tiled.loadTiledMap scene path
-        _ <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = nodeIds } Nothing True
+        _ <- Hree.addNode scene Hree.node { Hree.nodeChildren = nodeIds } Nothing True
         BV.mapM_ (addAnimationTask board t) animations
         return ()
 

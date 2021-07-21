@@ -95,7 +95,7 @@ main =
         stillBack <- createMesh scene materialId $ SV.head walkBackUVs
         stillLeft <- createMesh scene materialId $ SV.head walkLeftUVs
         stillRight <- createMesh scene materialId $ SV.head walkRightUVs
-        nodeId <- Hree.addNode scene Hree.newNode (Just stillFront) True
+        nodeId <- Hree.addNode scene Hree.node (Just stillFront) True
         walkFront <- createNodeMeshAnimation scene materialId nodeId walkFrontUVs
         walkBack <- createNodeMeshAnimation scene materialId nodeId walkBackUVs
         walkLeft <- createNodeMeshAnimation scene materialId nodeId walkLeftUVs
@@ -153,7 +153,7 @@ main =
     createMesh scene materialId (V2 (V2 x y) (V2 w h)) = do
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 (x / twidth') (y / theight')) (V2 (w / twidth') (h / theight')) GL.GL_FALSE 0
             geo' = Hree.addVerticesToGeometry Hree.spriteGeometry vs GL.GL_STATIC_READ
-        Hree.addMesh scene $ Hree.Mesh geo' materialId (Just 1)
+        Hree.addMesh scene (Hree.mesh geo' materialId) { Hree.meshInstanceCount = Just 1 }
 
     createMeshes scene materialId uvs = SV.mapM (createMesh scene materialId) uvs
 

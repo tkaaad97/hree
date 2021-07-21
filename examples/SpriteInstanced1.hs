@@ -42,9 +42,9 @@ main =
         mapping <- mkMappingSource
         let material = Hree.spriteMaterial { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping) }
         materialId <- Hree.addMaterial scene material
-        let mesh = Hree.Mesh geo' materialId (Just . Vector.length $ spriteVertices)
+        let mesh = (Hree.mesh geo' materialId) { Hree.meshInstanceCount = Just . Vector.length $ spriteVertices }
         meshId <- Hree.addMesh scene mesh
-        _ <- Hree.addNode scene Hree.newNode (Just meshId) True
+        _ <- Hree.addNode scene Hree.node (Just meshId) True
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
 

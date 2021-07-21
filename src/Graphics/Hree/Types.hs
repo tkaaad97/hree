@@ -149,6 +149,8 @@ newtype MeshId a = MeshId
 data Mesh b = Mesh
     { meshGeometry      :: !Geometry
     , meshMaterialId    :: !(MaterialId b)
+    , meshBlock         :: !(Maybe b)
+    , meshSkinId        :: !(Maybe SkinId)
     , meshInstanceCount :: !(Maybe Int)
     } deriving (Show)
 

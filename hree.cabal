@@ -76,7 +76,6 @@ library
       Graphics.Hree.Material.TestMaterial
       Graphics.Hree.Material.UserMaterial
       Graphics.Hree.Math
-      Graphics.Hree.Mesh
       Graphics.Hree.Program
       Graphics.Hree.Scene
       Graphics.Hree.SceneTask

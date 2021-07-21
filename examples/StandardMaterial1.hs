@@ -41,10 +41,10 @@ main = do
                     , Material.roughnessFactor = roughness
                     }
         materialId <- Hree.addMaterial scene material
-        let mesh = Hree.Mesh geometry materialId Nothing
+        let mesh = Hree.mesh geometry materialId
             light = Hree.directionalLight (V3 (-1) 0 (-5)) (V3 1 1 1) 1
         meshId <- Hree.addMesh scene mesh
-        _ <- Hree.addNode scene Hree.newNode (Just meshId) True
+        _ <- Hree.addNode scene Hree.node (Just meshId) True
         _ <- Hree.addLight scene light
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera

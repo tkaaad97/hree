@@ -271,8 +271,8 @@ createTextWithOption font text partialTextOption = do
     charPosVec <- UV.zip charVec . UV.scanl' (calcCharPos 0) (V2 0 0) <$> UV.mapM (getCharAdvance glyphVec charUvMap) charVec
 
     meshIds <- BV.imapM (createMesh fontState charPosVec) materials
-    childNodeIds <- mapM (\meshId -> Hree.addNode scene Hree.newNode (Just meshId) False) meshIds
-    Hree.addNode scene Hree.newNode { Hree.nodeChildren = childNodeIds } Nothing False
+    childNodeIds <- mapM (\meshId -> Hree.addNode scene Hree.node (Just meshId) False) meshIds
+    Hree.addNode scene Hree.node { Hree.nodeChildren = childNodeIds } Nothing False
 
     where
     Font scene _ _ sizeInfo _ = font
@@ -334,7 +334,7 @@ createTextWithOption font text partialTextOption = do
             vs = SV.generate (UV.length xs) (toSpriteVertex origin glyphVec . (xs UV.!))
 
         let geo = Hree.addVerticesToGeometry Hree.spriteGeometry vs GL.GL_STATIC_READ
-        let mesh = Hree.Mesh geo materialId . Just . SV.length $ vs
+        let mesh = (Hree.mesh geo materialId) { Hree.meshInstanceCount = Just . SV.length $ vs }
         Hree.addMesh scene mesh
 
 setFontPixelSize :: FontFace -> Int -> Int -> IO ()

@@ -100,10 +100,9 @@ import qualified Graphics.Hree as Hree (AnimationClip(..), AttributeFormat(..),
                                         TransformTrack(..), Vec3, Vec4,
                                         addAttribBindings, addMaterial, addMesh,
                                         addNode, addRootNodes, addSkin,
-                                        addSkinnedMesh, animationClipTransform,
-                                        emptyGeometry, flatColorMaterial,
-                                        matrixToTransform,
-                                        mkDefaultTextureIfNotExists, newNode,
+                                        animationClipTransform, emptyGeometry,
+                                        flatColorMaterial, matrixToTransform,
+                                        mesh, mkDefaultTextureIfNotExists, node,
                                         standardMaterial, standardMaterialBlock,
                                         updateNode)
 import qualified Graphics.Hree.GL as Hree (attribFormat, attribIFormat)
@@ -841,11 +840,11 @@ createMeshFromPrimitive scene bufferByteStrings bufferSources bufferViews access
 #endif
     let defaultMaterial = Hree.flatColorMaterial (Linear.V4 0.5 0.5 0.5 1)
     mesh <-
-        maybe (return . Left . flip (Hree.Mesh geometry) Nothing =<< Hree.addMaterial scene defaultMaterial)
+        maybe (Left . Hree.mesh geometry <$> Hree.addMaterial scene defaultMaterial)
             (return . Right) $ do
                 materialIndex <- primitiveMaterial primitive
                 materialId <- materials BV.!? materialIndex
-                return $ Hree.Mesh geometry materialId Nothing
+                return $ Hree.mesh geometry materialId
     return mesh
 
 createGeometry :: BV.Vector Hree.BufferSource -> BV.Vector BufferView -> BV.Vector Accessor -> Primitive -> IO Hree.Geometry
@@ -951,7 +950,7 @@ createNode scene a = do
                     r = fromMaybe (Linear.Quaternion 1 (Linear.V3 0 0 0)) (nodeRotation a)
                     s = fromMaybe (Linear.V3 1 1 1) (nodeScale a)
                 in Hree.Transform t r s
-    node = Hree.newNode
+    node = Hree.node
             { Hree.nodeName = nodeName a
             , Hree.nodeTranslation = translation
             , Hree.nodeRotation = rotation
@@ -979,16 +978,16 @@ createMeshNodes scene nodeIds meshsets skinIds i a =
         void . Hree.updateNode scene nodeId $ \node ->
             node { Hree.nodeChildren = Hree.nodeChildren node `mappend` children }
     where
-    addSkinnedMesh skinId (Left mesh)  = Left <$> Hree.addSkinnedMesh scene mesh skinId
-    addSkinnedMesh skinId (Right mesh) = Right <$> Hree.addSkinnedMesh scene mesh skinId
+    addSkinnedMesh skinId (Left mesh)  = Left <$> Hree.addMesh scene mesh { Hree.meshSkinId = Just skinId }
+    addSkinnedMesh skinId (Right mesh) = Right <$> Hree.addMesh scene mesh { Hree.meshSkinId = Just skinId }
     addMesh (Left mesh)  = Left <$> Hree.addMesh scene mesh
     addMesh (Right mesh) = Right <$> Hree.addMesh scene mesh
 
 createMeshNode :: Hree.Scene -> Either (Hree.MeshId Hree.FlatColorMaterialBlock) (Hree.MeshId Hree.StandardMaterialBlock) -> IO Hree.NodeId
 createMeshNode scene (Left meshId) =
-    Hree.addNode scene Hree.newNode (Just meshId) False
+    Hree.addNode scene Hree.node (Just meshId) False
 createMeshNode scene (Right meshId) =
-    Hree.addNode scene Hree.newNode (Just meshId) False
+    Hree.addNode scene Hree.node (Just meshId) False
 
 createSkins :: Hree.Scene -> BV.Vector Node -> BV.Vector Hree.NodeId -> BV.Vector ByteString -> BV.Vector BufferView -> BV.Vector Accessor -> BV.Vector Skin -> IO (BV.Vector Hree.SkinId)
 createSkins scene nodes nodeIds buffers bufferViews accessors =

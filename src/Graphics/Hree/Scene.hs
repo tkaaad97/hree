@@ -9,13 +9,11 @@ module Graphics.Hree.Scene
     , addNodeUniformBlock
     , addRootNodes
     , addSkin
-    , addSkinnedMesh
     , applyTransformToNode
     , defaultRendererOption
     , deleteRenderer
     , deleteScene
     , mkDefaultTextureIfNotExists
-    , newNode
     , newRenderer
     , newRendererWithOption
     , newScene
@@ -52,6 +50,7 @@ import Data.Bits ((.|.))
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import qualified Data.Component as Component
+import Data.Function ((&))
 import qualified Data.IntMap.Strict as IntMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.List (nubBy)
@@ -81,8 +80,8 @@ import Graphics.Hree.GL.UniformBlock
 import Graphics.Hree.Light
 import Graphics.Hree.Material (defaultRenderOption, textureMappingUniformName)
 import Graphics.Hree.Math
-import Graphics.Hree.Mesh
 import Graphics.Hree.Program
+import Graphics.Hree.Skin (maxJointCount)
 import Graphics.Hree.Types
 import Linear (V2(..), V4(..), (!*!), (^+^))
 import qualified Linear
@@ -332,13 +331,7 @@ castMeshId :: MeshId a -> MeshId b
 castMeshId (MeshId a) = MeshId a
 
 addMesh :: Block b => Scene -> Mesh b -> IO (MeshId b)
-addMesh scene mesh = addMesh_ scene mesh Nothing
-
-addSkinnedMesh :: Block b => Scene -> Mesh b -> SkinId -> IO (MeshId b)
-addSkinnedMesh scene mesh skin = addMesh_ scene mesh (Just skin)
-
-addMesh_ :: Block b => Scene -> Mesh b -> Maybe SkinId -> IO (MeshId b)
-addMesh_ scene mesh maybeSkinId = do
+addMesh scene mesh = do
     maybeSkin <- maybe (return Nothing) (Component.readComponent (sceneSkinStore scene)) maybeSkinId
     materialInfo <- maybe
         (throwIO . userError $ "material not found. materialId: " ++ show materialId) return
@@ -354,6 +347,7 @@ addMesh_ scene mesh maybeSkinId = do
     return . castMeshId $ meshId
 
     where
+    maybeSkinId = meshSkinId mesh
     materialId = castMaterialId . meshMaterialId $ mesh
     geo = meshGeometry mesh
     instanceCount = meshInstanceCount mesh
@@ -370,7 +364,7 @@ addMesh_ scene mesh maybeSkinId = do
     createMeshMaterialInfo materialInfo roption poption pname = do
         let mappings = Map.fromList . map (\(ttype, mapping) -> (textureMappingUniformName ttype, mapping)) . Map.toList $ materialInfoMappings materialInfo
             pspec = materialInfoProgramSpec materialInfo
-            block = unStd140 . SV.head . SV.unsafeCast . materialInfoUniformBlock $ materialInfo
+            block = fromMaybe (unStd140 . SV.head . SV.unsafeCast . materialInfoUniformBlock $ materialInfo) (meshBlock mesh)
 
         ptr <- Foreign.mallocForeignPtrBytes (sizeOfStd140 mesh)
         Foreign.withForeignPtr ptr $ \p -> pokeBlock p mesh block
@@ -381,8 +375,34 @@ addMesh_ scene mesh maybeSkinId = do
         return (MeshMaterial materialId (Foreign.castForeignPtr ptr, buffer) mappings roption poption pspec pname)
 
     pokeBlock :: Block b => Ptr () -> proxy b -> b -> IO ()
-    pokeBlock ptr _ block = do
+    pokeBlock ptr _ block =
         Foreign.poke (Foreign.castPtr ptr) (Std140 block)
+
+meshProgramOption :: Mesh b -> MaterialInfo -> Maybe Skin -> ProgramOption
+meshProgramOption mesh materialInfo maybeSkin =
+    let geo = meshGeometry mesh
+        options = defaultProgramOption
+            & applyWhen (hasAttribute geo "jointIndices") (`setHasJointIndices` True)
+            & applyWhen (hasAttribute geo "jointWeights") (`setHasJointWeights` True)
+            & applyWhen (hasAttribute geo "normal") (`setHasVertexNormal` True)
+            & applyWhen (hasAttribute geo "tangent") (`setHasVertexTangent` True)
+            & applyWhen (hasAttribute geo "color") (`setHasVertexColor` True)
+            & applyWhen (hasTextureMapping NormalMapping) (`setHasNormalMap` True)
+            & applyWhen (hasTextureMapping MetallicRoughnessMapping) (`setHasMetallicRoughnessMap` True)
+            & applyWhen (hasTextureMapping EmissiveMapping) (`setHasEmissiveMap` True)
+            & applyWhen (hasTextureMapping OcclusionMapping) (`setHasOcclusionMap` True)
+            & applySkinOptions maybeSkin
+            & flip applyPartialProgramOption (materialInfoProgramOption materialInfo)
+    in options
+    where
+    applyWhen True f a  = f a
+    applyWhen False _ a = a
+    applySkinOptions (Just skin) =
+        (`setUseVertexSkinning` True) . (`setMaxJointCount` maxJointCount skin)
+    applySkinOptions Nothing = id
+    mappings = materialInfoMappings materialInfo
+    hasTextureMapping = flip Map.member mappings
+    hasAttribute geo attribName = Map.member attribName (geometryAttribBindings geo)
 
 instantiateGeometry :: Geometry -> IO GeometryInfo
 instantiateGeometry geo = do
@@ -532,9 +552,6 @@ addRootNodes scene nodeIds = atomicModifyIORef' (sceneState scene) addRootNodesF
         let rootNodeIds = ssRootNodes state
             state' = state { ssRootNodes = rootNodeIds `mappend` nodeIds }
         in (state', ())
-
-newNode :: Node
-newNode = Node Nothing BV.empty (Linear.V3 0 0 0) (Linear.Quaternion 1 (Linear.V3 0 0 0)) (Linear.V3 1 1 1) Linear.identity
 
 translateNode :: Scene -> NodeId -> Vec3 -> IO ()
 translateNode scene nodeId v = applyTransformToNode scene nodeId f

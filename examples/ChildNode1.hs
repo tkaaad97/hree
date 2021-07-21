@@ -34,19 +34,19 @@ main =
             childMaterial = Material.flatColorMaterial (V4 0.95 0.1 0.1 1)
         materialId <- Hree.addMaterial scene material
         childMaterialId <- Hree.addMaterial scene childMaterial
-        let childMesh = Hree.Mesh geometry childMaterialId Nothing
-            mesh = Hree.Mesh geometry materialId Nothing
+        let childMesh = Hree.mesh geometry childMaterialId
+            mesh = Hree.mesh geometry materialId
         childMeshId <- Hree.addMesh scene childMesh
         meshId <- Hree.addMesh scene mesh
 
-        let childNode = Hree.newNode
+        let childNode = Hree.node
                 { Hree.nodeTranslation = V3 0.5 0 0
                 , Hree.nodeScale = V3 0.5 1 1
                 , Hree.nodeInverseBindMatrix = inverseBindMatrix
                 }
         childNodeId <- Hree.addNode scene childNode (Just childMeshId) False
 
-        let node = Hree.newNode
+        let node = Hree.node
                 { Hree.nodeTranslation = V3 0 0 0
                 , Hree.nodeChildren = BV.fromList [childNodeId]
                 , Hree.nodeInverseBindMatrix = inverseBindMatrix

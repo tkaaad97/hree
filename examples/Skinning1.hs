@@ -118,9 +118,9 @@ main =
         let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                         `Hree.setIndexBufferSourceUInt` indices
 
-        nodeId2 <- Hree.addNode scene Hree.newNode { Hree.nodeRotation = Quaternion 1 (V3 0 0 0) } Nothing False
-        nodeId1 <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.singleton nodeId2, Hree.nodeTranslation = V3 0 1 0 } Nothing False
-        nodeId0 <- Hree.addNode scene Hree.newNode { Hree.nodeChildren = BV.singleton nodeId1 } Nothing True
+        nodeId2 <- Hree.addNode scene Hree.node { Hree.nodeRotation = Quaternion 1 (V3 0 0 0) } Nothing False
+        nodeId1 <- Hree.addNode scene Hree.node { Hree.nodeChildren = BV.singleton nodeId2, Hree.nodeTranslation = V3 0 1 0 } Nothing False
+        nodeId0 <- Hree.addNode scene Hree.node { Hree.nodeChildren = BV.singleton nodeId1 } Nothing True
 
         skinId <- Hree.addSkin scene nodeId0 (SV.fromList [nodeId1, nodeId2]) invMats
 
@@ -131,8 +131,7 @@ main =
                     , Material.baseColorFactor = V4 0.1 0.1 0.8 1.0
                     }
         materialId <- Hree.addMaterial scene material
-        let mesh = Hree.Mesh geometry materialId Nothing
-        meshId <- Hree.addSkinnedMesh scene mesh skinId
+        meshId <- Hree.addMesh scene (Hree.skinnedMesh geometry materialId skinId)
 
         _ <- Hree.updateNodeMesh scene nodeId0 (Just meshId)
 

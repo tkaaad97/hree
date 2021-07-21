@@ -66,7 +66,7 @@ main =
         meshId <- createMesh scene materialId
         sprites <- either (throwIO . userError) return . DA.eitherDecodeStrict' =<< ByteString.readFile "examples/walksprite.json"
         let animation = createUvAnimation scene meshId sprites
-        _ <- Hree.addNode scene Hree.newNode (Just meshId) True
+        _ <- Hree.addNode scene Hree.node (Just meshId) True
         taskBoard <- Hree.newSceneTaskBoard scene
         st <- Time.now
         _ <- Hree.addSceneTask taskBoard (Hree.AnimationTask st animation (Hree.AnimationTaskOption True False Nothing))
@@ -118,7 +118,7 @@ main =
     createMesh scene material = do
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 1 1 0) (V3 0 0 0) 0 (V2 0 0) (V2 1 1) GL.GL_FALSE 0
             geo' = Hree.addVerticesToGeometry Hree.spriteGeometry vs GL.GL_STATIC_READ
-        Hree.addMesh scene $ Hree.Mesh geo' material (Just 1)
+        Hree.addMesh scene (Hree.mesh geo' material) { Hree.meshInstanceCount = Just 1 }
 
     createUvAnimation scene meshId sprites =
         let updateMaterialBlock x a = a

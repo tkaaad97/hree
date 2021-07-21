@@ -65,9 +65,9 @@ main = do
                             _ -> throwIO . userError $ "unknown format. path: " ++ path
             let material = Material.basicMaterial $ V3 0.5 (-1) (-0.5)
             materialId <- Hree.addMaterial scene material
-            let mesh = Hree.Mesh geometry materialId Nothing
+            let mesh = Hree.mesh geometry materialId
             meshId <- Hree.addMesh scene mesh
-            void $ Hree.addNode scene Hree.newNode (Just meshId) True
+            void $ Hree.addNode scene Hree.node (Just meshId) True
             return Nothing
 
     onDisplay (r, s, c, Just taskBoard) w = do

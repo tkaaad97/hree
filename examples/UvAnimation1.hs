@@ -83,7 +83,7 @@ main =
         (material, materialId) <- createMaterial scene (uvOffset $ UV.head walkFrontUVs)
         meshId <- createMesh scene materialId (V2 16 (-16))
 
-        nodeId <- Hree.addNode scene Hree.newNode (Just meshId) True
+        nodeId <- Hree.addNode scene Hree.node (Just meshId) True
         uniformBlockBinder <- Hree.addNodeUniformBlock scene nodeId Hree.materialBlockBindingIndex (Hree.materialUniformBlock material)
 
         let walkFront = createUvAnimation uniformBlockBinder walkFrontUVs
@@ -150,7 +150,7 @@ main =
     createMesh scene materialId (V2 w h) = do
         let vs = SV.singleton $ Hree.SpriteVertex (V3 0 0 0) (V3 0.5 0.5 0) (V3 0 0 0) 0 (V2 0 0) (V2 (w / twidth') (h / theight')) GL.GL_FALSE 0
         let geo' = Hree.addVerticesToGeometry Hree.spriteGeometry vs GL.GL_STATIC_READ
-        Hree.addMesh scene $ Hree.Mesh geo' materialId (Just 1)
+        Hree.addMesh scene (Hree.mesh geo' materialId) { Hree.meshInstanceCount = Just 1 }
 
     createUvAnimation ubb uvs =
         let uvs' = UV.map uvOffset uvs

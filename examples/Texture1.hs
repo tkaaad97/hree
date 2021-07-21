@@ -42,9 +42,9 @@ main =
                 { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping)
                 }
         materialId <- Hree.addMaterial scene material
-        let mesh = Hree.Mesh geometry materialId Nothing
+        let mesh = Hree.mesh geometry materialId
         meshId <- Hree.addMesh scene mesh
-        _ <- Hree.addNode scene Hree.newNode (Just meshId) True
+        _ <- Hree.addNode scene Hree.node (Just meshId) True
         camera <- Hree.newCamera proj la
         _ <- setCameraMouseControl w camera
         return (renderer, scene, camera)
