@@ -608,9 +608,8 @@ loadObject scene config map tilesetInfos gidRanges layerIndex opacity (ObjectTil
 
     loadRegion vertex (materialId, block) = do
         let geometry = Hree.addVerticesToGeometry Hree.spriteGeometry (SV.singleton vertex) GL.GL_STATIC_READ
-        meshId <- Hree.addMesh scene (Hree.mesh geometry materialId) { Hree.meshInstanceCount = Just 1 }
+        meshId <- Hree.addMesh scene (Hree.mesh geometry materialId) { Hree.meshBlock = Just block, Hree.meshInstanceCount = Just 1 }
         nodeId <- Hree.addNode scene Hree.node (Just meshId) False
-        Hree.updateMeshMaterialUniformBlock scene meshId (const block)
         return (RegionLoadInfo nodeId mempty)
 
 loadObject _ _ _ _ _ _ _ _ = return Nothing
