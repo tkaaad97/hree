@@ -138,22 +138,47 @@ spec = do
             assertBufferDead (GLW.Buffer 1)
             assertBufferDead (GLW.Buffer 2)
 
+    describe "addSkin" $ do
+        runOnOSMesaContext width height . it "allocate two buffers" $ do
+            scene <- Hree.newScene
+
+            let node1 = Hree.node { Hree.nodeTranslation = V3 0.5 0 0 }
+            node1Id <- Hree.addNode scene node1 Nothing False
+            let node2 = Hree.node { Hree.nodeChildren = pure node1Id }
+            node2Id <- Hree.addNode scene node2 Nothing True
+
+            skinId <- Hree.addSkin scene node2Id (SV.singleton node1Id) mempty
+
+            counter <- getSceneProp scene Hree.ssSkinCounter
+            counter `shouldBe` 2
+            assertBufferAlive (GLW.Buffer 1)
+            assertBufferAlive (GLW.Buffer 2)
+
+            Hree.removeSkinIfUnused scene skinId
+            assertBufferDead (GLW.Buffer 1)
+            assertBufferDead (GLW.Buffer 2)
+
     describe "deleteScene" $ do
         runOnOSMesaContext width height . it "delete meshes and materials and default texture" $ do
             scene <- Hree.newScene
+
+            -- default texture
             _ <- Hree.mkDefaultTextureIfNotExists scene
             assertTextureAlive (GLW.Texture 1)
+
+            -- add a material
             mapping <- mkMapping
             materialId <- Hree.addMaterial scene material { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping) }
             assertTextureAlive (GLW.Texture 2)
             materialSize <- Component.componentSize $ Hree.sceneMaterialStore scene
             materialSize `shouldBe` 1
 
+            -- add meshes
             let geometry1 = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 geometry2 = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh1 = Hree.mesh geometry1 materialId
                 mesh2 = Hree.mesh geometry2 materialId
-            _ <- Hree.addMesh scene mesh1
+            mesh1Id <- Hree.addMesh scene mesh1
             _ <- Hree.addMesh scene mesh2
             meshSize <- Component.componentSize $ Hree.sceneMeshStore scene
             meshSize `shouldBe` 2
@@ -161,6 +186,17 @@ spec = do
             assertBufferAlive (GLW.Buffer 2)
             assertBufferAlive (GLW.Buffer 3)
             assertBufferAlive (GLW.Buffer 4)
+
+            -- add a node
+            node1Id <- Hree.addNode scene Hree.node (Just mesh1Id) True
+            _ <- Hree.addNodeUniformBlock scene node1Id (Hree.UniformBufferBindingIndex 8) ()
+            assertBufferAlive (GLW.Buffer 5)
+            node2Id <- Hree.addNode scene Hree.node { Hree.nodeChildren = pure node1Id } Nothing True
+
+            -- add a skin
+            _ <- Hree.addSkin scene node2Id (SV.singleton node1Id) mempty
+            assertBufferAlive (GLW.Buffer 6)
+            assertBufferAlive (GLW.Buffer 7)
 
             Hree.deleteScene scene
 
@@ -173,6 +209,9 @@ spec = do
             assertBufferDead (GLW.Buffer 2)
             assertBufferDead (GLW.Buffer 3)
             assertBufferDead (GLW.Buffer 4)
+            assertBufferDead (GLW.Buffer 5)
+            assertBufferDead (GLW.Buffer 6)
+            assertBufferDead (GLW.Buffer 7)
 
             assertTextureDead (GLW.Texture 1)
             assertTextureDead (GLW.Texture 2)

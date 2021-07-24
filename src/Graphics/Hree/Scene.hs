@@ -829,6 +829,10 @@ deleteScene scene = do
     skins <- BV.freeze =<< Component.getComponentSlice skinStore
     BV.mapM_ (removeSkinIfUnused scene . skinId) skins
 
+    -- delete nodes
+    nodes <- BV.freeze =<< Component.getComponentSlice nodeStore
+    BV.mapM_ (removeNode scene . nodeInfoId) nodes
+
     -- delete default texture and buffers
     (maybeDefaultTexture, buffers) <- atomicModifyIORef' (sceneState scene) deleteSceneFunc
     mapM_ GLW.deleteObject buffers
