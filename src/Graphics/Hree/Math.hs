@@ -13,7 +13,7 @@ module Graphics.Hree.Math
     ) where
 
 import Data.Maybe (fromMaybe)
-import qualified Data.Vector.Unboxed as UV (fromList, maxIndex, (!))
+import qualified Data.Vector.Unboxed as UV (fromList, maxIndexBy, (!))
 import Data.Word (Word8)
 import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
@@ -80,9 +80,10 @@ matrixToTransform mat = Transform t q s
     s = Linear.V3 sx sy sz
     t = Linear.V3 m03 m13 m23
 
+-- http://marupeke296.sakura.ne.jp/DXG_No58_RotQuaternionTrans.html
 rotateMatrixToQuaternion :: Mat3 -> Maybe Quaternion
 rotateMatrixToQuaternion mat
-    | Linear.nearZero maxElem || maxElem < 0 = Nothing
+    | Linear.nearZero maxElem = Nothing
     | otherwise = q maxElemIndex
     where
     Linear.V3
@@ -93,10 +94,10 @@ rotateMatrixToQuaternion mat
     e1 = - m00 + m11 - m22 + 1
     e2 = - m00 - m11 + m22 + 1
     e3 = m00 + m11 + m22 + 1
-    elems = UV.fromList $ [e0, e1, e2, e3]
-    maxElemIndex = UV.maxIndex elems
+    elems = UV.fromList [e0, e1, e2, e3]
+    maxElemIndex = UV.maxIndexBy (\a b -> abs a `compare` abs b) elems
     maxElem = elems UV.! maxElemIndex
-    v = (sqrt maxElem) * 0.5
+    v = signum maxElem * sqrt (abs maxElem) * 0.5
     s = 0.25 / v
     q 0 =
         let qx = v

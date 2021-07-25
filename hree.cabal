@@ -755,6 +755,7 @@ test-suite hree-test
       GLSpec
       GLTFSpec
       GLTypesGen
+      MathSpec
       SceneSpec
       TiledSpec
       Paths_hree
