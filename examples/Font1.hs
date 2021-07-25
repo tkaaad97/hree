@@ -7,8 +7,7 @@ import qualified Graphics.UI.GLFW as GLFW
 import qualified Hree
 import qualified Hree.Text as Hree (FontOption_(..), OriginLocation(..),
                                     TextOption_(..), createTextWithOption,
-                                    deleteFont, loadCharactersIntoFont,
-                                    newFontWithOption)
+                                    loadCharactersIntoFont, newFontWithOption)
 import Linear (V2(..), V3(..))
 import Prelude hiding (init)
 import System.Environment (getArgs)

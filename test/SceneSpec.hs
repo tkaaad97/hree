@@ -6,7 +6,6 @@ module SceneSpec
 
 import qualified Data.Component as Component
 import Data.IORef (readIORef)
-import qualified Data.Map.Strict as Map
 import qualified Data.Vector as BV
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word8)
@@ -19,7 +18,6 @@ import qualified GLW.Internal.Objects as GLW (Buffer(..), Texture(..))
 import qualified Graphics.GL as GL
 import qualified Hree
 import qualified Hree.GL.Texture as Hree
-import qualified Hree.GL.Vertex as Hree
 import qualified Hree.Material.TestMaterial as Hree
 import qualified Hree.Types as Hree
 import Linear (V2(..), V3(..), V4(..))
@@ -76,24 +74,24 @@ spec = do
             scene <- Hree.newScene
             mapping <- mkMapping
             materialId <- Hree.addMaterial scene material { Hree.materialMappings = pure (Hree.BaseColorMapping, mapping) }
-            materialSize <- Component.componentSize $ Hree.sceneMaterialStore scene
-            materialSize `shouldBe` 1
+            materialSize0 <- Component.componentSize $ Hree.sceneMaterialStore scene
+            materialSize0 `shouldBe` 1
             let geometry = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
                 mesh = Hree.mesh geometry materialId
             meshId <- Hree.addMesh scene mesh
 
             -- should not be deleted at here
             Hree.removeMaterialIfUnused scene materialId
-            materialSize <- Component.componentSize $ Hree.sceneMaterialStore scene
-            materialSize `shouldBe` 1
+            materialSize1 <- Component.componentSize $ Hree.sceneMaterialStore scene
+            materialSize1 `shouldBe` 1
             assertTextureAlive (GLW.Texture 1)
 
             Hree.removeMesh scene meshId
             Hree.removeMaterialIfUnused scene materialId
 
             -- should be deleted at here
-            materialSize <- Component.componentSize $ Hree.sceneMaterialStore scene
-            materialSize `shouldBe` 0
+            materialSize2 <- Component.componentSize $ Hree.sceneMaterialStore scene
+            materialSize2 `shouldBe` 0
             assertTextureDead (GLW.Texture 1)
 
     describe "addMesh" $ do
@@ -263,7 +261,7 @@ spec = do
             assertBufferDead (GLW.Buffer 3)
             assertBufferDead (GLW.Buffer 4)
 
-            node1Id <- Hree.addNode scene Hree.node (Just mesh1Id) True
+            _ <- Hree.addNode scene Hree.node (Just mesh1Id) True
 
             Hree.renderScene renderer scene camera
             assertBufferAlive (GLW.Buffer 3)

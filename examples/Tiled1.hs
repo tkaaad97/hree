@@ -45,7 +45,6 @@ main = do
         Tiled.LoadInfo _ nodeIds animations _ <- Tiled.loadTiledMap scene path
         _ <- Hree.addNode scene Hree.node { Hree.nodeChildren = nodeIds } Nothing True
         BV.mapM_ (addAnimationTask board t) animations
-        return ()
 
     addAnimationTask board t animation =
         Hree.addSceneTask board (Hree.AnimationTask t animation (Hree.AnimationTaskOption True False Nothing))

@@ -2,9 +2,7 @@
 module SpriteInstanced1 where
 
 import qualified Data.Vector.Storable as Vector
-import Data.Word (Word8)
 import Example
-import Foreign (Ptr)
 import qualified Foreign
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL

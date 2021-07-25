@@ -174,8 +174,8 @@ main =
 
     keyCallback _ _ _ _ _ _ _ _ _ = return ()
 
-    resolveWalkAnimation characterInfo GLFW.Key'Up = Just $ (animationWalkBack characterInfo, GL.GL_FALSE)
-    resolveWalkAnimation characterInfo GLFW.Key'Down = Just $ (animationWalkFront characterInfo, GL.GL_FALSE)
-    resolveWalkAnimation characterInfo GLFW.Key'Left = Just $ (animationWalkRight characterInfo, GL.GL_TRUE)
-    resolveWalkAnimation characterInfo GLFW.Key'Right = Just $ (animationWalkRight characterInfo, GL.GL_FALSE)
+    resolveWalkAnimation characterInfo GLFW.Key'Up = Just (animationWalkBack characterInfo, GL.GL_FALSE)
+    resolveWalkAnimation characterInfo GLFW.Key'Down = Just (animationWalkFront characterInfo, GL.GL_FALSE)
+    resolveWalkAnimation characterInfo GLFW.Key'Left = Just (animationWalkRight characterInfo, GL.GL_TRUE)
+    resolveWalkAnimation characterInfo GLFW.Key'Right = Just (animationWalkRight characterInfo, GL.GL_FALSE)
     resolveWalkAnimation _ _ = Nothing
