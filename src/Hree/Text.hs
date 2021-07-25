@@ -33,7 +33,7 @@ import Data.Monoid (Last(..))
 import Data.Semigroup (Semigroup(..))
 import Data.Text (Text)
 import qualified Data.Text as Text (unpack)
-import qualified Data.Vector as BV (Vector, generateM, imapM, last, length, map,
+import qualified Data.Vector as BV (Vector, generateM, imapM, last, length,
                                     null, snoc, take, (!))
 import qualified Data.Vector.Algorithms.Intro as V (sort)
 import qualified Data.Vector.Storable as SV (generate, length)

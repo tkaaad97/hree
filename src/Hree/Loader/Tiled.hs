@@ -53,13 +53,11 @@ import qualified Hree (AnimationClip, Elem(..), Geometry, Interpolation(..),
                        TextureSourceData(..), VariationTrack(..), addMaterial,
                        addMesh, addNode, addVerticesToGeometry, mesh, node,
                        singleVariationClip, spriteGeometry,
-                       updateMeshMaterialUniformBlock, updateMeshVertexBuffer,
-                       updateUniformBlock_)
+                       updateMeshMaterialUniformBlock, updateMeshVertexBuffer)
 import qualified Hree.GL.Sampler as Hree (glTextureMagFilter,
                                           glTextureMinFilter)
 import Hree.Loader.Tiled.Types
-import qualified Hree.Material.SpriteMaterial as Hree (SpriteMaterial,
-                                                       SpriteMaterialBlock(..),
+import qualified Hree.Material.SpriteMaterial as Hree (SpriteMaterialBlock(..),
                                                        SpriteTile(..),
                                                        maxSpriteTileCount,
                                                        spriteMaterial)
