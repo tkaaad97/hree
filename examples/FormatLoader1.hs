@@ -7,13 +7,12 @@ import Control.Exception (throwIO)
 import Control.Monad (void)
 import qualified Data.Vector as BV (head, null)
 import Example
-import qualified Graphics.Format.GLTF as GLTF (Supplement(..),
-                                               loadSceneFromFile)
-import qualified Graphics.Format.PLY as PLY (loadGeometryFromFile)
-import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
-import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.BasicMaterial as Material
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.Loader.GLTF as GLTF (Supplement(..), loadSceneFromFile)
+import qualified Hree.Loader.PLY as PLY (loadGeometryFromFile)
+import qualified Hree.Loader.STL as STL (loadGeometryFromFile)
+import qualified Hree.Material.BasicMaterial as Material
 import Linear (V3(..))
 import Prelude hiding (init)
 import System.Environment (getArgs)

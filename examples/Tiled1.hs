@@ -5,10 +5,9 @@ import qualified Chronos as Time (now)
 import Control.Concurrent (threadDelay)
 import qualified Data.Vector as BV (mapM_)
 import Example
-import qualified Graphics.Format.Tiled.JSON as Tiled (LoadInfo(..),
-                                                      loadTiledMap)
-import Graphics.Hree as Hree
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.Loader.Tiled.JSON as Tiled (LoadInfo(..), loadTiledMap)
 import Linear (V3(..))
 import Prelude hiding (init)
 import System.Environment (getArgs)

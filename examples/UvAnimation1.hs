@@ -13,9 +13,9 @@ import Example
 import qualified Foreign
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.SpriteMaterial as Material (SpriteMaterialBlock(..))
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.Material.SpriteMaterial as Material (SpriteMaterialBlock(..))
 import Linear (V2(..), V3(..), (!*))
 import Prelude hiding (init)
 

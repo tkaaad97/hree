@@ -17,11 +17,11 @@ import qualified GLW
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified GLW.Internal.Objects as GLW (Buffer(..), Texture(..))
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.GL.Texture as Hree
-import qualified Graphics.Hree.GL.Vertex as Hree
-import qualified Graphics.Hree.Material.TestMaterial as Hree
-import qualified Graphics.Hree.Types as Hree
+import qualified Hree
+import qualified Hree.GL.Texture as Hree
+import qualified Hree.GL.Vertex as Hree
+import qualified Hree.Material.TestMaterial as Hree
+import qualified Hree.Types as Hree
 import Linear (V2(..), V3(..), V4(..))
 import Test.Hspec
 

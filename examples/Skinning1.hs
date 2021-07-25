@@ -10,10 +10,10 @@ import qualified Data.Vector.Unboxed as UV
 import Example
 import Foreign (Storable(..), castPtr, plusPtr)
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree as Hree
-import Graphics.Hree.GL (attribFormat, attribIFormat)
-import qualified Graphics.Hree.Material.StandardMaterial as Material
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import Hree.GL (attribFormat, attribIFormat)
+import qualified Hree.Material.StandardMaterial as Material
 import Linear (Quaternion(..), V3(..), V4(..))
 import Prelude hiding (init)
 

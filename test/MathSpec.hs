@@ -2,7 +2,7 @@ module MathSpec
     ( spec
     ) where
 
-import qualified Graphics.Hree as Hree
+import qualified Hree
 import Linear (Quaternion(..), V3(..), fromQuaternion, nearZero, normalize,
                (^-^))
 import Test.Hspec

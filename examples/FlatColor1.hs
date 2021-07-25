@@ -3,9 +3,9 @@ module FlatColor1 where
 import qualified Data.Vector.Storable as Vector
 import Example
 import qualified Graphics.GL as GL
-import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.FlatColorMaterial as Material
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.Material.FlatColorMaterial as Material
 import Linear (V2(..), V3(..), V4(..))
 import Prelude hiding (init)
 

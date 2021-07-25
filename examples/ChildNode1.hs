@@ -5,9 +5,9 @@ import qualified Chronos as Time (now)
 import qualified Data.Vector as BV
 import qualified Data.Vector.Unboxed as UV
 import Example
-import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.FlatColorMaterial as Material
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.Material.FlatColorMaterial as Material
 import Linear (V3(..), V4(..), axisAngle, inv44)
 import Prelude hiding (init)
 

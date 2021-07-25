@@ -3,14 +3,12 @@ module Font1 where
 
 import qualified Data.Text as Text (length, pack, replace, splitAt, unpack)
 import Example
-import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Text as Hree (FontOption_(..),
-                                             OriginLocation(..),
-                                             TextOption_(..),
-                                             createTextWithOption, deleteFont,
-                                             loadCharactersIntoFont,
-                                             newFontWithOption)
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.Text as Hree (FontOption_(..), OriginLocation(..),
+                                    TextOption_(..), createTextWithOption,
+                                    deleteFont, loadCharactersIntoFont,
+                                    newFontWithOption)
 import Linear (V2(..), V3(..))
 import Prelude hiding (init)
 import System.Environment (getArgs)

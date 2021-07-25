@@ -2,10 +2,10 @@
 module StandardMaterial1 where
 
 import Example
-import qualified Graphics.Format.STL as STL (loadGeometryFromFile)
-import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.StandardMaterial as Material
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.Loader.STL as STL (loadGeometryFromFile)
+import qualified Hree.Material.StandardMaterial as Material
 import Linear (V3(..))
 import Prelude hiding (init)
 import System.Environment (getArgs)

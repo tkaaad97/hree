@@ -12,7 +12,7 @@ import Data.Text (Text)
 import qualified Data.Vector as BV (fromList)
 import qualified Data.Vector.Unboxed as UV (fromList)
 import Data.Word (Word32)
-import Graphics.Format.Tiled.Types
+import Hree.Loader.Tiled.Types
 import qualified Linear (V4(..))
 import qualified Test.Hspec as Hspec (Spec, it, shouldBe)
 

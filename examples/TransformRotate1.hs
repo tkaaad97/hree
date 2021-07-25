@@ -2,9 +2,9 @@
 module TransformRotate1 where
 
 import Example
-import qualified Graphics.Hree as Hree
-import qualified Graphics.Hree.Material.FlatColorMaterial as Material
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.Material.FlatColorMaterial as Material
 import Linear (V3(..), V4(..))
 import Prelude hiding (init)
 

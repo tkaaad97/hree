@@ -6,7 +6,7 @@ module GLTFSpec
 import qualified Codec.Picture as Picture
 import qualified Data.Map.Strict as Map
 import qualified Data.Vector as BV
-import qualified Graphics.Format.GLTF as GLTF
+import qualified Hree.Loader.GLTF as GLTF
 import Test.Hspec
 
 emptyNode :: GLTF.Node

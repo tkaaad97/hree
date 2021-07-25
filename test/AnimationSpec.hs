@@ -4,9 +4,9 @@ module AnimationSpec
 
 import Chronos (Timespan(..))
 import qualified Data.Vector.Unboxed as UV
-import qualified Graphics.Hree as Hree
-import Graphics.Hree.Animation
-import Graphics.Hree.Math (Transform(..))
+import qualified Hree
+import Hree.Animation
+import Hree.Math (Transform(..))
 import Linear (Epsilon(..), V3(..))
 import Test.Hspec
 

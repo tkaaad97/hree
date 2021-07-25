@@ -13,7 +13,7 @@ import qualified GLW.Groups.DepthFunction as DepthFunction
 import qualified GLW.Groups.StencilFunction as StencilFunction
 import qualified GLW.Groups.StencilOp as StencilOp
 import qualified Graphics.GL as GL
-import Graphics.Hree.GL.Types
+import Hree.GL.Types
 import Linear (V4(..))
 import Test.QuickCheck (Arbitrary(..))
 import qualified Test.QuickCheck as QuickCheck (choose, elements)

@@ -14,9 +14,9 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import Data.Word (Word8)
 import qualified GLW
-import qualified Graphics.Hree.Camera as Hree
-import qualified Graphics.Hree.CameraControl.SphericalControl as Hree
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.CameraControl.SphericalControl as Hree
 import Linear (V2(..), V4(..))
 import System.Exit (exitSuccess)
 

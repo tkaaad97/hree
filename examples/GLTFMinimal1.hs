@@ -3,9 +3,9 @@ module GLTFMinimal1 where
 
 import Control.Monad (void)
 import Example
-import qualified Graphics.Format.GLTF as GLTF (loadSceneFromFile)
-import qualified Graphics.Hree as Hree
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Hree
+import qualified Hree.Loader.GLTF as GLTF (loadSceneFromFile)
 import Linear (V3(..))
 import Prelude hiding (init)
 
