@@ -243,6 +243,37 @@ spec = do
             (`shouldBe` Nothing) =<< Hree.readNode scene node2Id
             (`shouldBe` Just Hree.node) =<< Hree.readNode scene node3Id
             (`shouldBe` BV.fromList [node3Id]) =<< getSceneProp scene Hree.ssRootNodes
+
+    describe "renderScene" $ do
+        runOnOSMesaContext width height . it "allocate camera and light uniform block" $ do
+            renderer <- Hree.newRenderer
+            scene <- Hree.newScene
+
+            let
+                proj = Hree.orthographic (-100) 100 (-1.0) 1.0 0.01 10.0
+                la = Hree.lookAt (V3 0 0 1) (V3 0 0 0) (V3 0 1 0)
+            camera <- Hree.newCamera proj la
+
+            materialId <- Hree.addMaterial scene material
+            let geometry1 = Hree.addVerticesToGeometry Hree.emptyGeometry vs GL.GL_STREAM_DRAW
+                mesh1 = Hree.mesh geometry1 materialId
+            mesh1Id <- Hree.addMesh scene mesh1
+            assertBufferAlive (GLW.Buffer 1)
+            assertBufferAlive (GLW.Buffer 2)
+            assertBufferDead (GLW.Buffer 3)
+            assertBufferDead (GLW.Buffer 4)
+
+            node1Id <- Hree.addNode scene Hree.node (Just mesh1Id) True
+
+            Hree.renderScene renderer scene camera
+            assertBufferAlive (GLW.Buffer 3)
+            assertBufferAlive (GLW.Buffer 4)
+
+            Hree.deleteScene scene
+            assertBufferDead (GLW.Buffer 1)
+            assertBufferDead (GLW.Buffer 2)
+            assertBufferDead (GLW.Buffer 3)
+            assertBufferDead (GLW.Buffer 4)
     where
     width = 1
     height = 1
