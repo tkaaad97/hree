@@ -5,7 +5,6 @@ import Example
 import qualified Graphics.GL as GL
 import qualified Graphics.UI.GLFW as GLFW
 import qualified Hree
-import qualified Hree.Material.FlatColorMaterial as Material
 import Linear (V2(..), V3(..), V4(..))
 import Prelude hiding (init)
 
@@ -27,7 +26,7 @@ main =
         , Hree.BasicVertex (V3 x 0 0) (V3 0 0 0) (V2 0 0) (V4 1 1 1 1)
         ]
 
-    material = Material.flatColorMaterial (V4 0 1 0 1.0)
+    material = Hree.flatColorMaterial (V4 0 1 0 1.0)
 
     --proj = orthographic 0 1 0 1 (-10) 10
     proj = Hree.perspective 90 1.0 0.1 10.0

@@ -12,7 +12,6 @@ import qualified Hree
 import qualified Hree.Loader.GLTF as GLTF (Supplement(..), loadSceneFromFile)
 import qualified Hree.Loader.PLY as PLY (loadGeometryFromFile)
 import qualified Hree.Loader.STL as STL (loadGeometryFromFile)
-import qualified Hree.Material.BasicMaterial as Material
 import Linear (V3(..))
 import Prelude hiding (init)
 import System.Environment (getArgs)
@@ -62,7 +61,7 @@ main = do
                             ".stl" -> STL.loadGeometryFromFile path
                             ".ply" -> PLY.loadGeometryFromFile path
                             _ -> throwIO . userError $ "unknown format. path: " ++ path
-            let material = Material.basicMaterial $ V3 0.5 (-1) (-0.5)
+            let material = Hree.basicMaterial $ V3 0.5 (-1) (-0.5)
             materialId <- Hree.addMaterial scene material
             let mesh = Hree.mesh geometry materialId
             meshId <- Hree.addMesh scene mesh

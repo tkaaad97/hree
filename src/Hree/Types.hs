@@ -58,7 +58,7 @@ import Hree.GL.UniformBlock
 import Hree.Light
 import Hree.Math
 import Hree.Program
-import Linear (V4(..))
+import qualified Linear (V4)
 
 data Geometry = Geometry
     { geometryAttribBindings    :: !(Map ByteString AttribBinding)
@@ -218,7 +218,7 @@ data SceneState = SceneState
     } deriving (Show)
 
 data ClearOption = ClearOption
-    { clearOptionColor   :: !(Maybe (V4 GL.GLfloat))
+    { clearOptionColor   :: !(Maybe (Linear.V4 GL.GLfloat))
     , clearOptionDepth   :: !(Maybe GL.GLdouble)
     , clearOptionStencil :: !(Maybe GL.GLint)
     } deriving (Show, Eq)

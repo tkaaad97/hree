@@ -7,7 +7,6 @@ import qualified Data.Vector.Unboxed as UV
 import Example
 import qualified Graphics.UI.GLFW as GLFW
 import qualified Hree
-import qualified Hree.Material.FlatColorMaterial as Material
 import Linear (V3(..), V4(..), axisAngle, inv44)
 import Prelude hiding (init)
 
@@ -30,8 +29,8 @@ main =
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         let geometry = Hree.boxGeometry 0.5 0.1 0.1
-            material = Material.flatColorMaterial (V4 0.1 0.1 0.95 1)
-            childMaterial = Material.flatColorMaterial (V4 0.95 0.1 0.1 1)
+            material = Hree.flatColorMaterial (V4 0.1 0.1 0.95 1)
+            childMaterial = Hree.flatColorMaterial (V4 0.95 0.1 0.1 1)
         materialId <- Hree.addMaterial scene material
         childMaterialId <- Hree.addMaterial scene childMaterial
         let childMesh = Hree.mesh geometry childMaterialId

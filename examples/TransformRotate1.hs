@@ -4,7 +4,6 @@ module TransformRotate1 where
 import Example
 import qualified Graphics.UI.GLFW as GLFW
 import qualified Hree
-import qualified Hree.Material.FlatColorMaterial as Material
 import Linear (V3(..), V4(..))
 import Prelude hiding (init)
 
@@ -25,7 +24,7 @@ main =
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         let geometry = Hree.boxGeometry 0.5 0.5 0.5
-            material = Material.flatColorMaterial (V4 0.2 0.4 0.6 1)
+            material = Hree.flatColorMaterial (V4 0.2 0.4 0.6 1)
         materialId <- Hree.addMaterial scene material
         let mesh = Hree.mesh geometry materialId
         meshId <- Hree.addMesh scene mesh

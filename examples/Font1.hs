@@ -5,9 +5,6 @@ import qualified Data.Text as Text (length, pack, replace, splitAt, unpack)
 import Example
 import qualified Graphics.UI.GLFW as GLFW
 import qualified Hree
-import qualified Hree.Text as Hree (FontOption_(..), OriginLocation(..),
-                                    TextOption_(..), createTextWithOption,
-                                    loadCharactersIntoFont, newFontWithOption)
 import Linear (V2(..), V3(..))
 import Prelude hiding (init)
 import System.Environment (getArgs)

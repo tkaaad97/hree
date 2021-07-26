@@ -35,8 +35,8 @@ main = do
         renderer <- Hree.newRenderer
         scene <- Hree.newScene
         geometry <- STL.loadGeometryFromFile path
-        let material = Material.standardMaterial $
-                Material.standardMaterialBlock
+        let material = Hree.standardMaterial $
+                Hree.standardMaterialBlock
                     { Material.metallicFactor = metalness
                     , Material.roughnessFactor = roughness
                     }

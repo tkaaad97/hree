@@ -82,6 +82,7 @@ library
       Hree.Skin
       Hree.Text
       Hree.Types
+      Hree.Utility
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -O2

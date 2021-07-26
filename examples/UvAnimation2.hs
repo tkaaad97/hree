@@ -20,7 +20,7 @@ import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Graphics.UI.GLFW as GLFW
 import qualified Hree
-import qualified Hree.Material.SpriteMaterial as Material (SpriteMaterialBlock(..))
+import qualified Hree.Material.SpriteMaterial as Material
 import Linear (V2(..), V3(..))
 import Prelude hiding (init)
 
