@@ -5,7 +5,7 @@ module Hree.Utility
     ) where
 
 import Hree.Types
-import qualified Linear (Quaternion(..), V3(..), V4, identity)
+import qualified Linear (Quaternion(..), V3(..), identity)
 
 mesh :: Geometry -> MaterialId b -> Mesh b
 mesh geometry materialId = Mesh geometry materialId Nothing Nothing Nothing

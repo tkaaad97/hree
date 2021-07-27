@@ -37,8 +37,8 @@ import Chronos (Time)
 import Data.ByteString (ByteString)
 import qualified Data.Component as Component
 import Data.Hashable (Hashable(..), hashUsing)
-import Data.IntMap.Strict (IntMap)
 import Data.IORef (IORef)
+import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Vector as BV
@@ -50,14 +50,18 @@ import Foreign (ForeignPtr, Storable(..), castPtr, plusPtr)
 import GHC.TypeNats (KnownNat)
 import qualified GLW
 import qualified Graphics.GL as GL
-import Hree.Camera
+import Hree.Camera (CameraBlock)
 import Hree.GL.Block (Elem)
 import Hree.GL.Sampler (SamplerParamValue(..))
-import Hree.GL.Types
-import Hree.GL.UniformBlock
-import Hree.Light
-import Hree.Math
-import Hree.Program
+import Hree.GL.Types (AttribBinding, BindBufferSetting, BufferSource,
+                      IndexBuffer, IndexBufferSource, LimitedVector, Mat4,
+                      PartialRenderOption, ProgramInfo, RenderOption,
+                      TextureAndSampler, UniformBufferBindingIndex, Vec3)
+import Hree.GL.UniformBlock (UniformBlockBinder)
+import Hree.Light (LightBlock, LightStruct)
+import Hree.Math (Quaternion, Transform)
+import Hree.Program (PartialProgramOption, ProgramName, ProgramOption,
+                     ProgramSpec)
 import qualified Linear (V4)
 
 data Geometry = Geometry

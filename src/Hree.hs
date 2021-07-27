@@ -6,7 +6,6 @@ module Hree
     , module Hree.GL.Texture
     , module Hree.GL.Types
     , module Hree.GL.UniformBlock
-    , module Hree.GL.Vertex
     , module Hree.Geometry
     , module Hree.Geometry.Box
     , module Hree.Light
@@ -18,6 +17,7 @@ module Hree
     , module Hree.Text
     , module Hree.Types
     , module Hree.Utility
+    , module Hree.Vertex
     ) where
 
 import Hree.Animation
@@ -29,9 +29,6 @@ import Hree.GL.Sampler
 import Hree.GL.Texture (TextureParam(..))
 import Hree.GL.Types
 import Hree.GL.UniformBlock
-import Hree.GL.Vertex (BasicVertex(..), PositionAndNormal(..), SpriteOffset(..),
-                       SpriteVertex(..), Uv(..), Vertex(..), VertexField(..),
-                       VertexSpec(..))
 import Hree.Light
 import Hree.Material
 import Hree.Math
@@ -45,3 +42,6 @@ import Hree.Types (ClearOption(..), LightId, MappingSource(..), Material(..),
                    Skin, SkinId, TextureMappingType(..), TextureSettings(..),
                    TextureSourceData(..))
 import Hree.Utility
+import Hree.Vertex (BasicVertex(..), PositionAndNormal(..), SpriteOffset(..),
+                    SpriteVertex(..), Uv(..), Vertex(..), VertexField(..),
+                    VertexSpec(..))

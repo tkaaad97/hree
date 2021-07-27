@@ -58,7 +58,6 @@ library
       Hree.GL.Texture
       Hree.GL.Types
       Hree.GL.UniformBlock
-      Hree.GL.Vertex
       Hree.Light
       Hree.Loader.GLTF
       Hree.Loader.GLTF.Draco
@@ -83,6 +82,7 @@ library
       Hree.Text
       Hree.Types
       Hree.Utility
+      Hree.Vertex
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wtabs -O2

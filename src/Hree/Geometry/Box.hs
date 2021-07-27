@@ -7,7 +7,7 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as Vector
 import qualified Graphics.GL as GL
 import Hree.Geometry (Geometry, addVerticesToGeometry, emptyGeometry)
-import Hree.GL.Vertex (PositionAndNormal(..))
+import Hree.Vertex (PositionAndNormal(..))
 import Linear (V3(..))
 
 boxGeometry :: Float -> Float -> Float -> Geometry

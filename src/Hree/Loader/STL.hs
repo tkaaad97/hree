@@ -16,8 +16,8 @@ import qualified Data.Vector as Vector
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word16, Word32, Word8)
 import qualified Graphics.GL as GL
-import Hree.GL.Vertex (BasicVertex(..))
 import Hree.Geometry
+import Hree.Vertex (BasicVertex(..))
 import Linear (V2(..), V3(..), V4(..))
 
 data Triangle = Triangle

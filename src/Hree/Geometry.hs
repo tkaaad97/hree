@@ -22,9 +22,13 @@ import qualified Data.Vector.Storable as Vector
 import Data.Word (Word16, Word32, Word8)
 import qualified GLW
 import qualified Graphics.GL as GL
-import Hree.GL.Types
-import Hree.GL.Vertex
-import Hree.Types
+import Hree.GL.Types (AttribBinding(AttribBinding), AttributeFormat,
+                      BindBufferSetting, BufferSource(BufferSourceVector),
+                      IndexBufferSource(IndexBufferSource))
+import Hree.Types (Geometry(..))
+import Hree.Vertex (SpriteOffset(SpriteOffset), Vertex(..),
+                    VertexField(VertexField, vertexFieldAttribName),
+                    VertexSpec(VertexSpec))
 import Linear (V2(..), V3(..))
 
 emptyGeometry :: Geometry

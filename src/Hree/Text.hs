@@ -48,7 +48,6 @@ import qualified FreeType
 import qualified GLW.Groups.PixelFormat as PixelFormat
 import qualified Graphics.GL as GL
 import qualified Hree.Geometry as Hree (addVerticesToGeometry, spriteGeometry)
-import qualified Hree.GL.Vertex as Hree (SpriteVertex(..))
 import qualified Hree.Material.SpriteMaterial as Hree (SpriteMaterialBlock,
                                                        spriteMaterial)
 import qualified Hree.Scene as Hree (addMaterial, addMesh, addNode,
@@ -58,6 +57,7 @@ import qualified Hree.Types as Hree (MappingSource(..), Material(..),
                                      Scene, TextureMappingType(..),
                                      TextureSettings(..), TextureSourceData(..))
 import qualified Hree.Utility as Hree (mesh, node)
+import qualified Hree.Vertex as Hree (SpriteVertex(..))
 import Linear (V2(..), V3(..), V4(..))
 import System.Directory (canonicalizePath)
 
